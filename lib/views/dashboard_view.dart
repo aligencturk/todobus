@@ -96,11 +96,27 @@ class _DashboardViewState extends State<DashboardView> {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-            CupertinoSliverRefreshControl(
-              onRefresh: () async {
-                await groupViewModel.loadGroups();
-              },
-            ),
+            // Platform'a göre farklı refresh kontrolü ekleyelim
+            if (Platform.isIOS)
+              CupertinoSliverRefreshControl(
+                onRefresh: () async {
+                  await groupViewModel.loadGroups();
+                },
+              )
+            else
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Center(
+                    child: PlatformIconButton(
+                      icon: Icon(context.platformIcons.refresh),
+                      onPressed: () {
+                        groupViewModel.loadGroups();
+                      },
+                    ),
+                  ),
+                ),
+              ),
             // iOS tarzı kullanıcı selamlama bölümü
             SliverToBoxAdapter(
               child: _buildWelcomeSection(),
