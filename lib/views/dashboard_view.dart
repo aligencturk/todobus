@@ -7,6 +7,8 @@ import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
+import '../models/group_models.dart';
+import '../models/user_model.dart';
 import 'login_view.dart';
 import 'profile_view.dart';
 import 'group_detail_view.dart';
@@ -85,12 +87,22 @@ class _DashboardViewState extends State<DashboardView> {
           ],
         ),
         cupertino: (_, __) => CupertinoNavigationBarData(
-          trailing: CupertinoButton(
-            padding: EdgeInsets.zero,
-            child: Icon(context.platformIcons.search),
-            onPressed: () {
-              // Arama işlevi buraya eklenecek
-            },
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: Icon(context.platformIcons.search),
+                onPressed: () {
+                  // Arama işlevi buraya eklenecek
+                },
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: Icon(context.platformIcons.person),
+                onPressed: _goToProfile,
+              ),
+            ],
           ),
         ),
       ),
@@ -123,6 +135,11 @@ class _DashboardViewState extends State<DashboardView> {
             // iOS tarzı kullanıcı selamlama bölümü
             SliverToBoxAdapter(
               child: _buildWelcomeSection(),
+            ),
+            
+            // Kullanıcı Hızlı Bilgi Kartı
+            SliverToBoxAdapter(
+              child: _buildUserQuickInfoCard(),
             ),
             
             // Widget kartları
@@ -166,6 +183,11 @@ class _DashboardViewState extends State<DashboardView> {
                   ),
                 ]),
               ),
+            ),
+            
+            // Son Aktif Gruplar
+            SliverToBoxAdapter(
+              child: _buildRecentGroupsList(),
             ),
             
             // Yaklaşan Etkinlikler Bölümü
@@ -492,6 +514,326 @@ class _DashboardViewState extends State<DashboardView> {
                     ),
                   ],
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Kullanıcı Hızlı Bilgi Kartı
+  Widget _buildUserQuickInfoCard() {
+    final dashboardViewModel = Provider.of<DashboardViewModel>(context);
+    final isIOS = isCupertino(context);
+    final user = dashboardViewModel.user;
+    
+    if (user == null) {
+      return const SizedBox.shrink();
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isIOS 
+            ? CupertinoColors.systemBackground 
+            : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: isIOS
+            ? [BoxShadow(
+                color: CupertinoColors.systemGrey5.withOpacity(0.5),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              )]
+            : [BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              )],
+        ),
+        child: InkWell(
+          onTap: _goToProfile,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: isIOS 
+                      ? CupertinoColors.activeBlue.withOpacity(0.1) 
+                      : Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isIOS ? CupertinoIcons.person_fill : Icons.person,
+                    color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.userFullname,
+                        style: platformThemeData(
+                          context,
+                          material: (data) => data.textTheme.titleMedium,
+                          cupertino: (data) => data.textTheme.navTitleTextStyle,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user.userEmail,
+                        style: platformThemeData(
+                          context,
+                          material: (data) => data.textTheme.bodySmall,
+                          cupertino: (data) => data.textTheme.textStyle.copyWith(
+                            color: CupertinoColors.secondaryLabel,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isIOS 
+                      ? CupertinoColors.systemIndigo.withOpacity(0.1) 
+                      : Colors.indigo.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    user.userRank,
+                    style: platformThemeData(
+                      context,
+                      material: (data) => data.textTheme.bodySmall?.copyWith(
+                        color: Colors.indigo,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
+                        color: CupertinoColors.systemIndigo,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Son Aktif Gruplar Listesi
+  Widget _buildRecentGroupsList() {
+    final groupViewModel = Provider.of<GroupViewModel>(context);
+    final isIOS = isCupertino(context);
+    
+    if (groupViewModel.groups.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // En fazla 3 grubu al
+    final recentGroups = groupViewModel.groups.length > 3 
+        ? groupViewModel.groups.sublist(0, 3) 
+        : groupViewModel.groups;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Son Aktif Gruplar',
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.titleLarge?.copyWith(fontSize: 18),
+                  cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
+                    fontSize: 18, 
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  // Tüm gruplar sayfasına git
+                },
+                child: Text(
+                  'Tümü',
+                  style: platformThemeData(
+                    context,
+                    material: (data) => data.textTheme.bodyMedium?.copyWith(
+                      color: Colors.blue,
+                    ),
+                    cupertino: (data) => data.textTheme.textStyle.copyWith(
+                      color: CupertinoColors.activeBlue,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 110,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            scrollDirection: Axis.horizontal,
+            itemCount: recentGroups.length,
+            itemBuilder: (context, index) {
+              final group = recentGroups[index];
+              return _buildGroupCard(group);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildGroupCard(Group group) {
+    final isIOS = isCupertino(context);
+    
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          platformPageRoute(
+            context: context,
+            builder: (context) => GroupDetailView(groupId: group.groupID),
+          ),
+        );
+      },
+      child: Container(
+        width: 220,
+        margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: isIOS 
+            ? CupertinoColors.systemBackground 
+            : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isIOS
+            ? [BoxShadow(
+                color: CupertinoColors.systemGrey5.withOpacity(0.5),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              )]
+            : [BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              )],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: group.isAdmin
+                        ? (isIOS 
+                            ? CupertinoColors.activeBlue.withOpacity(0.1) 
+                            : Colors.blue.withOpacity(0.1))
+                        : (isIOS 
+                            ? CupertinoColors.systemGreen.withOpacity(0.1) 
+                            : Colors.green.withOpacity(0.1)),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      group.isAdmin
+                        ? (isIOS ? CupertinoIcons.shield_lefthalf_fill : Icons.admin_panel_settings)
+                        : (isIOS ? CupertinoIcons.group_solid : Icons.group),
+                      color: group.isAdmin
+                        ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
+                        : (isIOS ? CupertinoColors.systemGreen : Colors.green),
+                      size: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      group.groupName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: platformThemeData(
+                        context,
+                        material: (data) => data.textTheme.titleSmall,
+                        cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Text(
+                  group.groupDesc,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: platformThemeData(
+                    context,
+                    material: (data) => data.textTheme.bodySmall,
+                    cupertino: (data) => data.textTheme.textStyle.copyWith(
+                      color: CupertinoColors.secondaryLabel,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${group.projects.length} Proje',
+                    style: platformThemeData(
+                      context,
+                      material: (data) => data.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey,
+                        fontSize: 10,
+                      ),
+                      cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
+                        color: CupertinoColors.secondaryLabel,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                  if (!group.isFree)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isIOS 
+                          ? CupertinoColors.systemOrange.withOpacity(0.2) 
+                          : Colors.orange.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        group.packageName,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),

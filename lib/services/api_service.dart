@@ -325,4 +325,80 @@ class ApiService {
       throw Exception('Grup güncellenirken hata: $e');
     }
   }
+  
+  // Gruptan kullanıcı çıkar
+  Future<bool> removeUserFromGroup(int groupID, int userID) async {
+    try {
+      _logger.i('Gruptan kullanıcı çıkarılıyor: GroupID: $groupID, UserID: $userID');
+      
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Kullanıcı token bilgisi bulunamadı');
+      }
+      
+      final response = await put(
+        'service/user/group/userRemove',
+        body: {
+          'userToken': token,
+          'groupID': groupID,
+          'userID': userID,
+          'step': 'group',
+        },
+        requiresToken: true,
+      );
+      
+      // 410 Gone durumu başarılı kabul edilir
+      if ((response['error'] == false && response['success'] == true) || response['410'] == 'Gone') {
+        _logger.i('Kullanıcı gruptan başarıyla çıkarıldı');
+        return true;
+      } else {
+        final errorMsg = response['message'] ?? 'Bilinmeyen hata';
+        _logger.e('Kullanıcı gruptan çıkarılamadı: $errorMsg');
+        throw Exception('Kullanıcı gruptan çıkarılamadı: $errorMsg');
+      }
+    } catch (e) {
+      _logger.e('Kullanıcı gruptan çıkarılırken hata: $e');
+      throw Exception('Kullanıcı gruptan çıkarılırken hata: $e');
+    }
+  }
+  
+  // Kullanıcı davet et (email veya QR)
+  Future<Map<String, dynamic>> inviteUserToGroup(int groupID, String userEmail, int userRole, String inviteType) async {
+    try {
+      _logger.i('Kullanıcı gruba davet ediliyor: GroupID: $groupID, Email: $userEmail, Role: $userRole, Type: $inviteType');
+      
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Kullanıcı token bilgisi bulunamadı');
+      }
+      
+      final response = await post(
+        'service/user/group/InviteUser',
+        body: {
+          'userToken': token,
+          'userEmail': userEmail,
+          'userRole': userRole,
+          'groupID': groupID,
+          'invateStep': inviteType, // "email" veya "qr"
+        },
+        requiresToken: true,
+      );
+      
+      if (response['error'] == false && response['success'] == true) {
+        _logger.i('Davet işlemi başarılı');
+        // Davet URL'ini dön
+        return {
+          'success': true,
+          'inviteUrl': response['data']?['invateURL'] ?? '',
+        };
+      } else {
+        final errorMsg = response['message'] ?? 'Bilinmeyen hata';
+        _logger.e('Davet işlemi başarısız: $errorMsg');
+        throw Exception('Davet işlemi başarısız: $errorMsg');
+      }
+    } catch (e) {
+      _logger.e('Davet gönderilirken hata: $e');
+      throw Exception('Davet gönderilirken hata: $e');
+    }
+  }
 } 

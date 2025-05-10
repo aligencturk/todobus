@@ -112,6 +112,63 @@ class GroupViewModel with ChangeNotifier {
     notifyListeners();
   }
   
+  // Gruptan kullanıcı çıkar
+  Future<bool> removeUserFromGroup(int groupID, int userID) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _errorMessage = '';
+      notifyListeners();
+      
+      final success = await _apiService.removeUserFromGroup(groupID, userID);
+      
+      if (success) {
+        // Başarı durumunda grupları yeniden yükle
+        await loadGroups();
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString();
+      _logger.e('Kullanıcı gruptan çıkarılırken hata: $e');
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Kullanıcı davet et
+  Future<Map<String, dynamic>> inviteUserToGroup(
+    int groupID, 
+    String userEmail, 
+    int userRole, 
+    String inviteType
+  ) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _errorMessage = '';
+      notifyListeners();
+      
+      final result = await _apiService.inviteUserToGroup(
+        groupID, 
+        userEmail, 
+        userRole, 
+        inviteType
+      );
+      
+      _status = GroupLoadStatus.loaded;
+      notifyListeners();
+      
+      return result;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString();
+      _logger.e('Kullanıcı davet edilirken hata: $e');
+      notifyListeners();
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+  
   // Durumu sıfırla
   void reset() {
     _status = GroupLoadStatus.initial;
