@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
+import 'dart:io' show Platform;
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import '../viewmodels/group_viewmodel.dart';
