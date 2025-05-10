@@ -11,6 +11,7 @@ import 'services/storage_service.dart';
 import 'services/device_info_service.dart';
 import 'views/login_view.dart';
 import 'main_app.dart';
+import 'services/snackbar_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,7 +70,7 @@ class _MyAppState extends State<MyApp> {
         settings: PlatformSettingsData(
           iosUsesMaterialWidgets: true,
         ),
-        builder: (context) => PlatformApp(
+        builder: (context) => MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'TodoBus',
           localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
@@ -81,21 +82,11 @@ class _MyAppState extends State<MyApp> {
             Locale('tr', 'TR'),
             Locale('en', 'US'),
           ],
-          material: (_, __) {
-            return MaterialAppData(
-              theme: ThemeData(
-                colorSchemeSeed: Colors.blue,
-                useMaterial3: true,
-              ),
-            );
-          },
-          cupertino: (_, __) {
-            return CupertinoAppData(
-              theme: const CupertinoThemeData(
-                primaryColor: CupertinoColors.activeBlue,
-              ),
-            );
-          },
+          theme: ThemeData(
+            colorSchemeSeed: Colors.blue,
+            useMaterial3: true,
+          ),
+          scaffoldMessengerKey: SnackBarService.scaffoldMessengerKey,
           home: _isLoading
               ? PlatformScaffold(
                   body: Center(

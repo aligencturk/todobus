@@ -7,6 +7,36 @@ import '../viewmodels/group_viewmodel.dart';
 import 'create_group_view.dart';
 import 'group_detail_view.dart';
 
+// SnackBar için yardımcı fonksiyon
+void showCustomSnackBar(BuildContext context, String message, {bool isError = false}) {
+  if (isCupertino(context)) {
+    showCupertinoDialog(
+      context: context,
+      builder: (BuildContext context) => CupertinoAlertDialog(
+        title: Text(isError ? 'Hata' : 'Bilgi'),
+        content: Text(message),
+        actions: <CupertinoDialogAction>[
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
+  } else {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : null,
+      ),
+    );
+  }
+}
+
 class GroupsView extends StatefulWidget {
   const GroupsView({Key? key}) : super(key: key);
 
@@ -307,13 +337,13 @@ class _GroupsViewState extends State<GroupsView> {
               Icon(CupertinoIcons.calendar, size: 14, color: CupertinoColors.secondaryLabel),
               const SizedBox(width: 4),
               Text(
-                group.createDate,
+                group.projects.length.toString(),
                 style: CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(
                   color: CupertinoColors.secondaryLabel,
                   fontSize: 12,
                 ),
               ),
-            ],
+               ],
           ),
         ],
       ),
@@ -336,22 +366,36 @@ class _GroupsViewState extends State<GroupsView> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (!group.isFree)
-                Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                color: CupertinoColors.systemOrange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemOrange.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  group.packageName.toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: CupertinoColors.systemOrange,
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: Text(
-                group.packageName.toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: CupertinoColors.systemOrange,
-                  fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
           const SizedBox(width: 8),
+          if (group.isAdmin)
+            PlatformIconButton(
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                isIOS ? CupertinoIcons.ellipsis_circle : Icons.more_vert,
+                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+                size: 20,
+              ),
+              onPressed: () => _showGroupActions(context, group, viewModel),
+            ),
+          const SizedBox(width: 4),
           const CupertinoListTileChevron(),
         ],
       ),
@@ -365,6 +409,199 @@ class _GroupsViewState extends State<GroupsView> {
         );
       },
     );
+  }
+
+  // Grup işlemleri menüsünü göster
+  void _showGroupActions(BuildContext context, Group group, GroupViewModel viewModel) {
+    final isIOS = isCupertino(context);
+    
+    if (isIOS) {
+      showCupertinoModalPopup<void>(
+        context: context,
+        builder: (BuildContext context) => CupertinoActionSheet(
+          title: Text(
+            '${group.groupName} İşlemleri',
+            style: CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(fontSize: 18),
+          ),
+          message: const Text(
+            'Bu grup için yapabileceğiniz işlemler',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  platformPageRoute(
+                    context: context,
+                    builder: (context) => GroupDetailView(groupId: group.groupID),
+                  ),
+                );
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(CupertinoIcons.eye, size: 20),
+                  SizedBox(width: 8),
+                  Text('Grup Detayları'),
+                ],
+              ),
+            ),
+            if (group.projects.isNotEmpty)
+              CupertinoActionSheetAction(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showProjectsDialog(context, group);
+                },
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(CupertinoIcons.collections, size: 20),
+                    SizedBox(width: 8),
+                    Text('Projeleri Göster'),
+                  ],
+                ),
+              ),
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.pop(context);
+                _confirmDeleteGroup(context, group, viewModel);
+              },
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(CupertinoIcons.delete, size: 20),
+                  SizedBox(width: 8),
+                  Text('Grubu Sil'),
+                ],
+              ),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            child: const Text('İptal'),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        builder: (BuildContext context) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.visibility),
+              title: const Text('Grup Detayları'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.of(context).push(
+                  platformPageRoute(
+                    context: context,
+                    builder: (context) => GroupDetailView(groupId: group.groupID),
+                  ),
+                );
+              },
+            ),
+            if (group.projects.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.collections_bookmark),
+                title: const Text('Projeleri Göster'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showProjectsDialog(context, group);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Grubu Sil', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmDeleteGroup(context, group, viewModel);
+              },
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  // Grubu silme onayı
+  void _confirmDeleteGroup(BuildContext context, Group group, GroupViewModel viewModel) {
+    final isIOS = isCupertino(context);
+    
+    if (isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('Grubu Sil'),
+          content: Text('${group.groupName} grubunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve gruptaki tüm projeler, görevler ve veriler silinecektir.'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _deleteGroup(group.groupID, viewModel);
+              },
+              child: const Text('Sil'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Grubu Sil'),
+          content: Text('${group.groupName} grubunu silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve gruptaki tüm projeler, görevler ve veriler silinecektir.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _deleteGroup(group.groupID, viewModel);
+              },
+              child: const Text('Sil'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  // Grubu silme işlemi
+  Future<void> _deleteGroup(int groupID, GroupViewModel viewModel) async {
+    try {
+      setState(() {
+        // Silme işlemi sırasında yükleniyor göster
+      });
+      
+      final success = await viewModel.deleteGroup(groupID);
+      
+      if (mounted) {
+        if (success) {
+          showCustomSnackBar(context, 'Grup başarıyla silindi');
+        } else {
+          showCustomSnackBar(context, 'Grup silinirken bir hata oluştu', isError: true);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showCustomSnackBar(context, 'Hata: $e', isError: true);
+      }
+    }
   }
 
   void _showProjectsDialog(BuildContext context, Group group) {

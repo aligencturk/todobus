@@ -24,6 +24,12 @@ class _MainAppState extends State<MainApp> {
   Widget build(BuildContext context) {
     return PlatformScaffold(
       body: _pages[_currentIndex],
+      material: (_, __) => MaterialScaffoldData(
+        // Material platform için ayarlar
+      ),
+      cupertino: (_, __) => CupertinoPageScaffoldData(
+        // iOS platform için ayarlar
+      ),
       bottomNavBar: PlatformNavBar(
         currentIndex: _currentIndex,
         itemChanged: (int index) {

@@ -24,6 +24,9 @@ class _DashboardViewState extends State<DashboardView> {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
   
+  List<GroupLog> _recentLogs = [];
+  bool _isLoadingLogs = false;
+  
   @override
   void initState() {
     super.initState();
@@ -36,7 +39,15 @@ class _DashboardViewState extends State<DashboardView> {
         
         // API'den kullanıcı ve dashboard verilerini yükle
         dashboardViewModel.loadDashboardData();
-        groupViewModel.loadGroups();
+        
+        // Önce grupları yükle, sonra logları getir
+        groupViewModel.loadGroups().then((_) {
+          if (mounted) {
+            // Gruplar yüklendiyse son aktivite loglarını yükle
+            _loadRecentLogs(groupViewModel);
+            _logger.i('Gruplar yüklendi ve loglar istendi');
+          }
+        });
         
         _logger.i('Dashboard açıldı: Veriler yükleniyor...');
       }
@@ -115,6 +126,9 @@ class _DashboardViewState extends State<DashboardView> {
                 onRefresh: () async {
                   await dashboardViewModel.loadDashboardData();
                   await groupViewModel.loadGroups();
+                  
+                  // Refresh sırasında logları da yenile
+                  await _loadRecentLogs(groupViewModel);
                 },
               )
             else
@@ -127,6 +141,7 @@ class _DashboardViewState extends State<DashboardView> {
                       onPressed: () {
                         dashboardViewModel.loadDashboardData();
                         groupViewModel.loadGroups();
+                        _loadRecentLogs(groupViewModel);
                       },
                     ),
                   ),
@@ -176,7 +191,7 @@ class _DashboardViewState extends State<DashboardView> {
                   ),
                   _buildInfoCard(
                     context,
-                    title: 'Yaklaşan',
+                    title: 'Etkinlikler',
                     value: '${dashboardViewModel.upcomingEvents.length}',
                     icon: isIOS ? CupertinoIcons.time : Icons.access_time,
                     color: isIOS ? CupertinoColors.systemPurple : Colors.purple,
@@ -247,8 +262,15 @@ class _DashboardViewState extends State<DashboardView> {
                   ),
             ),
             
+            // Son Aktiviteler/Raporlar Bölümü
+            SliverToBoxAdapter(
+              child: _buildRecentActivities(),
+            ),
             
-           
+            // Alt boşluk
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 20),
+            ),
           ]
         )
       )
@@ -643,9 +665,9 @@ class _DashboardViewState extends State<DashboardView> {
       return const SizedBox.shrink();
     }
     
-    // En fazla 3 grubu al
-    final recentGroups = groupViewModel.groups.length > 3 
-        ? groupViewModel.groups.sublist(0, 3) 
+    // En fazla 5 grubu al
+    final recentGroups = groupViewModel.groups.length > 5 
+        ? groupViewModel.groups.sublist(0, 5) 
         : groupViewModel.groups;
     
     return Column(
@@ -688,7 +710,7 @@ class _DashboardViewState extends State<DashboardView> {
           ),
         ),
         SizedBox(
-          height: 110,
+          height: 180,
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             scrollDirection: Axis.horizontal,
@@ -706,6 +728,21 @@ class _DashboardViewState extends State<DashboardView> {
   Widget _buildGroupCard(Group group) {
     final isIOS = isCupertino(context);
     
+    // Grup tipine göre renk ve simge belirle
+    Color cardColor;
+    IconData groupIcon;
+    
+    if (group.isAdmin) {
+      groupIcon = isIOS ? CupertinoIcons.shield_lefthalf_fill : Icons.admin_panel_settings;
+      cardColor = isIOS ? CupertinoColors.activeBlue : Colors.blue;
+    } else if (!group.isFree) {
+      groupIcon = isIOS ? CupertinoIcons.star_fill : Icons.star;
+      cardColor = isIOS ? CupertinoColors.systemOrange : Colors.orange;
+    } else {
+      groupIcon = isIOS ? CupertinoIcons.group_solid : Icons.group;
+      cardColor = isIOS ? CupertinoColors.systemGreen : Colors.green;
+    }
+    
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
@@ -716,13 +753,13 @@ class _DashboardViewState extends State<DashboardView> {
         );
       },
       child: Container(
-        width: 220,
+        width: 150,
         margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: isIOS 
             ? CupertinoColors.systemBackground 
             : Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: isIOS
             ? [BoxShadow(
                 color: CupertinoColors.systemGrey5.withOpacity(0.5),
@@ -735,6 +772,267 @@ class _DashboardViewState extends State<DashboardView> {
                 offset: const Offset(0, 2),
               )],
         ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Üst kısım
+            Container(
+              height: 60,
+              decoration: BoxDecoration(
+                color: cardColor.withOpacity(0.1),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  groupIcon,
+                  color: cardColor,
+                  size: 32,
+                ),
+              ),
+            ),
+            
+            // İçerik kısmı
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group.groupName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: platformThemeData(
+                            context,
+                            material: (data) => data.textTheme.titleSmall,
+                            cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          group.groupDesc,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: platformThemeData(
+                            context,
+                            material: (data) => data.textTheme.bodySmall,
+                            cupertino: (data) => data.textTheme.textStyle.copyWith(
+                              color: CupertinoColors.secondaryLabel,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    // Alt kısım: bilgi çipleri
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Proje sayısı
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isIOS 
+                              ? CupertinoColors.systemGrey4 
+                              : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${group.projects.length} Proje',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isIOS ? CupertinoColors.label : Colors.black87,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        
+                        // Paket bilgisi
+                        if (!group.isFree)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: cardColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              group.packageName,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: cardColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Son aktiviteleri yükle - gruplardaki son logları getir
+  Future<void> _loadRecentLogs(GroupViewModel groupViewModel) async {
+    if (_isLoadingLogs) return;
+    
+    setState(() {
+      _isLoadingLogs = true;
+      _recentLogs = []; // Önceki logları temizle
+    });
+    
+    try {
+      _logger.i('Son aktiviteler yükleniyor...');
+      
+      // Gruplar boş mu kontrol et
+      if (groupViewModel.groups.isEmpty) {
+        // Önce grupları yüklemeyi dene
+        await groupViewModel.loadGroups();
+        
+        // Hala boşsa işlemi bitir
+        if (groupViewModel.groups.isEmpty) {
+          setState(() {
+            _isLoadingLogs = false;
+          });
+          return;
+        }
+      }
+      
+      // Tercih sırası: Admin olan gruplar, Premium gruplar, Standart gruplar
+      int? targetGroupId;
+      
+      // 1. Önce Admin olduğumuz grupları kontrol et
+      final adminGroups = groupViewModel.groups.where((group) => group.isAdmin).toList();
+      if (adminGroups.isNotEmpty) {
+        targetGroupId = adminGroups.first.groupID;
+        _logger.i('Admin olduğunuz grup bulundu: ${adminGroups.first.groupName} (ID: $targetGroupId)');
+      } 
+      // 2. Admin grup yoksa premium grupları kontrol et
+      else {
+        final premiumGroups = groupViewModel.groups.where((group) => !group.isFree).toList();
+        if (premiumGroups.isNotEmpty) {
+          targetGroupId = premiumGroups.first.groupID;
+          _logger.i('Premium grup bulundu: ${premiumGroups.first.groupName} (ID: $targetGroupId)');
+        }
+        // 3. Premium grup da yoksa herhangi bir grubu kullan
+        else if (groupViewModel.groups.isNotEmpty) {
+          targetGroupId = groupViewModel.groups.first.groupID;
+          _logger.i('Standart grup bulundu: ${groupViewModel.groups.first.groupName} (ID: $targetGroupId)');
+        }
+      }
+      
+      // Hedef grup bulunduysa rapor verilerini getir
+      if (targetGroupId != null) {
+        final isAdmin = adminGroups.any((group) => group.groupID == targetGroupId);
+        
+        _logger.i('Grup ID: $targetGroupId için rapor verileri getiriliyor (Admin: $isAdmin)');
+        
+        // API'den logları getir
+        try {
+          final logs = await groupViewModel.getGroupReports(targetGroupId, isAdmin);
+          
+          if (mounted) {
+            setState(() {
+              _recentLogs = logs;
+              _isLoadingLogs = false;
+            });
+            
+            _logger.i('${logs.length} adet log başarıyla yüklendi');
+          }
+        } catch (innerError) {
+          if (mounted) {
+            _logger.e('Loglar yüklenirken iç hata: $innerError');
+            setState(() {
+              _isLoadingLogs = false;
+            });
+          }
+        }
+      } else {
+        // Hedef grup bulunamadı, hata durumu
+        if (mounted) {
+          _logger.e('Hiçbir grup bulunamadı');
+          setState(() {
+            _isLoadingLogs = false;
+          });
+        }
+      }
+    } catch (e) {
+      _logger.e('Son aktiviteler yüklenirken hata: $e');
+      if (mounted) {
+        setState(() {
+          _recentLogs = [];
+          _isLoadingLogs = false;
+        });
+      }
+    }
+  }
+  
+  // Log öğesi
+  Widget _buildLogItem(BuildContext context, GroupLog log) {
+    final isIOS = isCupertino(context);
+    
+    // Log tipine göre ikon ve renk belirle
+    IconData logIcon;
+    Color logColor;
+    
+    if (log.logName.contains('Tamamlandı')) {
+      logIcon = isIOS ? CupertinoIcons.checkmark_circle : Icons.check_circle;
+      logColor = isIOS ? CupertinoColors.activeGreen : Colors.green;
+    } else if (log.logName.contains('Tamamlanmadı')) {
+      logIcon = isIOS ? CupertinoIcons.xmark_circle : Icons.cancel;
+      logColor = isIOS ? CupertinoColors.systemRed : Colors.red;
+    } else if (log.logName.contains('Açıldı')) {
+      logIcon = isIOS ? CupertinoIcons.add_circled : Icons.add_circle;
+      logColor = isIOS ? CupertinoColors.activeBlue : Colors.blue;
+    } else {
+      logIcon = isIOS ? CupertinoIcons.doc_text : Icons.article;
+      logColor = isIOS ? CupertinoColors.systemGrey : Colors.grey;
+    }
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: isIOS 
+          ? CupertinoColors.systemBackground 
+          : Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: isIOS
+          ? [BoxShadow(
+              color: CupertinoColors.systemGrey5.withOpacity(0.5),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            )]
+          : [BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            )],
+      ),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            platformPageRoute(
+              context: context,
+              builder: (context) => GroupDetailView(groupId: log.groupID),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Column(
@@ -745,37 +1043,51 @@ class _DashboardViewState extends State<DashboardView> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: group.isAdmin
-                        ? (isIOS 
-                            ? CupertinoColors.activeBlue.withOpacity(0.1) 
-                            : Colors.blue.withOpacity(0.1))
-                        : (isIOS 
-                            ? CupertinoColors.systemGreen.withOpacity(0.1) 
-                            : Colors.green.withOpacity(0.1)),
+                      color: logColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
-                      group.isAdmin
-                        ? (isIOS ? CupertinoIcons.shield_lefthalf_fill : Icons.admin_panel_settings)
-                        : (isIOS ? CupertinoIcons.group_solid : Icons.group),
-                      color: group.isAdmin
-                        ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
-                        : (isIOS ? CupertinoColors.systemGreen : Colors.green),
+                      logIcon,
+                      color: logColor,
                       size: 16,
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      group.groupName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      log.logName,
                       style: platformThemeData(
                         context,
-                        material: (data) => data.textTheme.titleSmall,
+                        material: (data) => data.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: logColor,
+                        ),
                         cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.bold,
+                          color: logColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isIOS 
+                        ? CupertinoColors.systemGrey4
+                        : Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      log.createDate,
+                      style: platformThemeData(
+                        context,
+                        material: (data) => data.textTheme.bodySmall?.copyWith(
+                          fontSize: 10,
+                        ),
+                        cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
+                          color: CupertinoColors.secondaryLabel,
+                          fontSize: 10,
                         ),
                       ),
                     ),
@@ -783,62 +1095,175 @@ class _DashboardViewState extends State<DashboardView> {
                 ],
               ),
               const SizedBox(height: 8),
-              Expanded(
-                child: Text(
-                  group.groupDesc,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: platformThemeData(
-                    context,
-                    material: (data) => data.textTheme.bodySmall,
-                    cupertino: (data) => data.textTheme.textStyle.copyWith(
-                      color: CupertinoColors.secondaryLabel,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${group.projects.length} Proje',
-                    style: platformThemeData(
-                      context,
-                      material: (data) => data.textTheme.bodySmall?.copyWith(
-                        color: Colors.grey,
-                        fontSize: 10,
-                      ),
-                      cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
-                        color: CupertinoColors.secondaryLabel,
-                        fontSize: 10,
-                      ),
-                    ),
-                  ),
-                  if (!group.isFree)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isIOS 
-                          ? CupertinoColors.systemOrange.withOpacity(0.2) 
-                          : Colors.orange.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        group.packageName,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
-                          fontWeight: FontWeight.w600,
+              Padding(
+                padding: const EdgeInsets.only(left: 42),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      log.logDesc,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: platformThemeData(
+                        context,
+                        material: (data) => data.textTheme.bodySmall,
+                        cupertino: (data) => data.textTheme.textStyle.copyWith(
+                          color: CupertinoColors.label,
+                          fontSize: 13,
                         ),
                       ),
                     ),
-                ],
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _buildLogInfoChip(
+                          context,
+                          icon: isIOS ? CupertinoIcons.folder : Icons.folder,
+                          text: 'Proje: ${log.projectID}',
+                        ),
+                        const SizedBox(width: 8),
+                        _buildLogInfoChip(
+                          context,
+                          icon: isIOS ? CupertinoIcons.doc_text : Icons.assignment,
+                          text: 'Görev: ${log.workID}',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLogInfoChip(BuildContext context, {required IconData icon, required String text}) {
+    final isIOS = isCupertino(context);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isIOS 
+          ? CupertinoColors.systemGrey6
+          : Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 10,
+            color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 10,
+              color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Son Aktiviteler bölümü
+  Widget _buildRecentActivities() {
+    final isIOS = isCupertino(context);
+    final groupViewModel = Provider.of<GroupViewModel>(context);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Son Aktiviteler',
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.titleLarge?.copyWith(fontSize: 18),
+                  cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
+                    fontSize: 18, 
+                    fontWeight: FontWeight.bold
+                  ),
+                ),
+              ),
+              PlatformIconButton(
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  isIOS ? CupertinoIcons.refresh : Icons.refresh,
+                  size: 20,
+                ),
+                onPressed: () {
+                  _loadRecentLogs(groupViewModel);
+                },
+              ),
+            ],
+          ),
+        ),
+        
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: _isLoadingLogs 
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20.0),
+                  child: PlatformCircularProgressIndicator(),
+                ),
+              )
+            : _recentLogs.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          isIOS ? CupertinoIcons.doc_text_search : Icons.assignment_late,
+                          size: 36,
+                          color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Henüz aktivite kaydı bulunmuyor',
+                          style: platformThemeData(
+                            context,
+                            material: (data) => data.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                            cupertino: (data) => data.textTheme.textStyle.copyWith(color: CupertinoColors.systemGrey),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        PlatformElevatedButton(
+                          onPressed: () => _loadRecentLogs(groupViewModel),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(isIOS ? CupertinoIcons.refresh : Icons.refresh, size: 16),
+                              const SizedBox(width: 8),
+                              const Text('Yenile'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _recentLogs.length > 5 ? 5 : _recentLogs.length,
+                  itemBuilder: (context, index) {
+                    return _buildLogItem(context, _recentLogs[index]);
+                  },
+                ),
+        ),
+      ],
     );
   }
 } 
