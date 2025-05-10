@@ -195,30 +195,134 @@ class ApiService {
   }
 
   // Grup Listesini Getir
-  Future<GroupListResponse> getGroups() async {
-    final token = _storageService.getToken();
-    if (token == null) {
-      throw Exception('Token bulunamadı. Lütfen tekrar giriş yapın.');
+  Future<List<Group>> getGroups() async {
+    try {
+      _logger.i('Grup listesi getiriliyor...');
+      
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Kullanıcı token bilgisi bulunamadı');
+      }
+      
+      final response = await post(
+        'service/user/group/list',
+        body: {'userToken': token},
+        requiresToken: true,
+      );
+      
+      final groupListResponse = GroupListResponse.fromJson(response);
+      
+      if (groupListResponse.success && groupListResponse.data != null) {
+        final groups = groupListResponse.data!.groups;
+        _logger.i('${groups.length} grup alındı.');
+        return groups;
+      } else {
+        throw Exception('Grup verileri alınamadı: ${groupListResponse.errorMessage}');
+      }
+    } catch (e) {
+      _logger.e('Gruplar yüklenirken hata: $e');
+      throw Exception('Grup verileri yüklenemedi: $e');
     }
+  }
 
-    final body = {
-      'userToken': token,
-    };
-
-    final response = await post(
-      'service/user/group/list',
-      body: body,
-      requiresToken: true,
-    );
-
-    final groupListResponse = GroupListResponse.fromJson(response);
-    
-    if (groupListResponse.success) {
-      _logger.i('${groupListResponse.data?.groups.length ?? 0} grup alındı.');
-    } else {
-      _logger.w('Grup listesi alınamadı: ${groupListResponse.errorMessage}');
+  Future<GroupDetail> getGroupDetail(int groupID) async {
+    try {
+      _logger.i('Grup detayı getiriliyor... (GroupID: $groupID)');
+      
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Kullanıcı token bilgisi bulunamadı');
+      }
+      
+      final response = await post(
+        'service/user/group/id',
+        body: {
+          'userToken': token,
+          'groupID': groupID,
+        },
+        requiresToken: true,
+      );
+      
+      if (response['error'] == false && response['success'] == true) {
+        final Map<String, dynamic> groupData = response['data'] ?? {};
+        final groupDetail = GroupDetail.fromJson(groupData);
+        _logger.i('Grup detayları alındı. (${groupDetail.groupName})');
+        return groupDetail;
+      } else {
+        throw Exception('Grup detayları alınamadı: ${response['message']}');
+      }
+    } catch (e) {
+      _logger.e('Grup detayı yüklenirken hata: $e');
+      throw Exception('Grup detayları yüklenemedi: $e');
     }
-    
-    return groupListResponse;
+  }
+
+  // Grup oluştur
+  Future<bool> createGroup(String groupName, String groupDesc) async {
+    try {
+      _logger.i('Grup oluşturuluyor: $groupName');
+      
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Kullanıcı token bilgisi bulunamadı');
+      }
+      
+      final response = await post(
+        'service/user/group/create',
+        body: {
+          'userToken': token,
+          'groupName': groupName,
+          'groupDesc': groupDesc,
+        },
+        requiresToken: true,
+      );
+      
+      if (response['error'] == false && response['success'] == true) {
+        _logger.i('Grup başarıyla oluşturuldu');
+        return true;
+      } else {
+        final errorMsg = response['message'] ?? 'Bilinmeyen hata';
+        _logger.e('Grup oluşturulamadı: $errorMsg');
+        throw Exception('Grup oluşturulamadı: $errorMsg');
+      }
+    } catch (e) {
+      _logger.e('Grup oluşturulurken hata: $e');
+      throw Exception('Grup oluşturulurken hata: $e');
+    }
+  }
+  
+  // Grup güncelle
+  Future<bool> updateGroup(int groupID, String groupName, String groupDesc) async {
+    try {
+      _logger.i('Grup güncelleniyor: ID: $groupID, Ad: $groupName');
+      
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Kullanıcı token bilgisi bulunamadı');
+      }
+      
+      final response = await put(
+        'service/user/group/update',
+        body: {
+          'userToken': token,
+          'groupID': groupID,
+          'groupName': groupName,
+          'groupDesc': groupDesc,
+        },
+        requiresToken: true,
+      );
+      
+      if (response['error'] == false && response['success'] == true) {
+        _logger.i('Grup başarıyla güncellendi');
+        return true;
+      } else {
+        final errorMsg = response['message'] ?? 'Bilinmeyen hata';
+        _logger.e('Grup güncellenemedi: $errorMsg');
+        throw Exception('Grup güncellenemedi: $errorMsg');
+      }
+    } catch (e) {
+      _logger.e('Grup güncellenirken hata: $e');
+      throw Exception('Grup güncellenirken hata: $e');
+    }
   }
 } 

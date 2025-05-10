@@ -30,23 +30,67 @@ class GroupViewModel with ChangeNotifier {
       notifyListeners();
       
       _logger.i('Grup listesi yükleniyor');
-      final response = await _apiService.getGroups();
+      final groups = await _apiService.getGroups();
       
-      if (response.success && response.data != null) {
-        _groups = response.data!.groups;
-        _status = GroupLoadStatus.loaded;
-        _logger.i('${_groups.length} grup yüklendi');
-      } else {
-        _errorMessage = response.errorMessage ?? 'Grup listesi alınamadı';
-        _status = GroupLoadStatus.error;
-        _logger.w('Grup listesi yükleme başarısız: $_errorMessage');
-      }
+      _groups = groups;
+      _status = GroupLoadStatus.loaded;
+      _logger.i('${_groups.length} grup yüklendi');
     } catch (e) {
-      _errorMessage = 'Bir hata oluştu: ${e.toString()}';
       _status = GroupLoadStatus.error;
-      _logger.e('Grup listesi yükleme hatası:', e);
+      _errorMessage = e.toString();
+      _logger.e('Gruplar yüklenirken hata: $e');
     } finally {
       notifyListeners();
+    }
+  }
+  
+  // Grup oluşturma
+  Future<bool> createGroup(String groupName, String groupDesc) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _errorMessage = '';
+      notifyListeners();
+      
+      final success = await _apiService.createGroup(groupName, groupDesc);
+      
+      if (success) {
+        // Grup başarıyla oluşturulduğunda grupları yeniden yükle
+        await loadGroups();
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString();
+      _logger.e('Grup oluşturulurken hata: $e');
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Grup güncelleme
+  Future<bool> updateGroup(int groupID, String groupName, String groupDesc) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _errorMessage = '';
+      notifyListeners();
+      
+      final success = await _apiService.updateGroup(groupID, groupName, groupDesc);
+      
+      if (success) {
+        // Grup başarıyla güncellendiğinde grupları yeniden yükle
+        await loadGroups();
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString();
+      _logger.e('Grup güncellenirken hata: $e');
+      notifyListeners();
+      return false;
     }
   }
   

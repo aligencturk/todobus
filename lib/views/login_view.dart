@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/login_viewmodel.dart';
 import 'dashboard_view.dart';
+import '../main_app.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({Key? key}) : super(key: key);
@@ -129,7 +130,7 @@ class _LoginViewState extends State<LoginView> {
                                     // Giriş başarılıysa ana sayfaya yönlendir
                                     Navigator.of(context).pushReplacement(
                                       MaterialPageRoute(
-                                        builder: (context) => const DashboardView(),
+                                        builder: (context) => const MainApp(),
                                       ),
                                     );
                                   }

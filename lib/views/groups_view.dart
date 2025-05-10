@@ -4,6 +4,8 @@ import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
 import '../models/group_models.dart';
 import '../viewmodels/group_viewmodel.dart';
+import 'create_group_view.dart';
+import 'group_detail_view.dart';
 
 class GroupsView extends StatefulWidget {
   const GroupsView({Key? key}) : super(key: key);
@@ -13,6 +15,18 @@ class GroupsView extends StatefulWidget {
 }
 
 class _GroupsViewState extends State<GroupsView> {
+  Future<void> _navigateToCreateGroupView() async {
+    final result = await Navigator.of(context).push(
+      platformPageRoute(
+        context: context,
+        builder: (context) => const CreateGroupView(),
+      ),
+    );
+    if (result == true && mounted) {
+      Provider.of<GroupViewModel>(context, listen: false).loadGroups();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PlatformScaffold(
@@ -20,6 +34,11 @@ class _GroupsViewState extends State<GroupsView> {
         title: const Text('Gruplar'),
         material: (_, __) => MaterialAppBarData(
           actions: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'Yeni Grup Oluştur',
+              onPressed: _navigateToCreateGroupView,
+            ),
             IconButton(
               icon: Icon(context.platformIcons.refresh),
               onPressed: () {
@@ -30,6 +49,23 @@ class _GroupsViewState extends State<GroupsView> {
         ),
         cupertino: (_, __) => CupertinoNavigationBarData(
           transitionBetweenRoutes: false,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: const Icon(CupertinoIcons.add),
+                onPressed: _navigateToCreateGroupView,
+              ),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: Icon(context.platformIcons.refresh),
+                onPressed: () {
+                  Provider.of<GroupViewModel>(context, listen: false).loadGroups();
+                },
+              ),
+            ],
+          ),
         ),
       ),
       body: ChangeNotifierProvider(
@@ -88,31 +124,19 @@ class _GroupsViewState extends State<GroupsView> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              context.platformIcons.group,
+              CupertinoIcons.group,
               size: 64,
-              color: platformThemeData(
-                context,
-                material: (data) => data.disabledColor,
-                cupertino: (data) => CupertinoColors.systemGrey,
-              ),
+              color: CupertinoColors.systemGrey,
             ),
             const SizedBox(height: 16),
             Text(
               'Henüz hiç grup yok',
-              style: platformThemeData(
-                context,
-                material: (data) => data.textTheme.headlineSmall,
-                cupertino: (data) => data.textTheme.navTitleTextStyle,
-              ),
+              style: CupertinoTheme.of(context).textTheme.navTitleTextStyle,
             ),
             const SizedBox(height: 8),
             Text(
               'Yeni bir grup oluşturmak için + butonuna tıklayın',
-              style: platformThemeData(
-                context,
-                material: (data) => data.textTheme.bodyMedium,
-                cupertino: (data) => data.textTheme.textStyle.copyWith(color: CupertinoColors.secondaryLabel),
-              ),
+              style: CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(color: CupertinoColors.secondaryLabel),
               textAlign: TextAlign.center,
             ),
           ],
@@ -125,19 +149,35 @@ class _GroupsViewState extends State<GroupsView> {
         CupertinoSliverRefreshControl(
           onRefresh: viewModel.loadGroups,
         ),
-        SliverPadding(
-          padding: const EdgeInsets.all(8.0),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                if (index == 0) {
-                  return _buildGroupStats(context, viewModel);
-                }
-                final group = viewModel.groups[index - 1];
-                return _buildGroupCard(context, group);
-              },
-              childCount: viewModel.groups.length + 1,
-            ),
+        SliverSafeArea(
+          top: true,
+          bottom: false,
+          left: false,
+          right: false,
+          sliver: SliverMainAxisGroup(
+            slivers: [
+              SliverToBoxAdapter(
+                child: _buildGroupStats(context, viewModel),
+              ),
+              SliverToBoxAdapter(
+                child: CupertinoListSection.insetGrouped(
+                  header: Padding(
+                    padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
+                    child: Text(
+                      'Tüm Gruplar',
+                      style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                        color: CupertinoColors.secondaryLabel,
+                        fontWeight: FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  children: viewModel.groups.map((group) {
+                    return _buildGroupListItem(context, group, viewModel);
+                  }).toList(),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -145,379 +185,186 @@ class _GroupsViewState extends State<GroupsView> {
   }
 
   Widget _buildGroupStats(BuildContext context, GroupViewModel viewModel) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8.0),
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: platformThemeData(
-          context,
-          material: (data) => data.colorScheme.surface,
-          cupertino: (data) => CupertinoColors.systemBackground,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          if (!isCupertino(context))
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+    return CupertinoListSection.insetGrouped(
+      header: Padding(
+        padding: const EdgeInsets.only(left: 16.0, top:8.0, bottom: 4.0),
+        child: Text(
             'Özet',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleLarge,
-              cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
-                  context,
-                  context.platformIcons.group,
-                  'Gruplar',
-                  '${viewModel.groups.length}',
-                ),
+           style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                color: CupertinoColors.secondaryLabel,
+                fontWeight: FontWeight.normal,
+                fontSize: 13,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatItem(
-                  context,
-                  context.platformIcons.collections,
-                  'Projeler',
-                  '${viewModel.totalProjects}',
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _buildStatItem(
-    BuildContext context,
-    IconData icon,
-    String label,
-    String value,
-  ) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          size: 32,
-          color: platformThemeData(
-            context,
-            material: (data) => data.colorScheme.primary,
-            cupertino: (data) => CupertinoColors.activeBlue,
-          ),
+      children: <Widget>[
+        CupertinoListTile(
+          title: const Text('Toplam Grup'),
+          leading: const Icon(CupertinoIcons.group_solid),
+          additionalInfo: Text('${viewModel.groups.length}'),
         ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: platformThemeData(
-            context,
-            material: (data) => data.textTheme.headlineSmall,
-            cupertino: (data) => data.textTheme.navLargeTitleTextStyle.copyWith(fontSize: 24),
-          ),
-        ),
-        Text(
-          label,
-          style: platformThemeData(
-            context,
-            material: (data) => data.textTheme.bodySmall,
-            cupertino: (data) => data.textTheme.textStyle.copyWith(color: CupertinoColors.secondaryLabel),
-          ),
+        CupertinoListTile(
+          title: const Text('Toplam Proje'),
+          leading: const Icon(CupertinoIcons.briefcase_fill),
+          additionalInfo: Text('${viewModel.totalProjects}'),
         ),
       ],
     );
   }
 
-  Widget _buildGroupCard(BuildContext context, Group group) {
-    final hasProjects = group.projects.isNotEmpty;
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8.0),
-      decoration: BoxDecoration(
-        color: platformThemeData(
-          context,
-          material: (data) => data.colorScheme.surface,
-          cupertino: (data) => CupertinoColors.systemBackground,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          if (!isCupertino(context))
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildGroupHeader(context, group),
-          if (hasProjects) 
-            _buildProjectsList(context, group),
-        ],
-      ),
-    );
-  }
+  Widget _buildGroupListItem(BuildContext context, Group group, GroupViewModel viewModel) {
+    final bool isIOS = Theme.of(context).platform == TargetPlatform.iOS;
 
-  Widget _buildGroupHeader(BuildContext context, Group group) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: group.isAdmin 
-            ? platformThemeData(
-                context,
-                material: (data) => data.colorScheme.primaryContainer,
-                cupertino: (data) => CupertinoColors.activeBlue.withOpacity(0.1),
-              )
-            : null,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(12),
-          topRight: Radius.circular(12),
-          bottomLeft: Radius.circular(12),
-          bottomRight: Radius.circular(12),
+    return CupertinoListTile.notched(
+      title: Text(
+        group.groupName,
+        style: CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
         ),
       ),
-      child: Column(
+      subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  group.groupName,
-                  style: platformThemeData(
-                    context,
-                    material: (data) => data.textTheme.titleLarge,
-                    cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: group.isFree
-                      ? platformThemeData(
-                          context,
-                          material: (data) => Colors.green.withOpacity(0.1),
-                          cupertino: (data) => CupertinoColors.activeGreen.withOpacity(0.1),
-                        )
-                      : platformThemeData(
-                          context,
-                          material: (data) => Colors.deepOrange.withOpacity(0.1),
-                          cupertino: (data) => CupertinoColors.systemOrange.withOpacity(0.1),
-                        ),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  group.packageName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: group.isFree
-                        ? platformThemeData(
-                            context,
-                            material: (data) => Colors.green,
-                            cupertino: (data) => CupertinoColors.activeGreen,
-                          )
-                        : platformThemeData(
-                            context,
-                            material: (data) => Colors.deepOrange,
-                            cupertino: (data) => CupertinoColors.systemOrange,
-                          ),
-                  ),
-                ),
-              ),
-            ],
-          ),
           if (group.groupDesc.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 2),
             Text(
               group.groupDesc,
-              style: platformThemeData(
-                context,
-                material: (data) => data.textTheme.bodyMedium,
-                cupertino: (data) => data.textTheme.textStyle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                color: CupertinoColors.secondaryLabel,
+                fontSize: 13,
               ),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Row(
             children: [
-              Icon(
-                context.platformIcons.person,
-                size: 14,
-                color: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall?.color,
-                  cupertino: (data) => CupertinoColors.secondaryLabel,
-                ),
-              ),
+              Icon(CupertinoIcons.person_alt_circle, size: 14, color: CupertinoColors.secondaryLabel),
               const SizedBox(width: 4),
               Text(
                 group.createdBy,
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall,
-                  cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(color: CupertinoColors.secondaryLabel),
+                style: CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(
+                  color: CupertinoColors.secondaryLabel,
+                  fontSize: 12,
                 ),
               ),
-              const Spacer(),
-              Icon(
-                context.platformIcons.time,
-                size: 14,
-                color: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall?.color,
-                  cupertino: (data) => CupertinoColors.secondaryLabel,
-                ),
-              ),
+              const SizedBox(width: 8),
+              Icon(CupertinoIcons.calendar, size: 14, color: CupertinoColors.secondaryLabel),
               const SizedBox(width: 4),
               Text(
                 group.createDate,
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall,
-                  cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(color: CupertinoColors.secondaryLabel),
+                style: CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(
+                  color: CupertinoColors.secondaryLabel,
+                  fontSize: 12,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                context.platformIcons.collections,
-                size: 14,
-                color: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall?.color,
-                  cupertino: (data) => CupertinoColors.secondaryLabel,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'Projeler: ${group.projects.length}',
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall,
-                  cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(color: CupertinoColors.secondaryLabel),
-                ),
-              ),
-              if (group.isAdmin) ...[
-                const Spacer(),
+        ],
+      ),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: group.isAdmin ? CupertinoColors.activeBlue.withOpacity(0.15) : CupertinoColors.systemGroupedBackground,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Icon(
+            group.isAdmin ? CupertinoIcons.shield_lefthalf_fill : CupertinoIcons.group,
+            color: group.isAdmin ? CupertinoColors.activeBlue : CupertinoColors.secondaryLabel,
+            size: 20,
+          ),
+        ),
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!group.isFree)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: platformThemeData(
-                      context,
-                      material: (data) => data.colorScheme.secondary.withOpacity(0.1),
-                      cupertino: (data) => CupertinoColors.systemIndigo.withOpacity(0.1),
-                    ),
+                color: CupertinoColors.systemOrange.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    'Yönetici',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: platformThemeData(
-                        context,
-                        material: (data) => data.colorScheme.secondary,
-                        cupertino: (data) => CupertinoColors.systemIndigo,
+                group.packageName.toUpperCase(),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: CupertinoColors.systemOrange,
+                  fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProjectsList(BuildContext context, Group group) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Projeler',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium,
-              cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(fontSize: 15),
-            ),
-          ),
-          const SizedBox(height: 8),
-          ...group.projects.map((project) => _buildProjectItem(context, project)).toList(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProjectItem(BuildContext context, Project project) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        children: [
-          Icon(
-            context.platformIcons.collections,
-            size: 16,
-            color: platformThemeData(
-              context,
-              material: (data) => data.colorScheme.primary,
-              cupertino: (data) => CupertinoColors.activeBlue,
-            ),
-          ),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              project.projectName,
-              style: platformThemeData(
-                context,
-                material: (data) => data.textTheme.bodyMedium,
-                cupertino: (data) => data.textTheme.textStyle,
-              ),
-            ),
+          const CupertinoListTileChevron(),
+        ],
+      ),
+      onTap: () {
+        // Grup detay sayfasına yönlendir
+        Navigator.of(context).push(
+          platformPageRoute(
+            context: context,
+            builder: (context) => GroupDetailView(groupId: group.groupID),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: platformThemeData(
-                context,
-                material: (data) => data.colorScheme.primaryContainer.withOpacity(0.3),
-                cupertino: (data) => CupertinoColors.systemBlue.withOpacity(0.1),
-              ),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
+        );
+      },
+    );
+  }
+
+  void _showProjectsDialog(BuildContext context, Group group) {
+    showCupertinoModalPopup<void>(
+      context: context,
+      builder: (BuildContext context) => CupertinoActionSheet(
+        title: Text(
+          '${group.groupName} Projeleri',
+          style: CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(fontSize: 18),
+        ),
+        message: Text(
+          'Toplam ${group.projects.length} proje bulundu.',
+          style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+            fontSize: 15,
+            color: CupertinoColors.secondaryLabel,
+          ),
+        ),
+        actions: group.projects.map((project) {
+          return CupertinoActionSheetAction(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(project.projectName),
+                Text(
               project.projectStatus,
               style: TextStyle(
-                fontSize: 12,
-                color: platformThemeData(
-                  context,
-                  material: (data) => data.colorScheme.primary,
-                  cupertino: (data) => CupertinoColors.systemBlue,
+                    fontSize: 13,
+                    color: project.projectStatus.toLowerCase() == 'tamamlandı'
+                        ? CupertinoColors.activeGreen
+                        : CupertinoColors.systemOrange,
+                  ),
                 ),
-              ),
+              ],
             ),
-          ),
-        ],
+            onPressed: () {
+              Navigator.pop(context);
+              // Proje detayına gitme işlevi eklenebilir
+              Navigator.of(context).push(
+                platformPageRoute(
+                  context: context,
+                  builder: (context) => GroupDetailView(groupId: group.groupID),
+                ),
+              );
+            },
+          );
+        }).toList(),
+        cancelButton: CupertinoActionSheetAction(
+          child: const Text('Kapat'),
+          isDefaultAction: true,
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
       ),
     );
   }

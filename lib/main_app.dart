@@ -6,6 +6,7 @@ import 'views/dashboard_view.dart';
 import 'views/profile_view.dart';
 import 'views/groups_view.dart';
 import 'viewmodels/group_viewmodel.dart';
+import 'viewmodels/dashboard_viewmodel.dart';
 
 class MainApp extends StatefulWidget {
   const MainApp({Key? key}) : super(key: key);
@@ -27,6 +28,7 @@ class _MainAppState extends State<MainApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => GroupViewModel()),
+        ChangeNotifierProvider(create: (_) => DashboardViewModel()),
       ],
       child: PlatformScaffold(
         body: _pages[_currentIndex],
