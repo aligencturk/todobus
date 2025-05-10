@@ -3,6 +3,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'viewmodels/profile_viewmodel.dart';
+import 'viewmodels/dashboard_viewmodel.dart';
+import 'viewmodels/group_viewmodel.dart';
 import 'services/logger_service.dart';
 import 'services/storage_service.dart';
 import 'services/device_info_service.dart';
@@ -15,6 +18,8 @@ void main() async {
   // Servislerin başlatılması
   final storageService = StorageService();
   await storageService.init();
+  
+
   
   final deviceInfoService = DeviceInfoService();
   await deviceInfoService.init();
@@ -31,6 +36,7 @@ class MyApp extends StatefulWidget {
   @override
   _MyAppState createState() => _MyAppState();
 }
+
 
 class _MyAppState extends State<MyApp> {
   final StorageService _storageService = StorageService();
@@ -53,46 +59,53 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return PlatformProvider(
-      settings: PlatformSettingsData(
-        iosUsesMaterialWidgets: true,
-      ),
-      builder: (context) => PlatformApp(
-        debugShowCheckedModeBanner: false,
-        title: 'TodoBus',
-        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('tr', 'TR'),
-          Locale('en', 'US'),
-        ],
-        material: (_, __) {
-          return MaterialAppData(
-            theme: ThemeData(
-              colorSchemeSeed: Colors.blue,
-              useMaterial3: true,
-            ),
-          );
-        },
-        cupertino: (_, __) {
-          return CupertinoAppData(
-            theme: const CupertinoThemeData(
-              primaryColor: CupertinoColors.activeBlue,
-            ),
-          );
-        },
-        home: _isLoading
-            ? PlatformScaffold(
-                body: Center(
-                  child: PlatformCircularProgressIndicator(),
-                ),
-              )
-            : _isLoggedIn
-                ? const MainApp()
-                : const LoginView(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
+        ChangeNotifierProvider(create: (_) => DashboardViewModel()),
+        ChangeNotifierProvider(create: (_) => GroupViewModel()),
+      ],
+      child: PlatformProvider(
+        settings: PlatformSettingsData(
+          iosUsesMaterialWidgets: true,
+        ),
+        builder: (context) => PlatformApp(
+          debugShowCheckedModeBanner: false,
+          title: 'TodoBus',
+          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('tr', 'TR'),
+            Locale('en', 'US'),
+          ],
+          material: (_, __) {
+            return MaterialAppData(
+              theme: ThemeData(
+                colorSchemeSeed: Colors.blue,
+                useMaterial3: true,
+              ),
+            );
+          },
+          cupertino: (_, __) {
+            return CupertinoAppData(
+              theme: const CupertinoThemeData(
+                primaryColor: CupertinoColors.activeBlue,
+              ),
+            );
+          },
+          home: _isLoading
+              ? PlatformScaffold(
+                  body: Center(
+                    child: PlatformCircularProgressIndicator(),
+                  ),
+                )
+              : _isLoggedIn
+                  ? const MainApp()
+                  : const LoginView(),
+        ),
       ),
     );
   }

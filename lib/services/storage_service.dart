@@ -76,16 +76,29 @@ class StorageService {
   }
 
   // Kullanıcı bilgilerini kaydetme
-  Future<void> saveUserName(String userName) async {
+  Future<void> saveUserFirstname(String userFirstname) async {
     await _ensureInitialized();
-    await _prefs.setString('user_name', userName);
-    _logger.d('Kullanıcı adı kaydedildi: $userName');
+    await _prefs.setString('user_firstname', userFirstname);
+    _logger.d('Kullanıcı adı kaydedildi: $userFirstname');
   }
 
   // Kullanıcı adını getirme
-  String? getUserName() {
+  String? getUserFirstname() {
     _ensureInitializedSync();
-    return _prefs.getString('user_name');
+    return _prefs.getString('user_firstname');
+  }
+
+  // Kullanıcı e-postasını kaydetme
+  Future<void> saveUserEmail(String userEmail) async {
+    await _ensureInitialized();
+    await _prefs.setString('user_email', userEmail);
+    _logger.d('Kullanıcı e-postası kaydedildi: $userEmail');
+  }
+
+  // Kullanıcı e-postasını getirme
+  String? getUserEmail() {
+    _ensureInitializedSync();
+    return _prefs.getString('user_email');
   }
 
   // Servisin başlatıldığından emin olma

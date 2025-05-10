@@ -15,6 +15,16 @@ class GroupsView extends StatefulWidget {
 }
 
 class _GroupsViewState extends State<GroupsView> {
+  @override
+  void initState() {
+    super.initState();
+    // Widget oluşturulduktan sonra grup listesini yükle
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<GroupViewModel>(context, listen: false).loadGroups();
+    });
+  }
+
+  // Grup oluşturma sayfasına git
   Future<void> _navigateToCreateGroupView() async {
     final result = await Navigator.of(context).push(
       platformPageRoute(
@@ -22,6 +32,7 @@ class _GroupsViewState extends State<GroupsView> {
         builder: (context) => const CreateGroupView(),
       ),
     );
+    // Grup oluşturulduysa listeyi yenile
     if (result == true && mounted) {
       Provider.of<GroupViewModel>(context, listen: false).loadGroups();
     }
@@ -29,68 +40,60 @@ class _GroupsViewState extends State<GroupsView> {
 
   @override
   Widget build(BuildContext context) {
-    return PlatformScaffold(
-      appBar: PlatformAppBar(
-        title: const Text('Gruplar'),
-        material: (_, __) => MaterialAppBarData(
-          actions: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.add),
-              tooltip: 'Yeni Grup Oluştur',
-              onPressed: _navigateToCreateGroupView,
+    return Consumer<GroupViewModel>(
+      builder: (context, viewModel, _) {
+        return PlatformScaffold(
+          appBar: PlatformAppBar(
+            title: const Text('Gruplar'),
+            material: (_, __) => MaterialAppBarData(
+              actions: <Widget>[
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'Yeni Grup Oluştur',
+                  onPressed: _navigateToCreateGroupView,
+                ),
+                IconButton(
+                  icon: Icon(context.platformIcons.refresh),
+                  onPressed: () => viewModel.loadGroups(),
+                ),
+              ],
             ),
-            IconButton(
-              icon: Icon(context.platformIcons.refresh),
-              onPressed: () {
-                Provider.of<GroupViewModel>(context, listen: false).loadGroups();
-              },
+            cupertino: (_, __) => CupertinoNavigationBarData(
+              transitionBetweenRoutes: false,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(CupertinoIcons.add),
+                    onPressed: _navigateToCreateGroupView,
+                  ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: Icon(context.platformIcons.refresh),
+                    onPressed: () => viewModel.loadGroups(),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-        cupertino: (_, __) => CupertinoNavigationBarData(
-          transitionBetweenRoutes: false,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                child: const Icon(CupertinoIcons.add),
-                onPressed: _navigateToCreateGroupView,
-              ),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                child: Icon(context.platformIcons.refresh),
-                onPressed: () {
-                  Provider.of<GroupViewModel>(context, listen: false).loadGroups();
-                },
-              ),
-            ],
           ),
-        ),
-      ),
-      body: ChangeNotifierProvider(
-        create: (_) => GroupViewModel(),
-        child: Consumer<GroupViewModel>(
-          builder: (context, viewModel, _) {
-            if (viewModel.status == GroupLoadStatus.initial) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                viewModel.loadGroups();
-              });
-              return Center(child: PlatformCircularProgressIndicator());
-            } else if (viewModel.status == GroupLoadStatus.loading) {
-              return Center(child: PlatformCircularProgressIndicator());
-            } else if (viewModel.status == GroupLoadStatus.error) {
-              return _buildErrorView(context, viewModel);
-            } else {
-              return _buildGroupList(context, viewModel);
-            }
-          },
-        ),
-      ),
+          body: _buildBody(viewModel),
+        );
+      }
     );
   }
 
-  Widget _buildErrorView(BuildContext context, GroupViewModel viewModel) {
+  Widget _buildBody(GroupViewModel viewModel) {
+    if (viewModel.status == GroupLoadStatus.initial || viewModel.status == GroupLoadStatus.loading) {
+      return Center(child: PlatformCircularProgressIndicator());
+    } else if (viewModel.status == GroupLoadStatus.error) {
+      return _buildErrorView(viewModel);
+    } else {
+      return _buildGroupList(viewModel);
+    }
+  }
+
+  Widget _buildErrorView(GroupViewModel viewModel) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -117,7 +120,7 @@ class _GroupsViewState extends State<GroupsView> {
     );
   }
 
-  Widget _buildGroupList(BuildContext context, GroupViewModel viewModel) {
+  Widget _buildGroupList(GroupViewModel viewModel) {
     if (!viewModel.hasGroups) {
       return Center(
         child: Column(
@@ -157,7 +160,7 @@ class _GroupsViewState extends State<GroupsView> {
           sliver: SliverMainAxisGroup(
             slivers: [
               SliverToBoxAdapter(
-                child: _buildGroupStats(context, viewModel),
+                child: _buildGroupStats(viewModel),
               ),
               SliverToBoxAdapter(
                 child: CupertinoListSection.insetGrouped(
@@ -173,7 +176,7 @@ class _GroupsViewState extends State<GroupsView> {
                     ),
                   ),
                   children: viewModel.groups.map((group) {
-                    return _buildGroupListItem(context, group, viewModel);
+                    return _buildGroupListItem(group, viewModel);
                   }).toList(),
                 ),
               ),
@@ -184,7 +187,7 @@ class _GroupsViewState extends State<GroupsView> {
     );
   }
 
-  Widget _buildGroupStats(BuildContext context, GroupViewModel viewModel) {
+  Widget _buildGroupStats(GroupViewModel viewModel) {
     return CupertinoListSection.insetGrouped(
       header: Padding(
         padding: const EdgeInsets.only(left: 16.0, top:8.0, bottom: 4.0),
@@ -212,7 +215,7 @@ class _GroupsViewState extends State<GroupsView> {
     );
   }
 
-  Widget _buildGroupListItem(BuildContext context, Group group, GroupViewModel viewModel) {
+  Widget _buildGroupListItem(Group group, GroupViewModel viewModel) {
     final bool isIOS = Theme.of(context).platform == TargetPlatform.iOS;
 
     return CupertinoListTile.notched(

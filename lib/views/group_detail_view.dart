@@ -676,7 +676,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildMaterialTab(context, 'Bilgiler', 0),
-            _buildMaterialTab(context, 'Kullanıcılar', 1),
+            _buildMaterialTab(context, 'Üyeler', 1),
             _buildMaterialTab(context, 'Projeler', 2),
             _buildMaterialTab(context, 'Etkinlikler', 3),
           ],

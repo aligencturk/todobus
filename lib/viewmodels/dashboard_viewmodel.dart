@@ -17,7 +17,7 @@ class DashboardViewModel with ChangeNotifier {
   
   User? _user;
   int _taskCount = 0;
-  List<Activity> _activities = [];
+  String _userName = ''; // Kullanıcı adı
   
   // Etkinlikler için yeni değişkenler
   List<GroupEvent> _upcomingEvents = [];
@@ -28,7 +28,6 @@ class DashboardViewModel with ChangeNotifier {
   String get errorMessage => _errorMessage;
   User? get user => _user;
   int get taskCount => _taskCount;
-  List<Activity> get activities => _activities;
   bool get isLoading => _status == DashboardLoadStatus.loading;
   List<GroupEvent> get upcomingEvents => _upcomingEvents;
   
@@ -46,7 +45,7 @@ class DashboardViewModel with ChangeNotifier {
       
       if (response.success && response.data != null) {
         _user = response.data!.user;
-        await _storageService.saveUserName(_user?.userFullname ?? "Kullanıcı");
+        _userName = _user?.userFullname ?? '';
         _status = DashboardLoadStatus.loaded;
         _logger.i('Kullanıcı bilgileri başarıyla yüklendi: ${_user?.userFullname}');
       } else {
@@ -70,12 +69,7 @@ class DashboardViewModel with ChangeNotifier {
     notifyListeners();
   }
   
-  // Aktiviteleri yükle - API eklendikçe güncellenecek
-  Future<void> loadActivities() async {
-    // Bu fonksiyon ileride API ile aktiviteleri alacak
-    _activities = []; // Şimdilik boş liste
-    notifyListeners();
-  }
+
   
   // Tüm verileri yükle
   Future<void> loadDashboardData() async {
@@ -86,7 +80,6 @@ class DashboardViewModel with ChangeNotifier {
     try {
       await loadUserInfo();
       await loadTaskCount();
-      await loadActivities();
       await _loadUpcomingEvents();
       
       _status = DashboardLoadStatus.loaded;
@@ -180,19 +173,5 @@ class DashboardViewModel with ChangeNotifier {
   }
 }
 
-// API entegrasyonu eklendikçe kullanılacak
-class Activity {
-  final String id;
-  final String title;
-  final String description;
-  final DateTime time;
-  final String type;
-  
-  Activity({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.time,
-    required this.type,
-  });
-} 
+
+ 

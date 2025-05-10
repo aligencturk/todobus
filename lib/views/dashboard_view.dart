@@ -21,32 +21,24 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
-  String _userName = "";
   
   @override
   void initState() {
     super.initState();
-    _getUserInfo();
     
     // Sayfa açıldığında verileri yükle
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DashboardViewModel>().loadDashboardData();
-      context.read<GroupViewModel>().loadGroups();
+      if (mounted) {
+        final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
+        final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+        
+        // API'den kullanıcı ve dashboard verilerini yükle
+        dashboardViewModel.loadDashboardData();
+        groupViewModel.loadGroups();
+        
+        _logger.i('Dashboard açıldı: Veriler yükleniyor...');
+      }
     });
-  }
-  
-  Future<void> _getUserInfo() async {
-    final userName = await _storageService.getUserName();
-    if (userName != null && userName.isNotEmpty) {
-      setState(() {
-        _userName = userName;
-      });
-    } else {
-      setState(() {
-        _userName = "Kullanıcı";
-      });
-    }
-    _logger.i('Dashboard açıldı: Kullanıcı: $_userName');
   }
   
   Future<void> _logout() async {
@@ -233,105 +225,28 @@ class _DashboardViewState extends State<DashboardView> {
                   ),
             ),
             
-            // Son aktiviteler
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Son Aktiviteler',
-                  style: platformThemeData(
-                    context,
-                    material: (data) => data.textTheme.titleLarge?.copyWith(fontSize: 18),
-                    cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
-                      fontSize: 18, 
-                      fontWeight: FontWeight.bold
-                    ),
-                  ),
-                ),
-              ),
-            ),
             
-            // Aktiviteler listesi
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              sliver: dashboardViewModel.activities.isEmpty
-                ? SliverToBoxAdapter(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 20.0),
-                        child: Text(
-                          'Henüz aktivite bulunmuyor',
-                          style: platformThemeData(
-                            context,
-                            material: (data) => data.textTheme.bodyMedium?.copyWith(color: Colors.grey),
-                            cupertino: (data) => data.textTheme.textStyle.copyWith(color: CupertinoColors.systemGrey),
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        if (index < dashboardViewModel.activities.length) {
-                          final activity = dashboardViewModel.activities[index];
-                          return _buildActivityItem(
-                            context, 
-                            title: activity.title,
-                            description: activity.description,
-                            time: _formatTime(activity.time),
-                            icon: _getActivityIcon(activity.type, isIOS),
-                          );
-                        }
-                        return null;
-                      },
-                      childCount: dashboardViewModel.activities.isEmpty ? 0 : dashboardViewModel.activities.length,
-                    ),
-                  ),
-            ),
-          ],
-        ),
-      ),
+           
+          ]
+        )
+      )
     );
   }
+
   
-  String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final difference = now.difference(time);
-    
-    if (difference.inDays > 0) {
-      return '${difference.inDays} gün önce';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours} saat önce';
-    } else if (difference.inMinutes > 0) {
-      return '${difference.inMinutes} dakika önce';
-    } else {
-      return 'Az önce';
-    }
-  }
-  
-  IconData _getActivityIcon(String type, bool isIOS) {
-    switch (type) {
-      case 'task':
-        return isIOS ? CupertinoIcons.checkmark_circle : Icons.check_circle_outline;
-      case 'project':
-        return isIOS ? CupertinoIcons.collections : Icons.collections_bookmark;
-      case 'user':
-        return isIOS ? CupertinoIcons.person : Icons.person;
-      default:
-        return isIOS ? CupertinoIcons.bell : Icons.notifications;
-    }
-  }
+ 
   
   Widget _buildWelcomeSection() {
     final dashboardViewModel = Provider.of<DashboardViewModel>(context);
+    final userName = dashboardViewModel.user?.userFullname ?? 'Kullanıcı';
+    
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Merhaba, ${dashboardViewModel.user?.userFullname}',
+            'Merhaba, $userName',
             style: platformThemeData(
               context,
               material: (data) => data.textTheme.headlineSmall,
@@ -426,105 +341,7 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
   
-  Widget _buildActivityItem(
-    BuildContext context, {
-    required String title,
-    required String description,
-    required String time,
-    required IconData icon,
-  }) {
-    final isIOS = isCupertino(context);
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isIOS 
-          ? CupertinoColors.systemBackground 
-          : Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: isIOS
-          ? [
-              BoxShadow(
-                color: CupertinoColors.systemGrey5.withOpacity(0.5),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              )
-            ]
-          : [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.2),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              )
-            ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isIOS 
-                  ? CupertinoColors.systemGrey5 
-                  : Colors.grey[100],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                icon,
-                color: isIOS 
-                  ? CupertinoColors.activeBlue 
-                  : Colors.blue,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: platformThemeData(
-                      context,
-                      material: (data) => data.textTheme.titleSmall,
-                      cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: platformThemeData(
-                      context,
-                      material: (data) => data.textTheme.bodySmall,
-                      cupertino: (data) => data.textTheme.textStyle.copyWith(
-                        color: CupertinoColors.secondaryLabel,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              time,
-              style: platformThemeData(
-                context,
-                material: (data) => data.textTheme.bodySmall?.copyWith(fontSize: 10),
-                cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
-                  color: CupertinoColors.secondaryLabel,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
+  
   Widget _buildEventItem(
     BuildContext context, {
     required String title,

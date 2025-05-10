@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import '../viewmodels/profile_viewmodel.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import 'package:device_info_plus/device_info_plus.dart';
+import '../models/user_model.dart';
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import 'login_view.dart';
@@ -21,64 +20,13 @@ class _ProfileViewState extends State<ProfileView> {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
   
-  PackageInfo _packageInfo = PackageInfo(
-    appName: 'TodoBus',
-    packageName: 'com.example.todobus',
-    version: 'Bilinmiyor',
-    buildNumber: 'Bilinmiyor',
-  );
-  
-  String _deviceInfo = 'Cihaz bilgisi yükleniyor...';
-  String _userName = "Kullanıcı";
-  
   @override
   void initState() {
     super.initState();
-    _initPackageInfo();
-    _initDeviceInfo();
-    _getUserInfo();
-  }
-  
-  Future<void> _getUserInfo() async {
-    final userName = await _storageService.getUserName();
-    if (userName != null && userName.isNotEmpty) {
-      setState(() {
-        _userName = userName;
-      });
-    }
-  }
-
-  Future<void> _initPackageInfo() async {
-    final info = await PackageInfo.fromPlatform();
-    setState(() {
-      _packageInfo = info;
+    // Sayfa açıldığında profil verilerini yükle
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProfileViewModel>().loadUserProfile();
     });
-  }
-
-  Future<void> _initDeviceInfo() async {
-    final deviceInfoPlugin = DeviceInfoPlugin();
-    try {
-      if (Platform.isAndroid) {
-        final androidInfo = await deviceInfoPlugin.androidInfo;
-        setState(() {
-          _deviceInfo = '${androidInfo.brand} ${androidInfo.model} - Android ${androidInfo.version.release} (SDK ${androidInfo.version.sdkInt})';
-        });
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfoPlugin.iosInfo;
-        setState(() {
-          _deviceInfo = '${iosInfo.name} - iOS ${iosInfo.systemVersion}';
-        });
-      } else {
-        setState(() {
-          _deviceInfo = 'Desteklenmeyen platform';
-        });
-      }
-    } catch (e) {
-      _logger.e('Cihaz bilgisi alınamadı:', e);
-      setState(() {
-        _deviceInfo = 'Cihaz bilgisi alınamadı';
-      });
-    }
   }
   
   Future<void> _logout() async {
@@ -98,69 +46,135 @@ class _ProfileViewState extends State<ProfileView> {
 
   @override
   Widget build(BuildContext context) {
-    return PlatformScaffold(
-      appBar: PlatformAppBar(
-        title: const Text('Profil'),
-        material: (_, __) => MaterialAppBarData(
-          actions: <Widget>[
-            IconButton(
-              icon: Icon(context.platformIcons.share),
-              onPressed: _logout,
-              tooltip: 'Çıkış Yap',
+    return Consumer<ProfileViewModel>(
+      builder: (context, viewModel, _) {
+        return PlatformScaffold(
+          appBar: PlatformAppBar(
+            title: const Text('Profil'),
+            material: (_, __) => MaterialAppBarData(
+              actions: <Widget>[
+                IconButton(
+                  icon: Icon(context.platformIcons.share),
+                  onPressed: _logout,
+                  tooltip: 'Çıkış Yap',
+                ),
+              ],
             ),
-          ],
-        ),
-        cupertino: (_, __) => CupertinoNavigationBarData(
-          transitionBetweenRoutes: false,
-          trailing: CupertinoButton(
-            padding: EdgeInsets.zero,
-            child: Icon(context.platformIcons.share),
-            onPressed: _logout,
+            cupertino: (_, __) => CupertinoNavigationBarData(
+              transitionBetweenRoutes: false,
+              trailing: CupertinoButton(
+                padding: EdgeInsets.zero,
+                child: Icon(context.platformIcons.share),
+                onPressed: _logout,
+              ),
+            ),
           ),
-        ),
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
+          body: _buildBody(context, viewModel),
+        );
+      },
+    );
+  }
+  
+  Widget _buildBody(BuildContext context, ProfileViewModel viewModel) {
+    if (viewModel.status == ProfileStatus.loading) {
+      return Center(
+        child: PlatformCircularProgressIndicator(),
+      );
+    } else if (viewModel.status == ProfileStatus.error) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildProfileHeader(),
-            const SizedBox(height: 24),
-            _buildSectionHeader(context, 'Hesap Bilgileri'),
-            _buildListItem(context, 'Kullanıcı Adı', _userName),
-            _buildListItem(context, 'E-posta', 'kullanici@todobus.com'),
-            const SizedBox(height: 24),
-            _buildSectionHeader(context, 'Uygulama Bilgileri'),
-            _buildListItem(context, 'Versiyon', '${_packageInfo.version} (${_packageInfo.buildNumber})'),
-            _buildListItem(context, 'Paket Adı', _packageInfo.packageName),
-            const SizedBox(height: 24),
-            _buildSectionHeader(context, 'Cihaz Bilgileri'),
-            _buildListItem(context, 'Cihaz', _deviceInfo),
-            const SizedBox(height: 32),
+            Text(
+              'Bir hata oluştu',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: platformThemeData(
+                  context,
+                  material: (data) => Colors.red,
+                  cupertino: (data) => CupertinoColors.systemRed,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(viewModel.errorMessage),
+            const SizedBox(height: 16),
             PlatformElevatedButton(
-              onPressed: _logout,
-              child: Text(
-                'Çıkış Yap',
-                style: TextStyle(
-                  color: isCupertino(context) ? CupertinoColors.white : null,
-                ),
-              ),
-              material: (_, __) => MaterialElevatedButtonData(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-              cupertino: (_, __) => CupertinoElevatedButtonData(
-                color: CupertinoColors.destructiveRed,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
+              onPressed: () => viewModel.loadUserProfile(),
+              child: const Text('Tekrar Dene'),
             ),
           ],
         ),
+      );
+    }
+    
+    final user = viewModel.user;
+    
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          _buildProfileHeader(context, user),
+          const SizedBox(height: 24),
+          
+          _buildSectionHeader(context, 'Hesap Bilgileri'),
+          _buildListItem(context, 'Kullanıcı ID', '${user?.userID ?? ""}'),
+          _buildListItem(context, 'Kullanıcı Adı', user?.username ?? ""),
+          _buildListItem(context, 'Ad', user?.userFirstname ?? ""),
+          _buildListItem(context, 'Soyad', user?.userLastname ?? ""),
+          _buildListItem(context, 'Tam Ad', user?.userFullname ?? ""),
+          _buildListItem(context, 'E-posta', user?.userEmail ?? ""),
+          _buildListItem(context, 'Doğum Tarihi', user?.userBirthday ?? ""),
+          _buildListItem(context, 'Telefon', user?.userPhone ?? ""),
+          _buildListItem(context, 'Cinsiyet', user?.userGender ?? ""),
+          _buildListItem(context, 'Durum', user?.userStatus ?? ""),
+          _buildListItem(context, 'Rütbe', user?.userRank ?? ""),
+          
+          const SizedBox(height: 24),
+          _buildSectionHeader(context, 'Cihaz Bilgileri'),
+          _buildListItem(context, 'Platform', viewModel.platformInfo),
+          _buildListItem(context, 'Cihaz Modeli', viewModel.deviceModel),
+          _buildListItem(context, 'İşletim Sistemi', viewModel.osVersion),
+          _buildListItem(context, 'Platform Türü', user?.userPlatform ?? ""),
+          _buildListItem(context, 'Versiyon', user?.userVersion ?? ""),
+          _buildListItem(context, 'iOS Versiyonu', user?.iosVersion ?? ""),
+          _buildListItem(context, 'Android Versiyonu', user?.androidVersion ?? ""),
+          
+          const SizedBox(height: 24),
+          _buildSectionHeader(context, 'Uygulama Bilgileri'),
+          _buildListItem(context, 'Uygulama Adı', viewModel.appName),
+          _buildListItem(context, 'Versiyon', '${viewModel.appVersion} (${viewModel.buildNumber})'),
+          _buildListItem(context, 'Paket Adı', viewModel.packageName),
+          
+          const SizedBox(height: 32),
+          PlatformElevatedButton(
+            onPressed: _logout,
+            child: Text(
+              'Çıkış Yap',
+              style: TextStyle(
+                color: isCupertino(context) ? CupertinoColors.white : null,
+              ),
+            ),
+            material: (_, __) => MaterialElevatedButtonData(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+            cupertino: (_, __) => CupertinoElevatedButtonData(
+              color: CupertinoColors.destructiveRed,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ],
       ),
     );
   }
   
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(BuildContext context, User? user) {
+    String profileImageUrl = user?.profilePhoto ?? '';
+    bool hasProfileImage = profileImageUrl.isNotEmpty && profileImageUrl != 'null';
+    
     return Center(
       child: Column(
         children: [
@@ -168,28 +182,38 @@ class _ProfileViewState extends State<ProfileView> {
             width: 100,
             height: 100,
             decoration: BoxDecoration(
-              color: platformThemeData(
-                context,
-                material: (data) => Colors.blue.shade100,
-                cupertino: (data) => CupertinoColors.activeBlue.withOpacity(0.2),
-              ),
+              color: hasProfileImage 
+                  ? null 
+                  : platformThemeData(
+                      context,
+                      material: (data) => Colors.blue.shade100,
+                      cupertino: (data) => CupertinoColors.activeBlue.withOpacity(0.2),
+                    ),
               shape: BoxShape.circle,
+              image: hasProfileImage
+                  ? DecorationImage(
+                      image: NetworkImage(profileImageUrl),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
             ),
-            child: Center(
-              child: Icon(
-                context.platformIcons.person,
-                size: 50,
-                color: platformThemeData(
-                  context,
-                  material: (data) => Colors.blue,
-                  cupertino: (data) => CupertinoColors.activeBlue,
-                ),
-              ),
-            ),
+            child: !hasProfileImage 
+                ? Center(
+                    child: Icon(
+                      context.platformIcons.person,
+                      size: 50,
+                      color: platformThemeData(
+                        context,
+                        material: (data) => Colors.blue,
+                        cupertino: (data) => CupertinoColors.activeBlue,
+                      ),
+                    ),
+                  )
+                : null,
           ),
           const SizedBox(height: 16),
           Text(
-            _userName,
+            user?.userFullname ?? 'Yükleniyor...',
             style: platformThemeData(
               context,
               material: (data) => data.textTheme.headlineSmall,
@@ -198,7 +222,7 @@ class _ProfileViewState extends State<ProfileView> {
           ),
           const SizedBox(height: 4),
           Text(
-            'TodoBus Kullanıcısı',
+            user?.userRank ?? 'TodoBus Kullanıcısı',
             style: platformThemeData(
               context,
               material: (data) => data.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),

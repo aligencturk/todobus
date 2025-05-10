@@ -178,7 +178,7 @@ class ApiService {
     final userResponse = UserResponse.fromJson(response);
     
     // Platform ve versiyon kontrolü
-    if (userResponse.success && userResponse.data != null) {
+    if (userResponse.success == true && userResponse.data != null) {
       final user = userResponse.data!.user;
       
       // Platform'a göre kontroller
