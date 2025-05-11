@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'viewmodels/profile_viewmodel.dart';
 import 'viewmodels/dashboard_viewmodel.dart';
 import 'viewmodels/group_viewmodel.dart';
+import 'viewmodels/event_viewmodel.dart';
 import 'services/logger_service.dart';
 import 'services/storage_service.dart';
 import 'services/device_info_service.dart';
@@ -65,6 +66,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => ProfileViewModel()),
         ChangeNotifierProvider(create: (_) => DashboardViewModel()),
         ChangeNotifierProvider(create: (_) => GroupViewModel()),
+        ChangeNotifierProvider(create: (_) => EventViewModel()),
       ],
       child: PlatformProvider(
         settings: PlatformSettingsData(

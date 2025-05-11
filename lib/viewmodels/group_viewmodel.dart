@@ -378,6 +378,31 @@ class GroupViewModel with ChangeNotifier {
       return null;
     }
   }
+
+  // Proje sil
+  Future<bool> deleteProject(int projectID, int workID) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _errorMessage = '';
+      notifyListeners();  
+
+      final success = await _apiService.deleteProject(projectID, workID);
+      
+      if (success) {
+        _status = GroupLoadStatus.loaded;
+        notifyListeners();  
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString(); 
+      _logger.e('Proje silinirken hata: $e');
+      notifyListeners();
+      return false;
+    }
+  }
   
   // Proje durumlarını getir
   Future<List<ProjectStatus>> getProjectStatuses() async {
@@ -509,4 +534,5 @@ class GroupViewModel with ChangeNotifier {
     _groups = [];
     notifyListeners();
   }
+
 } 

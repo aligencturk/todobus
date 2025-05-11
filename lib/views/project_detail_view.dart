@@ -129,12 +129,12 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
   
   Widget _buildBody(BuildContext context) {
     return Column(
-      children: [
-        _buildProjectHeader(context),
-        _buildSegmentedControl(context),
+                      children: [
+                        _buildProjectHeader(context),
+                        _buildSegmentedControl(context),
         Expanded(
           child: _buildSelectedContent(context),
-        ),
+                    ),
       ],
     );
   }
@@ -704,75 +704,75 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
     
     return ListView(
       padding: const EdgeInsets.all(16.0),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Proje Üyeleri (${project.users.length})',
-              style: platformThemeData(
-                context,
-                material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                cupertino: (data) => data.textTheme.navTitleTextStyle,
-              ),
-            ),
-            PlatformIconButton(
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                isIOS ? CupertinoIcons.person_add : Icons.person_add,
-                color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
-                size: 20,
-              ),
-              onPressed: () {
-                // Üye ekleme işlevi eklenecek
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ...project.users.map((user) => Padding(
-          padding: const EdgeInsets.only(bottom: 8.0),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: user.userRoleID == 1 
-                  ? (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.2) 
-                  : (isIOS ? CupertinoColors.systemGrey : Colors.grey).withOpacity(0.2),
-              child: Text(
-                user.userName.substring(0, 1).toUpperCase(),
-                style: TextStyle(
-                  color: user.userRoleID == 1 
-                      ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
-                      : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Proje Üyeleri (${project.users.length})',
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  cupertino: (data) => data.textTheme.navTitleTextStyle,
                 ),
               ),
-            ),
-            title: Text(user.userName),
-            subtitle: Text(user.userRole),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  user.assignedDate,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                  ),
+              PlatformIconButton(
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  isIOS ? CupertinoIcons.person_add : Icons.person_add,
+                  color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                  size: 20,
                 ),
-                const SizedBox(width: 8),
-                PlatformIconButton(
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    isIOS ? CupertinoIcons.trash : Icons.delete_outline,
-                    color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
-                    size: 20,
-                  ),
-                  onPressed: () => _confirmRemoveUser(user),
-                ),
-              ],
-            ),
+                onPressed: () {
+                  // Üye ekleme işlevi eklenecek
+                },
+              ),
+            ],
           ),
-        )).toList(),
-      ],
+          const SizedBox(height: 16),
+          ...project.users.map((user) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: user.userRoleID == 1 
+                    ? (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.2) 
+                    : (isIOS ? CupertinoColors.systemGrey : Colors.grey).withOpacity(0.2),
+                child: Text(
+                  user.userName.substring(0, 1).toUpperCase(),
+                  style: TextStyle(
+                    color: user.userRoleID == 1 
+                        ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
+                        : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
+                  ),
+                ),
+              ),
+              title: Text(user.userName),
+              subtitle: Text(user.userRole),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    user.assignedDate,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  PlatformIconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      isIOS ? CupertinoIcons.trash : Icons.delete_outline,
+                      color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
+                      size: 20,
+                    ),
+                    onPressed: () => _confirmRemoveUser(user),
+                  ),
+                ],
+              ),
+            ),
+          )).toList(),
+        ],
     );
   }
   
@@ -838,36 +838,36 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
     }
     
     if (_projectWorks == null || _projectWorks!.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isIOS ? CupertinoIcons.square_list : Icons.assignment,
-                size: 48,
-                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isIOS ? CupertinoIcons.square_list : Icons.assignment,
+              size: 48,
+              color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Henüz görev bulunmuyor',
+              style: TextStyle(
+                fontSize: 16,
+                color: isIOS ? CupertinoColors.systemGrey : Colors.grey[600],
               ),
-              const SizedBox(height: 16),
-              Text(
-                'Henüz görev bulunmuyor',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: isIOS ? CupertinoColors.systemGrey : Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 16),
-              PlatformElevatedButton(
+            ),
+            const SizedBox(height: 16),
+            PlatformElevatedButton(
                 onPressed: _showAddWorkDialog,
-                child: Text(
-                  '+ Görev Ekle',
-                  style: TextStyle(
-                    color: isIOS ? CupertinoColors.white : Colors.white,
-                  ),
+              child: Text(
+                '+ Görev Ekle',
+                style: TextStyle(
+                  color: isIOS ? CupertinoColors.white : Colors.white,
                 ),
               ),
-            ],
+            ),
+          ],
           ),
         ),
       );
@@ -1541,7 +1541,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
           _showErrorSnackbar('Görev eklenemedi');
         }
       }
-    } catch (e) {
+          } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -1587,8 +1587,8 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
+          setState(() {
+            _isLoading = false;
         });
         
         _showErrorSnackbar(_formatErrorMessage(e.toString()));
@@ -1646,6 +1646,14 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                   _showEditWorkDialog(work);
                 },
                 child: const Text('Görevi Düzenle'),
+              ),
+              CupertinoActionSheetAction(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _confirmDeleteWork(work);
+                },
+                isDestructiveAction: true,
+                child: const Text('Görevi Sil'),
               ),
             ],
             cancelButton: CupertinoActionSheetAction(
@@ -1717,6 +1725,17 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                   onTap: () {
                     Navigator.pop(context);
                     _showEditWorkDialog(work);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.delete,
+                    color: Colors.red,
+                  ),
+                  title: const Text('Görevi Sil'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _confirmDeleteWork(work);
                   },
                 ),
               ],
@@ -2132,4 +2151,105 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       }
     }
   }
+  
+  // Görev silme doğrulama dialgogu
+  void _confirmDeleteWork(ProjectWork work) {
+    final isIOS = isCupertino(context);
+    
+    if (isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('Görevi Sil'),
+          content: Text('${work.workName} görevini silmek istediğinize emin misiniz?'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _deleteWork(work.workID);
+              },
+              child: const Text('Sil'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Görevi Sil'),
+          content: Text('${work.workName} görevini silmek istediğinize emin misiniz?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _deleteWork(work.workID);
+              },
+              child: const Text('Sil'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  // Görevi silme
+  void _deleteWork(int workID) async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final success = await Provider.of<GroupViewModel>(context, listen: false)
+          .deleteProject(widget.projectId, workID);
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        if (success) {
+          // Görevleri yeniden yükle
+          _projectWorks = null;
+          _loadProjectWorks();
+          
+          _snackBarService.showSuccess('Görev başarıyla silindi');
+        } else {
+          _showErrorSnackbar('Görev silinemedi');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        _showErrorSnackbar(_formatErrorMessage(e.toString()));
+      }
+    }
+  }
+  
+  // Hata mesajı göster
+  void _showErrorSnackbar(String errorMessage) {
+    if (!mounted) return;
+    
+    try {
+      _snackBarService.showError(_snackBarService.formatErrorMessage(errorMessage));
+    } catch (e) {
+      _logger.e('SnackBar gösterilirken hata: $e');
+    }
+  }
+  
 } 

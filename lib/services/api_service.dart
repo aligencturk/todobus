@@ -9,6 +9,7 @@ import '../services/device_info_service.dart';
 import '../models/auth_models.dart';
 import '../models/user_model.dart';
 import '../models/group_models.dart';
+import '../models/event_models.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -954,7 +955,7 @@ class ApiService {
   // Görev durumunu değiştirme (tamamlandı/tamamlanmadı)
   Future<bool> changeWorkCompletionStatus(int projectID, int workID, bool isCompleted) async {
     try {
-      final step = isCompleted ? "completed" : "non-completed";
+      final step = isCompleted ? "complated" : "non-complated";
       _logger.i('Görev durumu değiştiriliyor: WorkID: $workID, Step: $step (ProjectID: $projectID)');
       
       final token = await _storageService.getToken();
@@ -962,7 +963,7 @@ class ApiService {
         throw Exception('Kullanıcı token bilgisi bulunamadı');
       }
       
-      final response = await post(
+      final response = await put(
         'service/user/project/compWork',
         body: {
           'userToken': token,
@@ -984,6 +985,181 @@ class ApiService {
     } catch (e) {
       _logger.e('Görev durumu değiştirilirken hata: $e');
       throw Exception('Görev durumu değiştirilirken hata: $e');
+    }
+  }
+
+  // Proje sil 
+  Future<bool> deleteProject(int projectID, int workID) async {
+    try {
+      final userToken = _storageService.getToken();
+      if (userToken == null) {
+        throw Exception('Oturum bilgisi bulunamadı'); 
+      }
+  
+      final response = await delete(
+        'service/user/project/workDelete',
+        body: {
+          'userToken': userToken,
+          'projectID': projectID,
+          'workID': workID,
+        },
+        requiresToken: true,
+      );
+  
+      if (response['success'] == true) {
+        _logger.i('Proje başarıyla silindi');
+        return true;
+      } else {  
+        final errorMsg = response['message'] ?? 'Bilinmeyen hata';
+        _logger.e('Proje silinemedi: $errorMsg');
+        throw Exception('Proje silinemedi: $errorMsg');
+      }
+    } catch (e) {
+      _logger.e('Proje silinirken hata: $e');
+      throw Exception('Proje silinirken hata: $e');
+    }
+  }
+
+  // Etkinlikleri getir
+  Future<EventsResponse> getEvents({int groupID = 0}) async {
+    try {
+      final token = await  _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+        'groupID': groupID,
+      };
+
+      final response = await post('service/user/event/list', body: body);
+      return EventsResponse.fromJson(response);
+    } catch (e) {
+      _logger.e('Etkinlikler yüklenirken hata: $e');
+      throw Exception('Etkinlikler yüklenemedi: $e');
+    }
+  }
+
+  // Etkinlik detayı getir
+  Future<EventDetailResponse> getEventDetail(int eventID) async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+        'eventID': eventID,
+      };
+
+      final response = await post('service/user/event/id', body: body);
+      return EventDetailResponse.fromJson(response);
+    } catch (e) {
+      _logger.e('Etkinlik detayı yüklenirken hata: $e');
+      throw Exception('Etkinlik detayı yüklenemedi: $e');
+    }
+  }
+
+  // Etkinlik güncelle
+  Future<Map<String, dynamic>> updateEvent({
+    required int eventID,
+    required String eventTitle,
+    required String eventDesc,
+    required String eventDate,
+    required int eventStatus,
+  }) async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+        'eventID': eventID,
+        'eventTitle': eventTitle,
+        'eventDesc': eventDesc,
+        'eventDate': eventDate,
+        'eventStatus': eventStatus,
+      };
+
+      final response = await post('service/user/event/update', body: body);
+      return response;
+    } catch (e) {
+      _logger.e('Etkinlik güncellenirken hata: $e');
+      throw Exception('Etkinlik güncellenemedi: $e');
+    }
+  }
+
+  // Yeni etkinlik oluştur
+  Future<Map<String, dynamic>> createEvent({
+    required int groupID,
+    required String eventTitle,
+    required String eventDesc,
+    required String eventDate,
+  }) async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+        'groupID': groupID,
+        'eventTitle': eventTitle,
+        'eventDesc': eventDesc,
+        'eventDate': eventDate,
+      };
+
+      final response = await post('service/user/event/create', body: body);
+      return response;
+    } catch (e) {
+      _logger.e('Etkinlik oluşturulurken hata: $e');
+      throw Exception('Etkinlik oluşturulamadı: $e');
+    }
+  }
+
+  // Etkinlik sil
+  Future<Map<String, dynamic>> deleteEvent(int eventID) async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+        'eventID': eventID,
+      };
+
+      final response = await post('service/user/event/delete', body: body);
+      return response;
+    } catch (e) {
+      _logger.e('Etkinlik silinirken hata: $e');
+      throw Exception('Etkinlik silinemedi: $e');
+    }
+  }
+  
+  // Şirket etkinliklerini getir
+  Future<EventsResponse> getCompanyEvents() async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+      };
+
+      final response = await post('service/user/event/company', body: body);
+      return EventsResponse.fromJson(response);
+    } catch (e) {
+      _logger.e('Şirket etkinlikleri yüklenirken hata: $e');
+      throw Exception('Şirket etkinlikleri yüklenemedi: $e');
     }
   }
 } 

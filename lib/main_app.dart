@@ -1,22 +1,34 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
+import 'package:provider/provider.dart';
 import 'views/dashboard_view.dart';
 import 'views/profile_view.dart';
 import 'views/groups_view.dart';
+import 'views/events_view.dart';
+import 'viewmodels/event_viewmodel.dart';
 
 class MainApp extends StatefulWidget {
   const MainApp({super.key});
 
   @override
-  _MainAppState createState() => _MainAppState();
+  MainAppState createState() => MainAppState();
 }
 
-class _MainAppState extends State<MainApp> {
+class MainAppState extends State<MainApp> {
   int _currentIndex = 0;
+  
+  // Bu metodu dışarıdan çağrılabilir hale getiriyoruz
+  void setCurrentIndex(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+  
   final List<Widget> _pages = [
     const DashboardView(),
     const GroupsView(),
+    const EventsView(groupID: 0), // Tüm etkinlikler
     const ProfileView(),
   ];
 
@@ -45,6 +57,10 @@ class _MainAppState extends State<MainApp> {
           BottomNavigationBarItem(
             icon: Icon(context.platformIcons.collections),
             label: 'Gruplar',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(context.platformIcons.time),
+            label: 'Etkinlikler',
           ),
           BottomNavigationBarItem(
             icon: Icon(context.platformIcons.person),

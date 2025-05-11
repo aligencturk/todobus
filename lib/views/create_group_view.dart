@@ -75,42 +75,42 @@ class _CreateGroupViewState extends State<CreateGroupView> {
           transitionBetweenRoutes: false,
         ),
       ),
-      body: _isLoading
-          ? Center(child: PlatformCircularProgressIndicator())
-          : SafeArea(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_errorMessage.isNotEmpty)
-                          _buildErrorMessage(isIOS),
+      body: SafeArea(
+        child: _isLoading
+            ? Center(child: PlatformCircularProgressIndicator())
+            : SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_errorMessage.isNotEmpty)
+                            _buildErrorMessage(isIOS),
                           
-                        // Grup Adı Alanı
-                        if (isIOS)
-                          _buildIOSLabel('Grup Adı'),
-                        _buildGroupNameField(isIOS),
-                        
-                        const SizedBox(height: 16),
-                        
-                        // Grup Açıklaması Alanı
-                        if (isIOS)
-                          _buildIOSLabel('Grup Açıklaması'),
-                        _buildGroupDescField(isIOS),
-                        
-                        const SizedBox(height: 32),
-                        
-                        // Oluştur Butonu
-                        _buildCreateButton(isIOS),
-                      ],
+                          // Grup Adı Alanı
+                          if (isIOS)
+                            _buildIOSLabel('Grup Adı'),
+                          _buildGroupNameField(isIOS),
+                          
+                          const SizedBox(height: 16),
+                          
+                          // Grup Açıklaması Alanı
+                          if (isIOS)
+                            _buildIOSLabel('Grup Açıklaması'),
+                          _buildGroupDescField(isIOS),
+                          
+                          const SizedBox(height: 32),
+                          
+                          // Oluştur Butonu
+                          _buildCreateButton(isIOS),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+      ),
     );
   }
   

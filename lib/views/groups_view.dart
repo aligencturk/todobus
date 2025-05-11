@@ -117,7 +117,9 @@ class _GroupsViewState extends State<GroupsView> {
               ),
             ),
           ),
-          body: _buildBody(viewModel),
+          body: SafeArea(
+            child: _buildBody(viewModel),
+          ),
         );
       }
     );

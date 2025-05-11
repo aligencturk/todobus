@@ -9,9 +9,11 @@ import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import '../models/group_models.dart';
 import '../models/user_model.dart';
+import '../main_app.dart';
 import 'login_view.dart';
 import 'profile_view.dart';
 import 'group_detail_view.dart';
+import 'events_view.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({Key? key}) : super(key: key);
@@ -209,16 +211,49 @@ class _DashboardViewState extends State<DashboardView> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Yaklaşan Etkinlikler',
-                  style: platformThemeData(
-                    context,
-                    material: (data) => data.textTheme.titleLarge?.copyWith(fontSize: 18),
-                    cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
-                      fontSize: 18, 
-                      fontWeight: FontWeight.bold
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Yaklaşan Etkinlikler',
+                      style: platformThemeData(
+                        context,
+                        material: (data) => data.textTheme.titleLarge?.copyWith(fontSize: 18),
+                        cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
+                          fontSize: 18, 
+                          fontWeight: FontWeight.bold
+                        ),
+                      ),
                     ),
-                  ),
+                    TextButton(
+                      onPressed: () {
+                        // Etkinlikler sayfasına git
+                        final parentContext = context;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (Navigator.of(parentContext).canPop()) {
+                            Navigator.of(parentContext).pop();
+                          }
+                          
+                          // Alt menüdeki etkinlikler sekmesine geçiş yapılacak
+                          if (parentContext.findAncestorStateOfType<MainAppState>() != null) {
+                            parentContext.findAncestorStateOfType<MainAppState>()!.setCurrentIndex(2);
+                          }
+                        });
+                      },
+                      child: Text(
+                        'Tümü',
+                        style: platformThemeData(
+                          context,
+                          material: (data) => data.textTheme.bodyMedium?.copyWith(
+                            color: Colors.blue,
+                          ),
+                          cupertino: (data) => data.textTheme.textStyle.copyWith(
+                            color: CupertinoColors.activeBlue,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
