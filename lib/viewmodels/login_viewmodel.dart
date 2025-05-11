@@ -11,16 +11,30 @@ class LoginViewModel with ChangeNotifier {
   LoginStatus _status = LoginStatus.initial;
   String _errorMessage = '';
   bool _obscurePassword = true;
+  bool _isDisposed = false;
 
   // Getters
   LoginStatus get status => _status;
   String get errorMessage => _errorMessage;
   bool get obscurePassword => _obscurePassword;
 
+  // Güvenli notifyListeners
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      Future.microtask(() => notifyListeners());
+    }
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
   // Şifre görünürlüğünü değiştir
   void togglePasswordVisibility() {
     _obscurePassword = !_obscurePassword;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   // Giriş yap
@@ -28,14 +42,14 @@ class LoginViewModel with ChangeNotifier {
     if (email.isEmpty || password.isEmpty) {
       _errorMessage = 'E-posta ve şifre alanları boş bırakılamaz';
       _status = LoginStatus.error;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
 
     try {
       _status = LoginStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
 
       _logger.i('Giriş denemesi: $email');
       final response = await _apiService.login(email, password);
@@ -43,20 +57,20 @@ class LoginViewModel with ChangeNotifier {
       if (response.success) {
         _logger.i('Giriş başarılı: Kullanıcı ID: ${response.data?.userID}');
         _status = LoginStatus.success;
-        notifyListeners();
+        _safeNotifyListeners();
         return true;
       } else {
         _errorMessage = response.errorMessage ?? 'Giriş başarısız';
         _logger.w('Giriş başarısız: $_errorMessage');
         _status = LoginStatus.error;
-        notifyListeners();
+        _safeNotifyListeners();
         return false;
       }
     } catch (e) {
       _errorMessage = 'Bir hata oluştu: ${e.toString()}';
       _logger.e('Giriş hatası:', e);
       _status = LoginStatus.error;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -65,6 +79,6 @@ class LoginViewModel with ChangeNotifier {
   void reset() {
     _status = LoginStatus.initial;
     _errorMessage = '';
-    notifyListeners();
+    _safeNotifyListeners();
   }
 } 

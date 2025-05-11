@@ -12,6 +12,7 @@ class GroupViewModel with ChangeNotifier {
   GroupLoadStatus _status = GroupLoadStatus.initial;
   String _errorMessage = '';
   List<Group> _groups = [];
+  bool _isDisposed = false;
   
   // Getters
   GroupLoadStatus get status => _status;
@@ -20,6 +21,19 @@ class GroupViewModel with ChangeNotifier {
   bool get hasGroups => _groups.isNotEmpty;
   int get totalProjects => _groups.fold(0, (sum, group) => sum + group.projects.length);
   
+  // Güvenli notifyListeners
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      Future.microtask(() => notifyListeners());
+    }
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+  
   // Grup listesini yükle
   Future<void> loadGroups() async {
     if (_status == GroupLoadStatus.loading) return;
@@ -27,7 +41,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       _logger.i('Grup listesi yükleniyor');
       final groups = await _apiService.getGroups();
@@ -40,7 +54,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = e.toString();
       _logger.e('Gruplar yüklenirken hata: $e');
     } finally {
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
   
@@ -49,7 +63,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.createGroup(groupName, groupDesc);
       
@@ -64,7 +78,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Grup oluşturulurken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -74,7 +88,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.updateGroup(groupID, groupName, groupDesc);
       
@@ -89,7 +103,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Grup güncellenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -97,19 +111,19 @@ class GroupViewModel with ChangeNotifier {
   // Grupları adlarına göre sırala (A-Z)
   void sortGroupsByName() {
     _groups.sort((a, b) => a.groupName.compareTo(b.groupName));
-    notifyListeners();
+    _safeNotifyListeners();
   }
   
   // Grupları oluşturma tarihine göre sırala (yeniden eskiye)
   void sortGroupsByDate() {
     _groups.sort((a, b) => b.createDate.compareTo(a.createDate));
-    notifyListeners();
+    _safeNotifyListeners();
   }
   
   // Grupları proje sayısına göre sırala (çoktan aza)
   void sortGroupsByProjectCount() {
     _groups.sort((a, b) => b.projects.length.compareTo(a.projects.length));
-    notifyListeners();
+    _safeNotifyListeners();
   }
   
   // Gruptan kullanıcı çıkar
@@ -117,7 +131,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.removeUserFromGroup(groupID, userID);
       
@@ -132,7 +146,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Kullanıcı gruptan çıkarılırken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -147,7 +161,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final result = await _apiService.inviteUserToGroup(
         groupID, 
@@ -157,14 +171,14 @@ class GroupViewModel with ChangeNotifier {
       );
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return result;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Kullanıcı davet edilirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return {'success': false, 'error': e.toString()};
     }
   }
@@ -174,7 +188,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.deleteGroup(groupID);
       
@@ -189,7 +203,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Grup silinirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -198,19 +212,19 @@ class GroupViewModel with ChangeNotifier {
   Future<List<GroupLog>> getGroupReports(int groupID, bool isAdmin) async {
     try {
       _status = GroupLoadStatus.loading;
-      notifyListeners();
+      _safeNotifyListeners();
       
       final reports = await _apiService.getGroupReports(groupID, isAdmin);
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return reports;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Grup raporları yüklenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return [];
     }
   }
@@ -219,19 +233,19 @@ class GroupViewModel with ChangeNotifier {
   Future<ProjectDetail?> getProjectDetail(int projectID, int groupID) async {
     try {
       _status = GroupLoadStatus.loading;
-      notifyListeners();
+      _safeNotifyListeners();
       
       final projectDetail = await _apiService.getProjectDetail(projectID, groupID);
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return projectDetail;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Proje detayları yüklenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return null;
     }
   }
@@ -249,7 +263,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.createProject(
         groupID, 
@@ -262,14 +276,14 @@ class GroupViewModel with ChangeNotifier {
       );
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Proje oluşturulurken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -287,7 +301,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.updateProject(
         groupID, 
@@ -300,14 +314,14 @@ class GroupViewModel with ChangeNotifier {
       );
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Proje güncellenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -317,13 +331,13 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.removeUserFromProject(groupID, projectID, userID);
       
       if (success) {
         _status = GroupLoadStatus.loaded;
-        notifyListeners();
+        _safeNotifyListeners();
         return true;
       }
       
@@ -332,7 +346,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Kullanıcı projeden çıkarılırken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -341,19 +355,19 @@ class GroupViewModel with ChangeNotifier {
   Future<List<ProjectWork>> getProjectWorks(int projectID) async {
     try {
       _status = GroupLoadStatus.loading;
-      notifyListeners();
+      _safeNotifyListeners();
       
       final works = await _apiService.getProjectWorks(projectID);
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return works;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Proje görevleri yüklenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return [];
     }
   }
@@ -362,35 +376,35 @@ class GroupViewModel with ChangeNotifier {
   Future<ProjectWork?> getWorkDetail(int projectID, int workID) async {
     try {
       _status = GroupLoadStatus.loading;
-      notifyListeners();
+      _safeNotifyListeners();
       
       final workDetail = await _apiService.getWorkDetail(projectID, workID);
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return workDetail;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Görev detayı yüklenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return null;
     }
   }
-
+  
   // Proje sil
   Future<bool> deleteProject(int projectID, int workID) async {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();  
+      _safeNotifyListeners();  
 
       final success = await _apiService.deleteProject(projectID, workID);
       
       if (success) {
         _status = GroupLoadStatus.loaded;
-        notifyListeners();  
+        _safeNotifyListeners();  
         return true;
       }
       
@@ -399,7 +413,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString(); 
       _logger.e('Proje silinirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -408,19 +422,19 @@ class GroupViewModel with ChangeNotifier {
   Future<List<ProjectStatus>> getProjectStatuses() async {
     try {
       _status = GroupLoadStatus.loading;
-      notifyListeners();
+      _safeNotifyListeners();
       
       final statuses = await _apiService.getProjectStatuses();
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return statuses;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Proje durumları yüklenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return [];
     }
   }
@@ -437,7 +451,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.addProjectWork(
         projectID,
@@ -449,14 +463,14 @@ class GroupViewModel with ChangeNotifier {
       );
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Görev eklenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -475,7 +489,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.updateProjectWork(
         projectID,
@@ -489,14 +503,14 @@ class GroupViewModel with ChangeNotifier {
       );
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Görev güncellenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -506,7 +520,7 @@ class GroupViewModel with ChangeNotifier {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       final success = await _apiService.changeWorkCompletionStatus(
         projectID,
@@ -515,14 +529,14 @@ class GroupViewModel with ChangeNotifier {
       );
       
       _status = GroupLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
       
       return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Görev durumu değiştirilirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -532,7 +546,6 @@ class GroupViewModel with ChangeNotifier {
     _status = GroupLoadStatus.initial;
     _errorMessage = '';
     _groups = [];
-    notifyListeners();
+    _safeNotifyListeners();
   }
-
 } 

@@ -284,6 +284,141 @@ class ApiService {
     return loginResponse;
   }
 
+  // Kayıt metodu
+  Future<RegisterResponse> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String phone,
+    required String password,
+    required bool policy,
+    required bool kvkk,
+  }) async {
+    try {
+      _logger.i('Kullanıcı kaydı yapılıyor: $email');
+      
+      final registerRequest = RegisterRequest(
+        userFirstname: firstName,
+        userLastname: lastName,
+        userEmail: email,
+        userPhone: phone,
+        userPassword: password,
+        version: getAppVersion(),
+        platform: getPlatform(),
+        policy: policy,
+        kvkk: kvkk,
+      );
+      
+      final response = await post(
+        'service/auth/register',
+        body: registerRequest.toJson(),
+      );
+      
+      final registerResponse = RegisterResponse.fromJson(response);
+      
+      if (registerResponse.success) {
+        _logger.i('Kullanıcı kaydı başarılı: $email');
+      } else {
+        _logger.w('Kullanıcı kaydı başarısız: ${registerResponse.message}');
+      }
+      
+      return registerResponse;
+    } catch (e) {
+      _logger.e('Kullanıcı kaydı sırasında hata: $e');
+      throw Exception('Kayıt işlemi sırasında bir hata oluştu: $e');
+    }
+  }
+  
+  // Şifremi unuttum metodu
+  Future<ForgotPasswordResponse> forgotPassword(String email) async {
+    try {
+      _logger.i('Şifre sıfırlama isteği gönderiliyor: $email');
+      
+      final forgotRequest = ForgotPasswordRequest(
+        userEmail: email,
+      );
+      
+      final response = await post(
+        'service/auth/forgotPassword',
+        body: forgotRequest.toJson(),
+      );
+      
+      final forgotResponse = ForgotPasswordResponse.fromJson(response);
+      
+      if (forgotResponse.success) {
+        _logger.i('Şifre sıfırlama isteği başarılı: $email');
+      } else {
+        _logger.w('Şifre sıfırlama isteği başarısız: ${forgotResponse.message}');
+      }
+      
+      return forgotResponse;
+    } catch (e) {
+      _logger.e('Şifre sıfırlama isteği sırasında hata: $e');
+      throw Exception('Şifre sıfırlama isteği sırasında bir hata oluştu: $e');
+    }
+  }
+  
+  // Doğrulama kodu kontrolü
+  Future<CodeCheckResponse> checkVerificationCode(String code, String token) async {
+    try {
+      _logger.i('Doğrulama kodu kontrol ediliyor: $code');
+      
+      final codeRequest = CodeCheckRequest(
+        code: code,
+        token: token,
+      );
+      
+      final response = await post(
+        'service/auth/code/checkCode',
+        body: codeRequest.toJson(),
+      );
+      
+      final codeResponse = CodeCheckResponse.fromJson(response);
+      
+      if (codeResponse.success) {
+        _logger.i('Doğrulama kodu kontrolü başarılı');
+      } else {
+        _logger.w('Doğrulama kodu kontrolü başarısız: ${codeResponse.message}');
+      }
+      
+      return codeResponse;
+    } catch (e) {
+      _logger.e('Doğrulama kodu kontrolü sırasında hata: $e');
+      throw Exception('Doğrulama kodu kontrolü sırasında bir hata oluştu: $e');
+    }
+  }
+  
+  // Şifre güncelleme
+  Future<UpdatePasswordResponse> updatePassword(String passToken, String password, String passwordAgain) async {
+    try {
+      _logger.i('Şifre güncelleniyor');
+      
+      final updateRequest = UpdatePasswordRequest(
+        passToken: passToken,
+        password: password,
+        passwordAgain: passwordAgain,
+      );
+      
+      final response = await post(
+        'service/auth/forgotPassword/updatePass',
+        body: updateRequest.toJson(),
+      );
+      
+      final updateResponse = UpdatePasswordResponse.fromJson(response);
+      
+      if (updateResponse.success) {
+        _logger.i('Şifre güncelleme başarılı');
+      } else {
+        _logger.w('Şifre güncelleme başarısız: ${updateResponse.message}');
+      }
+      
+      return updateResponse;
+    } catch (e) {
+      _logger.e('Şifre güncelleme sırasında hata: $e');
+      throw Exception('Şifre güncelleme sırasında bir hata oluştu: $e');
+    }
+  }
+
   // Kullanıcı Bilgilerini Getir
   Future<UserResponse> getUser() async {
     final token = _storageService.getToken();
@@ -1041,6 +1176,31 @@ class ApiService {
     }
   }
 
+  // Kullanıcının görevlerini getir
+  Future<UserWorksResponse> getUserWorks() async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+      };
+
+      _logger.i('Kullanıcı görevleri getiriliyor...');
+      final response = await post('service/user/project/workListUser', body: body);
+      
+      final worksResponse = UserWorksResponse.fromJson(response);
+      _logger.i('Kullanıcı görevleri başarıyla getirildi: ${worksResponse.data?.works.length ?? 0} görev');
+      
+      return worksResponse;
+    } catch (e) {
+      _logger.e('Kullanıcı görevleri yüklenirken hata: $e');
+      throw Exception('Kullanıcı görevleri yüklenemedi: $e');
+    }
+  }
+
   // Etkinlik detayı getir
   Future<EventDetailResponse> getEventDetail(int eventID) async {
     try {
@@ -1143,23 +1303,5 @@ class ApiService {
     }
   }
   
-  // Şirket etkinliklerini getir
-  Future<EventsResponse> getCompanyEvents() async {
-    try {
-      final token = await _storageService.getToken();
-      if (token == null) {
-        throw Exception('Oturum bilgisi bulunamadı');
-      }
 
-      final body = {
-        'userToken': token,
-      };
-
-      final response = await post('service/user/event/company', body: body);
-      return EventsResponse.fromJson(response);
-    } catch (e) {
-      _logger.e('Şirket etkinlikleri yüklenirken hata: $e');
-      throw Exception('Şirket etkinlikleri yüklenemedi: $e');
-    }
-  }
 } 

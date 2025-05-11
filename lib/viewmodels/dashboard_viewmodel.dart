@@ -14,6 +14,7 @@ class DashboardViewModel with ChangeNotifier {
   
   DashboardLoadStatus _status = DashboardLoadStatus.initial;
   String _errorMessage = '';
+  bool _isDisposed = false;
   
   User? _user;
   int _taskCount = 0;
@@ -23,13 +24,34 @@ class DashboardViewModel with ChangeNotifier {
   List<GroupEvent> _upcomingEvents = [];
   List<GroupDetail> _userGroups = [];
   
+  // Kullanıcı görevleri için gerekli değişkenler
+  List<UserProjectWork> _userTasks = [];
+  bool _isLoadingTasks = false;
+  String _tasksErrorMessage = '';
+  
   // Getters
   DashboardLoadStatus get status => _status;
   String get errorMessage => _errorMessage;
   User? get user => _user;
-  int get taskCount => _taskCount;
+  int get taskCount => _userTasks.length;
   bool get isLoading => _status == DashboardLoadStatus.loading;
   List<GroupEvent> get upcomingEvents => _upcomingEvents;
+  List<UserProjectWork> get userTasks => _userTasks;
+  bool get isLoadingTasks => _isLoadingTasks;
+  String get tasksErrorMessage => _tasksErrorMessage;
+  
+  // Güvenli notifyListeners
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      Future.microtask(() => notifyListeners());
+    }
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
   
   // Kullanıcı bilgilerini yükle
   Future<void> loadUserInfo() async {
@@ -38,7 +60,7 @@ class DashboardViewModel with ChangeNotifier {
     try {
       _status = DashboardLoadStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       _logger.i('Dashboard kullanıcı bilgileri yükleniyor');
       final response = await _apiService.getUser();
@@ -58,7 +80,7 @@ class DashboardViewModel with ChangeNotifier {
       _status = DashboardLoadStatus.error;
       _logger.e('Kullanıcı bilgileri yükleme hatası:', e);
     } finally {
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
   
@@ -66,29 +88,89 @@ class DashboardViewModel with ChangeNotifier {
   Future<void> loadTaskCount() async {
     // Bu fonksiyon ileride API ile görev sayısını alacak
     _taskCount = 0; // Şimdilik varsayılan değer
-    notifyListeners();
+    _safeNotifyListeners();
   }
-  
-
   
   // Tüm verileri yükle
   Future<void> loadDashboardData() async {
     _status = DashboardLoadStatus.loading;
     _errorMessage = '';
-    notifyListeners();
+    _safeNotifyListeners();
     
     try {
       await loadUserInfo();
-      await loadTaskCount();
+      await loadUserTasks();
       await _loadUpcomingEvents();
       
       _status = DashboardLoadStatus.loaded;
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _status = DashboardLoadStatus.error;
       _errorMessage = 'Veriler yüklenirken bir hata oluştu: $e';
       _logger.e('Dashboard veri yüklenirken hata: $e');
-      notifyListeners();
+      _safeNotifyListeners();
+    }
+  }
+  
+  // Kullanıcı görevlerini yükle
+  Future<void> loadUserTasks() async {
+    if (_isLoadingTasks) return;
+    
+    _isLoadingTasks = true;
+    _tasksErrorMessage = '';
+    _safeNotifyListeners();
+    
+    try {
+      _logger.i('Kullanıcı görevleri yükleniyor...');
+      final response = await _apiService.getUserWorks();
+      
+      if (response.success && response.data != null) {
+        _userTasks = response.data!.works;
+        
+        // Görevleri tarihe göre sırala (önce yaklaşan tarihli görevler)
+        _userTasks.sort((a, b) {
+          if (a.workCompleted != b.workCompleted) {
+            return a.workCompleted ? 1 : -1; // Tamamlanmamış olanlar önce
+          }
+          // Tarih formatı: 25.04.2025
+          try {
+            final aEndDateParts = a.workEndDate.split('.');
+            final bEndDateParts = b.workEndDate.split('.');
+            
+            if (aEndDateParts.length != 3 || bEndDateParts.length != 3) {
+              return 0;
+            }
+            
+            final aEndDate = DateTime(
+              int.parse(aEndDateParts[2]), // Yıl
+              int.parse(aEndDateParts[1]), // Ay
+              int.parse(aEndDateParts[0]), // Gün
+            );
+            
+            final bEndDate = DateTime(
+              int.parse(bEndDateParts[2]), // Yıl
+              int.parse(bEndDateParts[1]), // Ay
+              int.parse(bEndDateParts[0]), // Gün
+            );
+            
+            return aEndDate.compareTo(bEndDate);
+          } catch (e) {
+            return 0;
+          }
+        });
+        
+        _logger.i('${_userTasks.length} görev başarıyla yüklendi');
+        _taskCount = _userTasks.length;
+      } else {
+        _tasksErrorMessage = response.errorMessage ?? 'Görevler alınamadı';
+        _logger.w('Görevler yükleme başarısız: $_tasksErrorMessage');
+      }
+    } catch (e) {
+      _tasksErrorMessage = 'Bir hata oluştu: ${e.toString()}';
+      _logger.e('Görevler yükleme hatası:', e);
+    } finally {
+      _isLoadingTasks = false;
+      _safeNotifyListeners();
     }
   }
   

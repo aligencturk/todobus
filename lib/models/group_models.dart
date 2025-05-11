@@ -642,4 +642,96 @@ class ProjectWorkDetailResponse {
       errorMessage: json['errorMessage'],
     );
   }
+}
+
+// Kullanıcı görevleri yanıtı için model
+class UserWorksResponse {
+  final bool error;
+  final bool success;
+  final UserWorksData? data;
+  final String? errorMessage;
+  final String? code;
+
+  UserWorksResponse({
+    required this.error,
+    required this.success,
+    this.data,
+    this.errorMessage,
+    this.code,
+  });
+
+  factory UserWorksResponse.fromJson(Map<String, dynamic> json) {
+    return UserWorksResponse(
+      error: json['error'] ?? false,
+      success: json['success'] ?? false,
+      data: json['data'] != null ? UserWorksData.fromJson(json['data']) : null,
+      errorMessage: json['errorMessage'],
+      code: json['410'],
+    );
+  }
+}
+
+class UserWorksData {
+  final List<UserProjectWork> works;
+
+  UserWorksData({required this.works});
+
+  factory UserWorksData.fromJson(Map<String, dynamic> json) {
+    List<UserProjectWork> worksList = [];
+    if (json['works'] != null) {
+      worksList = List<UserProjectWork>.from(
+          json['works'].map((work) => UserProjectWork.fromJson(work)));
+    }
+    return UserWorksData(works: worksList);
+  }
+}
+
+class UserProjectWork {
+  final int projectID;
+  final int workID;
+  final String projectName;
+  final String workName;
+  final String workDesc;
+  final int workOrder;
+  final bool workCompleted;
+  final String workStartDate;
+  final String workEndDate;
+  final String workCreateDate;
+  final List<WorkUser> workUsers;
+
+  UserProjectWork({
+    required this.projectID,
+    required this.workID,
+    required this.projectName,
+    required this.workName,
+    required this.workDesc,
+    required this.workOrder,
+    required this.workCompleted,
+    required this.workStartDate,
+    required this.workEndDate,
+    required this.workCreateDate,
+    required this.workUsers,
+  });
+
+  factory UserProjectWork.fromJson(Map<String, dynamic> json) {
+    List<WorkUser> usersList = [];
+    if (json['workUsers'] != null) {
+      usersList = List<WorkUser>.from(
+          json['workUsers'].map((user) => WorkUser.fromJson(user)));
+    }
+    
+    return UserProjectWork(
+      projectID: json['projectID'] ?? 0,
+      workID: json['workID'] ?? 0,
+      projectName: json['projectName'] ?? '',
+      workName: json['workName'] ?? '',
+      workDesc: json['workDesc'] ?? '',
+      workOrder: json['workOrder'] ?? 0,
+      workCompleted: json['workCompleted'] ?? false,
+      workStartDate: json['workStartDate'] ?? '',
+      workEndDate: json['workEndDate'] ?? '',
+      workCreateDate: json['workCreateDate'] ?? '',
+      workUsers: usersList,
+    );
+  }
 } 

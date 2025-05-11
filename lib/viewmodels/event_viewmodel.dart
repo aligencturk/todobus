@@ -14,6 +14,7 @@ class EventViewModel with ChangeNotifier {
   List<Event> _events = [];
   List<Event> _companyEvents = [];
   Event? _selectedEvent;
+  bool _isDisposed = false;
   
   // Getters
   EventLoadStatus get status => _status;
@@ -24,11 +25,24 @@ class EventViewModel with ChangeNotifier {
   Event? get selectedEvent => _selectedEvent;
   bool get isLoading => _status == EventLoadStatus.loading;
   
+  // Güvenli notifyListeners
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      Future.microtask(() => notifyListeners());
+    }
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+  
   // Tüm etkinlikleri yükle
   Future<void> loadEvents({int groupID = 0, bool includeCompanyEvents = true}) async {
     _status = EventLoadStatus.loading;
     _errorMessage = '';
-    notifyListeners();
+    _safeNotifyListeners();
     
     try {
       _logger.i('Etkinlikler yükleniyor (Grup ID: $groupID)');
@@ -38,10 +52,7 @@ class EventViewModel with ChangeNotifier {
         _events = response.data!.events;
         _logger.i('${_events.length} etkinlik başarıyla yüklendi');
         
-        // Şirket etkinliklerini yükle
-        if (includeCompanyEvents) {
-          await _loadCompanyEvents();
-        }
+        
         
         _status = EventLoadStatus.loaded;
       } else {
@@ -54,51 +65,14 @@ class EventViewModel with ChangeNotifier {
       _status = EventLoadStatus.error;
       _logger.e('Etkinlikler yükleme hatası:', e);
     } finally {
-      notifyListeners();
-    }
-  }
-  
-  // Şirket etkinliklerini yükle
-  Future<void> _loadCompanyEvents() async {
-    try {
-      _logger.i('Şirket etkinlikleri yükleniyor');
-      final response = await _apiService.getCompanyEvents();
-      
-      if (response.success && response.data != null) {
-        _companyEvents = response.data!.events;
-        _logger.i('${_companyEvents.length} şirket etkinliği başarıyla yüklendi');
-      } else {
-        _logger.w('Şirket etkinlikleri yüklenemedi: ${response.errorMessage}');
-        _companyEvents = [];
-      }
-    } catch (e) {
-      _logger.e('Şirket etkinlikleri yükleme hatası:', e);
-      _companyEvents = [];
-    }
-  }
-  
-  // Sadece şirket etkinliklerini yükle
-  Future<void> loadCompanyEventsOnly() async {
-    _status = EventLoadStatus.loading;
-    _errorMessage = '';
-    _events = []; // Kullanıcı etkinliklerini temizle
-    notifyListeners();
-    
-    try {
-      await _loadCompanyEvents();
-      _status = EventLoadStatus.loaded;
-    } catch (e) {
-      _errorMessage = 'Bir hata oluştu: ${e.toString()}';
-      _status = EventLoadStatus.error;
-    } finally {
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
   
   // Etkinlik detayı getir
   Future<void> getEventDetail(int eventID) async {
     _status = EventLoadStatus.loading;
-    notifyListeners();
+    _safeNotifyListeners();
     
     try {
       _logger.i('Etkinlik detayı yükleniyor (ID: $eventID)');
@@ -106,8 +80,14 @@ class EventViewModel with ChangeNotifier {
       
       if (response.success && response.data != null) {
         _selectedEvent = response.data;
+        
+        // userFullname boş gelirse API'den bu değeri doğru şekilde almadığımızdan emin olalım
+        if (_selectedEvent!.userFullname.isEmpty) {
+          _logger.w('Etkinlik detayında userFullname boş geldi, API yanıtını kontrol edin');
+        }
+        
         _status = EventLoadStatus.loaded;
-        _logger.i('Etkinlik detayı başarıyla yüklendi: ${_selectedEvent?.eventTitle}');
+        _logger.i('Etkinlik detayı başarıyla yüklendi: ${_selectedEvent?.eventTitle}, Oluşturan: ${_selectedEvent?.userFullname}');
       } else {
         _errorMessage = response.errorMessage ?? 'Etkinlik detayı alınamadı';
         _status = EventLoadStatus.error;
@@ -118,7 +98,7 @@ class EventViewModel with ChangeNotifier {
       _status = EventLoadStatus.error;
       _logger.e('Etkinlik detayı yükleme hatası:', e);
     } finally {
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
   
@@ -130,7 +110,7 @@ class EventViewModel with ChangeNotifier {
     required String eventDate,
   }) async {
     _status = EventLoadStatus.loading;
-    notifyListeners();
+    _safeNotifyListeners();
     
     try {
       _logger.i('Etkinlik oluşturuluyor: $eventTitle');
@@ -150,14 +130,14 @@ class EventViewModel with ChangeNotifier {
         _errorMessage = response['message'] ?? 'Etkinlik oluşturulamadı';
         _status = EventLoadStatus.error;
         _logger.w('Etkinlik oluşturma başarısız: $_errorMessage');
-        notifyListeners();
+        _safeNotifyListeners();
         return false;
       }
     } catch (e) {
       _errorMessage = 'Bir hata oluştu: ${e.toString()}';
       _status = EventLoadStatus.error;
       _logger.e('Etkinlik oluşturma hatası:', e);
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -172,7 +152,7 @@ class EventViewModel with ChangeNotifier {
     int groupID = 0,
   }) async {
     _status = EventLoadStatus.loading;
-    notifyListeners();
+    _safeNotifyListeners();
     
     try {
       _logger.i('Etkinlik güncelleniyor (ID: $eventID): $eventTitle');
@@ -193,14 +173,14 @@ class EventViewModel with ChangeNotifier {
         _errorMessage = response['message'] ?? 'Etkinlik güncellenemedi';
         _status = EventLoadStatus.error;
         _logger.w('Etkinlik güncelleme başarısız: $_errorMessage');
-        notifyListeners();
+        _safeNotifyListeners();
         return false;
       }
     } catch (e) {
       _errorMessage = 'Bir hata oluştu: ${e.toString()}';
       _status = EventLoadStatus.error;
       _logger.e('Etkinlik güncelleme hatası:', e);
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -219,13 +199,13 @@ class EventViewModel with ChangeNotifier {
       } else {
         _errorMessage = response['message'] ?? 'Etkinlik silinemedi';
         _logger.w('Etkinlik silme başarısız: $_errorMessage');
-        notifyListeners();
+        _safeNotifyListeners();
         return false;
       }
     } catch (e) {
       _errorMessage = 'Bir hata oluştu: ${e.toString()}';
       _logger.e('Etkinlik silme hatası:', e);
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }

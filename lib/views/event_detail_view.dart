@@ -76,6 +76,7 @@ class _EventDetailViewState extends State<EventDetailView> {
       }
     } catch (e) {
       _logger.e('Etkinlik detayı yüklenirken hata: $e');
+      // API hata yanıtlarını kontrol etme yapısı sağlanmıştır
     } finally {
       if (mounted) {
         setState(() {
@@ -438,13 +439,34 @@ class _EventDetailViewState extends State<EventDetailView> {
 
   Widget _buildErrorView(BuildContext context, String? errorMessage) {
     return Center(
-      child: Text(
-        errorMessage ?? 'Bir hata oluştu',
-        style: platformThemeData(
-          context,
-          material: (data) => data.textTheme.headlineSmall,
-          cupertino: (data) => data.textTheme.navTitleTextStyle,
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            isCupertino(context) ? CupertinoIcons.exclamationmark_circle : Icons.error_outline,
+            size: 64,
+            color: isCupertino(context) ? CupertinoColors.systemRed : Colors.red,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            errorMessage?.contains('Not Found') == true 
+                ? 'Bu etkinlik bulunamadı veya silinmiş olabilir.' 
+                : (errorMessage ?? 'Bir hata oluştu, lütfen tekrar deneyin.'),
+            textAlign: TextAlign.center,
+            style: platformThemeData(
+              context,
+              material: (data) => data.textTheme.titleMedium,
+              cupertino: (data) => data.textTheme.navTitleTextStyle,
+            ),
+          ),
+          const SizedBox(height: 24),
+          PlatformElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Geri Dön'),
+          ),
+        ],
       ),
     );
   }
@@ -603,7 +625,7 @@ class _EventDetailViewState extends State<EventDetailView> {
               context,
               isIOS ? CupertinoIcons.person : Icons.person,
               'Oluşturan',
-              isCompanyEvent ? 'Şirket Yönetimi' : event.userFullname,
+              isCompanyEvent ? 'Şirket Etkinliği' : event.userFullname,
             ),
             if (!isCompanyEvent && event.groupID > 0)
               Column(
@@ -831,7 +853,7 @@ class _EventDetailViewState extends State<EventDetailView> {
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {
+  Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value, {TextStyle? style}) {
     final isIOS = isCupertino(context);
     
     return Row(
@@ -866,7 +888,7 @@ class _EventDetailViewState extends State<EventDetailView> {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: platformThemeData(
+                style: style ?? platformThemeData(
                   context,
                   material: (data) => data.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
                   cupertino: (data) => data.textTheme.textStyle.copyWith(

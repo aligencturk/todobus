@@ -14,6 +14,7 @@ class ProfileViewModel with ChangeNotifier {
   ProfileStatus _status = ProfileStatus.initial;
   String _errorMessage = '';
   User? _user;
+  bool _isDisposed = false;
   
   // Cihaz bilgileri
   String _deviceModel = 'Yükleniyor...';
@@ -27,6 +28,19 @@ class ProfileViewModel with ChangeNotifier {
   String get deviceModel => _deviceModel;
   String get osVersion => _osVersion;
   
+  // Güvenli notifyListeners
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      Future.microtask(() => notifyListeners());
+    }
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+  
   // Kullanıcı bilgilerini getir
   Future<void> loadUserProfile() async {
     if (_status == ProfileStatus.loading) return;
@@ -34,7 +48,7 @@ class ProfileViewModel with ChangeNotifier {
     try {
       _status = ProfileStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
       
       // Cihaz bilgilerini yükle
       if (!_deviceInfoLoaded) {
@@ -58,7 +72,7 @@ class ProfileViewModel with ChangeNotifier {
       _status = ProfileStatus.error;
       _logger.e('Profil yükleme hatası:', e);
     } finally {
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
   
@@ -93,6 +107,6 @@ class ProfileViewModel with ChangeNotifier {
   void reset() {
     _status = ProfileStatus.initial;
     _errorMessage = '';
-    notifyListeners();
+    _safeNotifyListeners();
   }
 } 
