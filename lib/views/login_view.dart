@@ -227,8 +227,7 @@ class _LoginViewState extends State<LoginView> {
                               ),
                             ),
                           
-                          const Spacer(),
-                          
+                          const SizedBox(height: 20),                          
                           // Giriş butonu
                           Padding(
                             padding: const EdgeInsets.only(bottom: 20),
@@ -308,51 +307,7 @@ class _LoginViewState extends State<LoginView> {
                               ),
                             ),
                           ),
-                          
-                          // Veya çizgisi
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 20),
-                            child: Row(
-                              children: [
-                                Expanded(child: Divider(color: const Color(0xFFE0E0E0))),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  child: Text(
-                                    'veya',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: const Color(0xFF7F8C8D),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(child: Divider(color: const Color(0xFFE0E0E0))),
-                              ],
-                            ),
-                          ),
-                          
-                          // Şifremi unuttum bağlantısı
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 40),
-                            child: CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  CupertinoPageRoute(
-                                    builder: (context) => const ForgotPasswordView(),
-                                  ),
-                                );
-                              },
-                              child: Text(
-                                'Şifremi Unuttum',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: const Color(0xFF3498DB),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                             ],
                       ),
                     ),
                   ),

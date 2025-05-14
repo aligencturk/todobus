@@ -597,15 +597,15 @@ class ApiService {
     try {
       _logger.i('Gruptan kullanıcı çıkarılıyor: GroupID: $groupID, UserID: $userID');
       
-      final token = await _storageService.getToken();
-      if (token == null) {
+      final userToken = await _storageService.getToken();
+      if (userToken == null) {
         throw Exception('Kullanıcı token bilgisi bulunamadı');
       }
       
       final response = await put(
         'service/user/group/userRemove',
         body: {
-          'userToken': token,
+          'userToken': userToken,
           'groupID': groupID,
           'userID': userID,
           'step': 'group',
@@ -613,8 +613,7 @@ class ApiService {
         requiresToken: true,
       );
       
-      // 410 Gone durumu başarılı kabul edilir
-      if ((response['error'] == false && response['success'] == true) || response['410'] == 'Gone') {
+      if (response['success'] == true || response['410'] == 'Gone') {
         _logger.i('Kullanıcı gruptan başarıyla çıkarıldı');
         return true;
       } else {
@@ -704,7 +703,7 @@ class ApiService {
   // Grup raporlarını getir
   Future<List<GroupLog>> getGroupReports(int groupID, bool isAdmin) async {
     try {
-      final userToken = _storageService.getToken();
+      final userToken = await _storageService.getToken();
       if (userToken == null) {
         throw Exception('Oturum bilgisi bulunamadı');
       }
@@ -737,7 +736,7 @@ class ApiService {
   // Proje detaylarını getir
   Future<ProjectDetail> getProjectDetail(int projectID, int groupID) async {
     try {
-      final userToken = _storageService.getToken();
+      final userToken = await _storageService.getToken();
       if (userToken == null) {
         throw Exception('Oturum bilgisi bulunamadı');
       }
