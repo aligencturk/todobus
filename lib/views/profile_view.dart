@@ -19,6 +19,11 @@ class _ProfileViewState extends State<ProfileView> {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
   
+  // Genişletilebilir panellerin durumlarını takip etmek için
+  bool _isAccountSectionExpanded = false;
+  bool _isHelpSectionExpanded = false;
+  bool _isAppInfoSectionExpanded = false;
+  
   @override
   void initState() {
     super.initState();
@@ -41,6 +46,12 @@ class _ProfileViewState extends State<ProfileView> {
         (route) => false,
       );
     }
+  }
+
+  void _launchWebsite() {
+    // Web sitesi bağlantısı açılacak
+    // URL launcher kullanılabilir
+    _logger.i('Todobus web sitesi açılıyor');
   }
 
   @override
@@ -117,21 +128,109 @@ class _ProfileViewState extends State<ProfileView> {
           _buildProfileHeader(context, user),
           const SizedBox(height: 24),
           
-          _buildSectionHeader(context, 'Hesap Bilgileri'),
-          _buildListItem(context, 'Ad Soyad', user?.userFullname ?? ""),
-          _buildListItem(context, 'E-posta', user?.userEmail ?? ""),
-          _buildListItem(context, 'Doğum Tarihi', user?.userBirthday ?? ""),
-          _buildListItem(context, 'Telefon', user?.userPhone ?? ""),
-          _buildListItem(context, 'Cinsiyet', user?.userGender ?? ""),
+          // Hesap Bilgileri bölümü - genişletilebilir panel
+          _buildExpandableSection(
+            context,
+            title: 'Hesap Bilgileri',
+            isExpanded: _isAccountSectionExpanded,
+            onTap: () {
+              setState(() {
+                _isAccountSectionExpanded = !_isAccountSectionExpanded;
+              });
+            },
+            children: [
+              _buildListItem(context, 'Ad Soyad', user?.userFullname ?? ""),
+              _buildListItem(context, 'E-posta', user?.userEmail ?? ""),
+              _buildListItem(context, 'Doğum Tarihi', user?.userBirthday ?? ""),
+              _buildListItem(context, 'Telefon', user?.userPhone ?? ""),
+              _buildListItem(context, 'Cinsiyet', user?.userGender ?? ""),
+            ],
+          ),
           
-         
+          const SizedBox(height: 16),
+          
+          // Yardım bölümü - genişletilebilir panel
+          _buildExpandableSection(
+            context,
+            title: 'Yardım',
+            isExpanded: _isHelpSectionExpanded,
+            onTap: () {
+              setState(() {
+                _isHelpSectionExpanded = !_isHelpSectionExpanded;
+              });
+            },
+            children: [
+              _buildListItem(context, 'SSS', 'Sıkça Sorulan Sorular'),
+              _buildListItem(context, 'İletişim', 'Bize Ulaşın'),
+              _buildListItem(context, 'Kullanım Şartları', 'Uygulama Koşulları'),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Uygulama Bilgileri bölümü - genişletilebilir panel
+          _buildExpandableSection(
+            context,
+            title: 'Uygulama Bilgileri',
+            isExpanded: _isAppInfoSectionExpanded,
+            onTap: () {
+              setState(() {
+                _isAppInfoSectionExpanded = !_isAppInfoSectionExpanded;
+              });
+            },
+            children: [
+              _buildListItem(context, 'Uygulama Adı', viewModel.appName),
+              _buildListItem(context, 'Versiyon', '${viewModel.appVersion} (${viewModel.buildNumber})'),
+              _buildListItem(context, 'Web Sitesi', 'todobus.tr', 
+                onTap: _launchWebsite,
+                isLink: true
+              ),
+            ],
+          ),
           
           const SizedBox(height: 24),
-          _buildSectionHeader(context, 'Uygulama Bilgileri'),
-          _buildListItem(context, 'Uygulama Adı', viewModel.appName),
-          _buildListItem(context, 'Versiyon', '${viewModel.appVersion} (${viewModel.buildNumber})'),
           
-          const SizedBox(height: 32),
+          // Web sitesi linki
+          GestureDetector(
+            onTap: _launchWebsite,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: Text(
+                  'todobus.tr',
+                  style: TextStyle(
+                    color: platformThemeData(
+                      context,
+                      material: (data) => Colors.blue,
+                      cupertino: (data) => CupertinoColors.activeBlue,
+                    ),
+                    decoration: TextDecoration.underline,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Powered by Rivorya Yazılım
+          Center(
+            child: Text(
+              'Powered by Rivorya Yazılım',
+              style: platformThemeData(
+                context,
+                material: (data) => data.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                cupertino: (data) => data.textTheme.textStyle.copyWith(
+                  fontSize: 14,
+                  color: CupertinoColors.secondaryLabel,
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
           PlatformElevatedButton(
             onPressed: _logout,
             child: Text(
@@ -150,6 +249,8 @@ class _ProfileViewState extends State<ProfileView> {
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
+          
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -204,7 +305,6 @@ class _ProfileViewState extends State<ProfileView> {
               cupertino: (data) => data.textTheme.navLargeTitleTextStyle.copyWith(fontSize: 24),
             ),
           ),
-         
         ],
       ),
     );
@@ -227,10 +327,14 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
   
-  Widget _buildListItem(BuildContext context, String title, String value) {
+  Widget _buildExpandableSection(
+    BuildContext context, {
+    required String title,
+    required bool isExpanded,
+    required VoidCallback onTap,
+    required List<Widget> children,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: platformThemeData(
           context,
@@ -248,32 +352,120 @@ class _ProfileViewState extends State<ProfileView> {
                 ),
               ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              title,
-              style: platformThemeData(
-                context,
-                material: (data) => data.textTheme.titleSmall,
-                cupertino: (data) => data.textTheme.textStyle.copyWith(fontWeight: FontWeight.w500),
+          // Başlık ve genişletme iconu
+          InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: platformThemeData(
+                      context,
+                      material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    isExpanded
+                        ? Icons.expand_less
+                        : Icons.expand_more,
+                  ),
+                ],
               ),
             ),
           ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              style: platformThemeData(
-                context,
-                material: (data) => data.textTheme.bodyMedium,
-                cupertino: (data) => data.textTheme.textStyle.copyWith(color: CupertinoColors.secondaryLabel),
-              ),
-              textAlign: TextAlign.right,
+          // Genişletildiğinde gösterilecek içerik
+          if (isExpanded)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(children: children),
             ),
-          ),
         ],
+      ),
+    );
+  }
+  
+  Widget _buildListItem(
+    BuildContext context, 
+    String title, 
+    String value, {
+    VoidCallback? onTap, 
+    bool isLink = false
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        margin: const EdgeInsets.only(bottom: 8, right: 16, left: 16),
+        decoration: BoxDecoration(
+          color: platformThemeData(
+            context,
+            material: (data) => data.cardColor.withOpacity(0.7),
+            cupertino: (data) => CupertinoColors.systemBackground,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: platformThemeData(
+              context,
+              material: (data) => Colors.grey.shade200,
+              cupertino: (data) => CupertinoColors.systemGrey5,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Text(
+                title,
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.titleSmall,
+                  cupertino: (data) => data.textTheme.textStyle.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontWeight: isLink ? FontWeight.w500 : FontWeight.normal,
+                  color: isLink
+                      ? platformThemeData(
+                          context,
+                          material: (data) => Colors.blue,
+                          cupertino: (data) => CupertinoColors.activeBlue,
+                        )
+                      : platformThemeData(
+                          context,
+                          material: (data) => data.textTheme.bodyMedium?.color,
+                          cupertino: (data) => CupertinoColors.secondaryLabel,
+                        ),
+                  decoration: isLink ? TextDecoration.underline : null,
+                ),
+                textAlign: TextAlign.right,
+              ),
+            ),
+            if (onTap != null && !isLink)
+              Icon(
+                context.platformIcons.rightChevron,
+                size: 16,
+                color: platformThemeData(
+                  context,
+                  material: (data) => Colors.grey,
+                  cupertino: (data) => CupertinoColors.systemGrey,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

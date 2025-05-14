@@ -225,16 +225,12 @@ class _DashboardViewState extends State<DashboardView> {
               ),
             ),
             
-            _buildSectionHeader('Son Aktif Gruplar', onViewAll: () {
-              // Tüm gruplar sayfasına git
-            }),
+            _buildSectionHeader('Son Aktif Gruplar'),
             SliverToBoxAdapter(
               child: _buildRecentGroupsList(dashboardViewModel.isLoading),
             ),
             
-            _buildSectionHeader('Projelerim', onViewAll: () {
-               // Tüm projeler sayfasına git
-            }),
+            _buildSectionHeader('Projelerim'),
             SliverToBoxAdapter(
               child: _buildProjectsList(dashboardViewModel.isLoading),
             ),
@@ -282,9 +278,7 @@ class _DashboardViewState extends State<DashboardView> {
                     ),
             ),
             
-            _buildSectionHeader('Görevlerim', onViewAll: () {
-              // Tüm görevler sayfasına git
-            }),
+            _buildSectionHeader('Görevlerim'),
             _buildMyTasksSection(),
             
             _buildSectionHeader('Son Aktiviteler', onRefresh: () => _loadRecentLogs(groupViewModel)),
