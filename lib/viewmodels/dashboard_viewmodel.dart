@@ -62,6 +62,17 @@ class DashboardViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
+      // Önbellekteki kullanıcı bilgisini kontrol et
+      final cachedUser = _storageService.getCachedUserData();
+      if (cachedUser != null && !_storageService.isCacheStale()) {
+        _user = cachedUser;
+        _userName = _user?.userFullname ?? '';
+        _status = DashboardLoadStatus.loaded;
+        _logger.i('Kullanıcı bilgileri önbellekten alındı: ${_user?.userFullname}');
+        _safeNotifyListeners();
+      }
+      
+      // Güncel veriyi sunucudan al
       _logger.i('Dashboard kullanıcı bilgileri yükleniyor');
       final response = await _apiService.getUser();
       
@@ -69,16 +80,23 @@ class DashboardViewModel with ChangeNotifier {
         _user = response.data!.user;
         _userName = _user?.userFullname ?? '';
         _status = DashboardLoadStatus.loaded;
-        _logger.i('Kullanıcı bilgileri başarıyla yüklendi: ${_user?.userFullname}');
+        
+        // Kullanıcı bilgilerini önbelleğe kaydet
+        await _storageService.cacheUserData(_user!);
+        _logger.i('Kullanıcı bilgileri başarıyla yüklendi ve önbelleğe kaydedildi: ${_user?.userFullname}');
       } else {
-        _errorMessage = response.errorMessage ?? 'Kullanıcı bilgileri alınamadı';
-        _status = DashboardLoadStatus.error;
-        _logger.w('Kullanıcı bilgileri yükleme başarısız: $_errorMessage');
+        if (_user == null) { // Eğer önbellekten veri alınamadıysa hata göster
+          _errorMessage = response.errorMessage ?? 'Kullanıcı bilgileri alınamadı';
+          _status = DashboardLoadStatus.error;
+          _logger.w('Kullanıcı bilgileri yükleme başarısız: $_errorMessage');
+        }
       }
     } catch (e) {
-      _errorMessage = 'Bir hata oluştu: ${e.toString()}';
-      _status = DashboardLoadStatus.error;
-      _logger.e('Kullanıcı bilgileri yükleme hatası:', e);
+      if (_user == null) { // Eğer önbellekten veri alınamadıysa hata göster
+        _errorMessage = 'Bir hata oluştu: ${e.toString()}';
+        _status = DashboardLoadStatus.error;
+        _logger.e('Kullanıcı bilgileri yükleme hatası:', e);
+      }
     } finally {
       _safeNotifyListeners();
     }
@@ -121,57 +139,78 @@ class DashboardViewModel with ChangeNotifier {
     _safeNotifyListeners();
     
     try {
+      // Önbellekteki görevleri kontrol et
+      final cachedTasks = _storageService.getCachedUserTasks();
+      if (cachedTasks != null && !_storageService.isCacheStale()) {
+        _userTasks = cachedTasks;
+        _sortTasks();
+        _logger.i('${_userTasks.length} görev önbellekten alındı');
+        _isLoadingTasks = false;
+        _safeNotifyListeners();
+      }
+      
       _logger.i('Kullanıcı görevleri yükleniyor...');
       final response = await _apiService.getUserWorks();
       
       if (response.success && response.data != null) {
         _userTasks = response.data!.works;
+        _sortTasks();
         
-        // Görevleri tarihe göre sırala (önce yaklaşan tarihli görevler)
-        _userTasks.sort((a, b) {
-          if (a.workCompleted != b.workCompleted) {
-            return a.workCompleted ? 1 : -1; // Tamamlanmamış olanlar önce
-          }
-          // Tarih formatı: 25.04.2025
-          try {
-            final aEndDateParts = a.workEndDate.split('.');
-            final bEndDateParts = b.workEndDate.split('.');
-            
-            if (aEndDateParts.length != 3 || bEndDateParts.length != 3) {
-              return 0;
-            }
-            
-            final aEndDate = DateTime(
-              int.parse(aEndDateParts[2]), // Yıl
-              int.parse(aEndDateParts[1]), // Ay
-              int.parse(aEndDateParts[0]), // Gün
-            );
-            
-            final bEndDate = DateTime(
-              int.parse(bEndDateParts[2]), // Yıl
-              int.parse(bEndDateParts[1]), // Ay
-              int.parse(bEndDateParts[0]), // Gün
-            );
-            
-            return aEndDate.compareTo(bEndDate);
-          } catch (e) {
-            return 0;
-          }
-        });
+        // Görevleri önbelleğe kaydet
+        await _storageService.cacheUserTasks(_userTasks);
         
-        _logger.i('${_userTasks.length} görev başarıyla yüklendi');
+        _logger.i('${_userTasks.length} görev başarıyla yüklendi ve önbelleğe kaydedildi');
         _taskCount = _userTasks.length;
       } else {
-        _tasksErrorMessage = response.errorMessage ?? 'Görevler alınamadı';
-        _logger.w('Görevler yükleme başarısız: $_tasksErrorMessage');
+        if (_userTasks.isEmpty) { // Önbellekten veri alınamadıysa hata göster
+          _tasksErrorMessage = response.errorMessage ?? 'Görevler alınamadı';
+          _logger.w('Görevler yükleme başarısız: $_tasksErrorMessage');
+        }
       }
     } catch (e) {
-      _tasksErrorMessage = 'Bir hata oluştu: ${e.toString()}';
-      _logger.e('Görevler yükleme hatası:', e);
+      if (_userTasks.isEmpty) { // Önbellekten veri alınamadıysa hata göster
+        _tasksErrorMessage = 'Bir hata oluştu: ${e.toString()}';
+        _logger.e('Görevler yükleme hatası:', e);
+      }
     } finally {
       _isLoadingTasks = false;
       _safeNotifyListeners();
     }
+  }
+  
+  // Görevleri tarihe göre sırala
+  void _sortTasks() {
+    // Görevleri tarihe göre sırala (önce yaklaşan tarihli görevler)
+    _userTasks.sort((a, b) {
+      if (a.workCompleted != b.workCompleted) {
+        return a.workCompleted ? 1 : -1; // Tamamlanmamış olanlar önce
+      }
+      // Tarih formatı: 25.04.2025
+      try {
+        final aEndDateParts = a.workEndDate.split('.');
+        final bEndDateParts = b.workEndDate.split('.');
+        
+        if (aEndDateParts.length != 3 || bEndDateParts.length != 3) {
+          return 0;
+        }
+        
+        final aEndDate = DateTime(
+          int.parse(aEndDateParts[2]), // Yıl
+          int.parse(aEndDateParts[1]), // Ay
+          int.parse(aEndDateParts[0]), // Gün
+        );
+        
+        final bEndDate = DateTime(
+          int.parse(bEndDateParts[2]), // Yıl
+          int.parse(bEndDateParts[1]), // Ay
+          int.parse(bEndDateParts[0]), // Gün
+        );
+        
+        return aEndDate.compareTo(bEndDate);
+      } catch (e) {
+        return 0;
+      }
+    });
   }
   
   // Yeni metod: Tüm grupları yükle ve detayları al
@@ -200,6 +239,14 @@ class DashboardViewModel with ChangeNotifier {
   // Yaklaşan etkinlikleri yükle
   Future<void> _loadUpcomingEvents() async {
     try {
+      // Önbellekteki etkinlikleri kontrol et
+      final cachedEvents = _storageService.getCachedUpcomingEvents();
+      if (cachedEvents != null && !_storageService.isCacheStale()) {
+        _upcomingEvents = cachedEvents;
+        _logger.i('${_upcomingEvents.length} etkinlik önbellekten alındı');
+        return;
+      }
+      
       await _loadUserGroups(); // Önce tüm grupları yükle
       
       // Tüm gruplardan etkinlikleri al
@@ -230,7 +277,10 @@ class DashboardViewModel with ChangeNotifier {
         _upcomingEvents = _upcomingEvents.sublist(0, 5);
       }
       
-      _logger.i('${_upcomingEvents.length} yaklaşan etkinlik yüklendi');
+      // Etkinlikleri önbelleğe kaydet
+      await _storageService.cacheUpcomingEvents(_upcomingEvents);
+      
+      _logger.i('${_upcomingEvents.length} yaklaşan etkinlik yüklendi ve önbelleğe kaydedildi');
     } catch (e) {
       _logger.e('Etkinlikler yüklenirken hata: $e');
       // Ana process'i durdurmamak için hata fırlatma

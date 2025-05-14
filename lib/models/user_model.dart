@@ -58,6 +58,28 @@ class User {
       profilePhoto: json['profilePhoto'] ?? '',
     );
   }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'userID': userID,
+      'username': username,
+      'userFirstname': userFirstname,
+      'userLastname': userLastname,
+      'userFullname': userFullname,
+      'userEmail': userEmail,
+      'userBirthday': userBirthday,
+      'userPhone': userPhone,
+      'userRank': userRank,
+      'userStatus': userStatus,
+      'userGender': userGender,
+      'userToken': userToken,
+      'userPlatform': userPlatform,
+      'userVersion': userVersion,
+      'iosVersion': iosVersion,
+      'androidVersion': androidVersion,
+      'profilePhoto': profilePhoto,
+    };
+  }
 }
 
 class UserResponse {

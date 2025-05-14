@@ -42,8 +42,10 @@ class _DashboardViewState extends State<DashboardView> {
         final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
         final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
         
+        // İlk veri yüklemeleri - önbellekten ve sunucudan
         dashboardViewModel.loadDashboardData();
         
+        // Grup verilerinin yüklenmesi ve ilgili projeksiyonlar
         groupViewModel.loadGroups().then((_) {
           if (mounted) {
             _loadRecentLogs(groupViewModel);
@@ -57,17 +59,27 @@ class _DashboardViewState extends State<DashboardView> {
     });
   }
   
+  // Verileri yenileme 
   Future<void> _refreshData() async {
+    _logger.i('Veriler yenileniyor...');
+    
+    // Önceden önbellekten yüklenen verileri koruruz, yenileyiciyi çekerken yenisini alırız
     final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
     final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
 
+    // Önce dashboardViewModel verilerini güncelle
     await dashboardViewModel.loadDashboardData();
+    
+    // Sonra grup verilerini güncelle
     await groupViewModel.loadGroups();
     
+    // Son olarak projeleri ve logları yükle
     if (mounted) {
       await _loadRecentLogs(groupViewModel);
       _loadUserProjects(groupViewModel);
     }
+    
+    _logger.i('Dashboard verileri yenilendi');
   }
 
   Future<void> _logout() async {

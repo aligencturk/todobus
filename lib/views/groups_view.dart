@@ -48,6 +48,7 @@ class _GroupsViewState extends State<GroupsView> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   int _selectedFilterIndex = 0; // 0: Tüm, 1: Admin Olduğum, 2: Üye Olduğum
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -66,15 +67,44 @@ class _GroupsViewState extends State<GroupsView> {
 
   // Grup oluşturma sayfasına git
   Future<void> _navigateToCreateGroupView() async {
-    final result = await Navigator.of(context).push(
-      platformPageRoute(
-        context: context,
-        builder: (context) => const CreateGroupView(),
-      ),
-    );
-    // Grup oluşturulduysa listeyi yenile
-    if (result == true && mounted) {
-      Provider.of<GroupViewModel>(context, listen: false).loadGroups();
+    try {
+      final result = await Navigator.of(context).push(
+        platformPageRoute(
+          context: context,
+          builder: (context) => const CreateGroupView(),
+        ),
+      );
+      // Grup oluşturulduysa listeyi yenile
+      if (result == true && mounted) {
+        Provider.of<GroupViewModel>(context, listen: false).loadGroups();
+      }
+    } catch (e) {
+      if (mounted) {
+        showCustomSnackBar(context, 'Bir hata oluştu: ${e.toString()}', isError: true);
+      }
+    }
+  }
+
+  // Listeyi yenile
+  Future<void> _refreshGroups() async {
+    if (_isRefreshing) return;
+    
+    setState(() {
+      _isRefreshing = true;
+    });
+    
+    try {
+      await Provider.of<GroupViewModel>(context, listen: false).loadGroups();
+    } catch (e) {
+      if (mounted) {
+        showCustomSnackBar(context, 'Gruplar yüklenirken bir hata oluştu', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
     }
   }
 
@@ -94,7 +124,7 @@ class _GroupsViewState extends State<GroupsView> {
                 ),
                 IconButton(
                   icon: Icon(context.platformIcons.refresh),
-                  onPressed: () => viewModel.loadGroups(),
+                  onPressed: _refreshGroups,
                 ),
               ],
             ),
@@ -111,7 +141,7 @@ class _GroupsViewState extends State<GroupsView> {
                   CupertinoButton(
                     padding: EdgeInsets.zero,
                     child: Icon(context.platformIcons.refresh),
-                    onPressed: () => viewModel.loadGroups(),
+                    onPressed: _refreshGroups,
                   ),
                 ],
               ),
@@ -126,7 +156,10 @@ class _GroupsViewState extends State<GroupsView> {
   }
 
   Widget _buildBody(GroupViewModel viewModel) {
-    if (viewModel.status == GroupLoadStatus.initial || viewModel.status == GroupLoadStatus.loading) {
+    if (viewModel.status == GroupLoadStatus.initial) {
+      return Center(child: PlatformCircularProgressIndicator());
+    } else if (viewModel.status == GroupLoadStatus.loading && !viewModel.hasGroups) {
+      // Sadece gruplar yoksa loading göster, varsa mevcut verileri göstermeye devam et
       return Center(child: PlatformCircularProgressIndicator());
     } else if (viewModel.status == GroupLoadStatus.error) {
       return _buildErrorView(viewModel);
@@ -147,49 +180,61 @@ class _GroupsViewState extends State<GroupsView> {
         _buildSearchBar(),
         _buildFilterChips(),
         Expanded(
-          child: CustomScrollView(
-            slivers: [
-              if (isIOS)
-                CupertinoSliverRefreshControl(
-                  onRefresh: viewModel.loadGroups,
-                ),
-              SliverSafeArea(
-                top: false,
-                bottom: false,
-                left: false,
-                right: false,
-                sliver: SliverMainAxisGroup(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: _buildGroupStats(viewModel),
-                    ),
-                    _buildQuickAccessSection(viewModel),
-                    SliverToBoxAdapter(
-                      child: CupertinoListSection.insetGrouped(
-                        header: Padding(
-                          padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
-                          child: Text(
-                            _filteredGroups(viewModel.groups).isEmpty 
-                              ? 'Grup Bulunamadı' 
-                              : 'Tüm Gruplar',
-                            style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                              color: CupertinoColors.secondaryLabel,
-                              fontWeight: FontWeight.normal,
-                              fontSize: 13,
+          child: RefreshIndicator(
+            onRefresh: _refreshGroups,
+            child: CustomScrollView(
+              slivers: [
+                if (isIOS)
+                  CupertinoSliverRefreshControl(
+                    onRefresh: _refreshGroups,
+                  ),
+                SliverSafeArea(
+                  top: false,
+                  bottom: false,
+                  left: false,
+                  right: false,
+                  sliver: SliverMainAxisGroup(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: _buildGroupStats(viewModel),
+                      ),
+                      _buildQuickAccessSection(viewModel),
+                      SliverToBoxAdapter(
+                        child: CupertinoListSection.insetGrouped(
+                          header: Padding(
+                            padding: const EdgeInsets.only(left: 16.0, top: 8.0, bottom: 4.0),
+                            child: Text(
+                              _filteredGroups(viewModel.groups).isEmpty 
+                                ? 'Grup Bulunamadı' 
+                                : 'Tüm Gruplar',
+                              style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
+                                color: CupertinoColors.secondaryLabel,
+                                fontWeight: FontWeight.normal,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
+                          children: _filteredGroups(viewModel.groups).map((group) {
+                            return _buildGroupListItem(group, viewModel);
+                          }).toList(),
                         ),
-                        children: _filteredGroups(viewModel.groups).map((group) {
-                          return _buildGroupListItem(group, viewModel);
-                        }).toList(),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
+        // Loading devam ediyorsa alt kısımda göster
+        if (viewModel.status == GroupLoadStatus.loading && viewModel.hasGroups)
+          Container(
+            height: 2,
+            width: double.infinity,
+            child: LinearProgressIndicator(
+              backgroundColor: Colors.transparent,
+            ),
+          ),
       ],
     );
   }
@@ -223,8 +268,24 @@ class _GroupsViewState extends State<GroupsView> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            Icon(
+              CupertinoIcons.exclamationmark_circle,
+              size: 64,
+              color: CupertinoColors.systemRed,
+            ),
+            const SizedBox(height: 16),
             Text(
-              'Hata: ${viewModel.errorMessage}',
+              'Gruplar Yüklenemedi',
+              style: platformThemeData(
+                context,
+                material: (data) => data.textTheme.headlineSmall,
+                cupertino: (data) => data.textTheme.navTitleTextStyle,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              viewModel.errorMessage,
               style: platformThemeData(
                 context,
                 material: (data) => data.textTheme.bodyLarge?.copyWith(color: Colors.red),
@@ -234,7 +295,7 @@ class _GroupsViewState extends State<GroupsView> {
             ),
             const SizedBox(height: 20),
             PlatformElevatedButton(
-              onPressed: () => viewModel.loadGroups(),
+              onPressed: _refreshGroups,
               child: const Text('Tekrar Dene'),
             ),
           ],
@@ -585,11 +646,13 @@ class _GroupsViewState extends State<GroupsView> {
   
   // Grubu silme işlemi
   Future<void> _deleteGroup(int groupID, GroupViewModel viewModel) async {
+    if (_isRefreshing) return;
+    
+    setState(() {
+      _isRefreshing = true;
+    });
+    
     try {
-      setState(() {
-        // Silme işlemi sırasında yükleniyor göster
-      });
-      
       final success = await viewModel.deleteGroup(groupID);
       
       if (mounted) {
@@ -602,6 +665,12 @@ class _GroupsViewState extends State<GroupsView> {
     } catch (e) {
       if (mounted) {
         showCustomSnackBar(context, 'Hata: $e', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
       }
     }
   }

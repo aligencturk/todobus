@@ -607,23 +607,23 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     if (isIOS) {
       final Map<int, Widget> segments = {
         0: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
+          padding: EdgeInsets.symmetric(horizontal: 1),
           child: Text('Bilgiler'),
         ),
         1: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
+          padding: EdgeInsets.symmetric(horizontal: 1),
           child: Text('Üyeler'),
         ),
         2: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
+          padding: EdgeInsets.symmetric(horizontal: 1),
           child: Text('Projeler'),
         ),
         3: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
+          padding: EdgeInsets.symmetric(horizontal:1),
           child: Text('Etkinlikler'),
         ),
         4: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8),
+          padding: EdgeInsets.symmetric(horizontal: 1),
           child: Text('Raporlar'),
         ),
       };

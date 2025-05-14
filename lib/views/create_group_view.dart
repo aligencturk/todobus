@@ -20,6 +20,7 @@ class _CreateGroupViewState extends State<CreateGroupView> {
   
   bool _isLoading = false;
   String _errorMessage = '';
+  bool _formSubmitted = false;
   
   @override
   void dispose() {
@@ -29,16 +30,19 @@ class _CreateGroupViewState extends State<CreateGroupView> {
   }
 
   Future<void> _submitForm() async {
+    if (_formSubmitted) return; // Çift gönderimi engelle
+    
     if (_formKey.currentState?.validate() ?? false) {
-      final groupName = _groupNameController.text.trim();
-      final groupDesc = _groupDescController.text.trim();
-      
       setState(() {
         _isLoading = true;
         _errorMessage = '';
+        _formSubmitted = true;
       });
       
       try {
+        final groupName = _groupNameController.text.trim();
+        final groupDesc = _groupDescController.text.trim();
+        
         // Ana provider'dan GroupViewModel'e erişim
         final viewModel = Provider.of<GroupViewModel>(context, listen: false);
         final success = await viewModel.createGroup(groupName, groupDesc);
@@ -49,16 +53,22 @@ class _CreateGroupViewState extends State<CreateGroupView> {
             Navigator.of(context).pop(true);
           }
         } else {
-          setState(() {
-            _errorMessage = 'Grup oluşturulamadı. Lütfen tekrar deneyin.';
-            _isLoading = false;
-          });
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Grup oluşturulamadı. Lütfen tekrar deneyin.';
+              _isLoading = false;
+              _formSubmitted = false;
+            });
+          }
         }
       } catch (e) {
-        setState(() {
-          _errorMessage = 'Hata: ${e.toString()}';
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Hata: ${e.toString()}';
+            _isLoading = false;
+            _formSubmitted = false;
+          });
+        }
         _logger.e('Grup oluşturma hatası: $e');
       }
     }
@@ -68,61 +78,103 @@ class _CreateGroupViewState extends State<CreateGroupView> {
   Widget build(BuildContext context) {
     final isIOS = isCupertino(context);
     
-    return PlatformScaffold(
-      appBar: PlatformAppBar(
-        title: const Text('Yeni Grup Oluştur'),
-        cupertino: (_, __) => CupertinoNavigationBarData(
-          transitionBetweenRoutes: false,
+    return WillPopScope(
+      onWillPop: () async {
+        // Eğer form gönderimi devam ediyorsa, geri tuşunu devre dışı bırak
+        return !_isLoading;
+      },
+      child: PlatformScaffold(
+        appBar: PlatformAppBar(
+          title: const Text('Yeni Grup Oluştur'),
+          cupertino: (_, __) => CupertinoNavigationBarData(
+            transitionBetweenRoutes: false,
+          ),
+          // İslem devam ederken geri düğmesini devre dışı bırak
+          automaticallyImplyLeading: !_isLoading,
         ),
-      ),
-      body: SafeArea(
-        child: _isLoading
-            ? Center(child: PlatformCircularProgressIndicator())
-            : SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (_errorMessage.isNotEmpty)
-                            _buildErrorMessage(isIOS),
-                          
-                          // Grup Adı Alanı
-                          if (isIOS)
-                            _buildIOSLabel('Grup Adı'),
-                          _buildGroupNameField(isIOS),
-                          
-                          const SizedBox(height: 16),
-                          
-                          // Grup Açıklaması Alanı
-                          if (isIOS)
-                            _buildIOSLabel('Grup Açıklaması'),
-                          _buildGroupDescField(isIOS),
-                          
-                          const SizedBox(height: 32),
-                          
-                          // Oluştur Butonu
-                          _buildCreateButton(isIOS),
-                        ],
+        body: SafeArea(
+          child: _isLoading
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      PlatformCircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Grup oluşturuluyor...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_errorMessage.isNotEmpty)
+                              _buildErrorMessage(isIOS),
+                            
+                            // Grup Adı Alanı
+                            if (isIOS)
+                              _buildIOSLabel('Grup Adı'),
+                            _buildGroupNameField(isIOS),
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Grup Açıklaması Alanı
+                            if (isIOS)
+                              _buildIOSLabel('Grup Açıklaması'),
+                            _buildGroupDescField(isIOS),
+                            
+                            const SizedBox(height: 32),
+                            
+                            // Oluştur Butonu
+                            _buildCreateButton(isIOS),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+        ),
       ),
     );
   }
   
   Widget _buildErrorMessage(bool isIOS) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16.0),
-      child: Text(
-        _errorMessage,
-        style: TextStyle(
-          color: isIOS ? CupertinoColors.systemRed : Colors.red,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 16.0),
+      decoration: BoxDecoration(
+        color: isIOS ? CupertinoColors.systemRed.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isIOS ? CupertinoColors.systemRed.withOpacity(0.3) : Colors.red.withOpacity(0.3),
         ),
-        textAlign: TextAlign.center,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isIOS ? CupertinoIcons.exclamationmark_triangle : Icons.error_outline,
+            color: isIOS ? CupertinoColors.systemRed : Colors.red,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _errorMessage,
+              style: TextStyle(
+                color: isIOS ? CupertinoColors.systemRed : Colors.red,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

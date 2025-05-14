@@ -80,6 +80,21 @@ class Group {
       projects: projectsList,
     );
   }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'groupID': groupID,
+      'groupName': groupName,
+      'groupDesc': groupDesc,
+      'createdBy': createdBy,
+      'packageName': packageName,
+      'packageExpires': packageExpires,
+      'createDate': createDate,
+      'isFree': isFree,
+      'isAdmin': isAdmin,
+      'projects': projects.map((project) => project.toJson()).toList(),
+    };
+  }
 }
 
 class Project {
@@ -102,6 +117,15 @@ class Project {
       projectStatus: json['projectStatus'] ?? '',
       projectStatusID: json['projectStatusID'] ?? 0,
     );
+  }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'projectID': projectID,
+      'projectName': projectName,
+      'projectStatus': projectStatus,
+      'projectStatusID': projectStatusID,
+    };
   }
 }
 
@@ -246,6 +270,21 @@ class GroupEvent {
       eventDate: json['eventDate'] ?? '',
       createDate: json['createDate'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'eventID': eventID,
+      'groupID': groupID,
+      'userID': userID,
+      'userFullname': userFullname,
+      'eventTitle': eventTitle,
+      'eventDesc': eventDesc,
+      'eventStatusID': eventStatusID,
+      'eventStatus': eventStatus,
+      'eventDate': eventDate,
+      'createDate': createDate,
+    };
   }
 
   DateTime get eventDateTime {
@@ -619,6 +658,15 @@ class WorkUser {
       assignedDate: json['assignedDate'] ?? '',
     );
   }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'workAssID': workAssID,
+      'userID': userID,
+      'userName': userName,
+      'assignedDate': assignedDate,
+    };
+  }
 }
 
 class ProjectWorkDetailResponse {
@@ -733,5 +781,21 @@ class UserProjectWork {
       workCreateDate: json['workCreateDate'] ?? '',
       workUsers: usersList,
     );
+  }
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'projectID': projectID,
+      'workID': workID,
+      'projectName': projectName,
+      'workName': workName,
+      'workDesc': workDesc,
+      'workOrder': workOrder,
+      'workCompleted': workCompleted,
+      'workStartDate': workStartDate,
+      'workEndDate': workEndDate,
+      'workCreateDate': workCreateDate,
+      'workUsers': workUsers.map((user) => user.toJson()).toList(),
+    };
   }
 } 

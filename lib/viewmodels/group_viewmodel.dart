@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import '../models/group_models.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
+import '../services/storage_service.dart';
 
 enum GroupLoadStatus { initial, loading, loaded, error }
 
 class GroupViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LoggerService _logger = LoggerService();
+  final StorageService _storageService = StorageService();
   
   GroupLoadStatus _status = GroupLoadStatus.initial;
   String _errorMessage = '';
   List<Group> _groups = [];
   bool _isDisposed = false;
+  bool _isLoadingFromApi = false;
   
   // Getters
   GroupLoadStatus get status => _status;
@@ -24,7 +27,7 @@ class GroupViewModel with ChangeNotifier {
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
     if (!_isDisposed) {
-      Future.microtask(() => notifyListeners());
+      notifyListeners();
     }
   }
   
@@ -36,31 +39,80 @@ class GroupViewModel with ChangeNotifier {
   
   // Grup listesini yükle
   Future<void> loadGroups() async {
-    if (_status == GroupLoadStatus.loading) return;
+    // Eğer yükleme zaten devam ediyorsa, yeni bir yükleme başlatma
+    if (_isLoadingFromApi) return;
     
     try {
       _status = GroupLoadStatus.loading;
-      _errorMessage = '';
       _safeNotifyListeners();
       
-      _logger.i('Grup listesi yükleniyor');
+      // Önbellekten grupları kontrol et ve göster
+      final cachedGroups = _storageService.getCachedGroups();
+      if (cachedGroups != null) {
+        _groups = cachedGroups;
+        _status = GroupLoadStatus.loaded;
+        _safeNotifyListeners();
+        
+        // Önbellek güncelliğini kontrol et
+        if (_storageService.isCacheStale()) {
+          // Arka planda güncel verileri yükle
+          _loadGroupsFromApi();
+        }
+      } else {
+        // Önbellekte grup yoksa API'den yükle
+        await _loadGroupsFromApi();
+      }
+    } catch (e) {
+      // Hata durumunda önbellekte veri varsa onları göster, yoksa hata göster
+      if (_groups.isNotEmpty) {
+        _status = GroupLoadStatus.loaded;
+      } else {
+        _status = GroupLoadStatus.error;
+        _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
+        _logger.e('Gruplar yüklenirken hata: $e');
+      }
+      _safeNotifyListeners();
+    }
+  }
+  
+  // API'den grupları yükle
+  Future<void> _loadGroupsFromApi() async {
+    if (_isLoadingFromApi) return;
+    
+    _isLoadingFromApi = true;
+    try {
+      _logger.i('Grup listesi API\'den yükleniyor');
       final groups = await _apiService.getGroups();
       
       _groups = groups;
       _status = GroupLoadStatus.loaded;
-      _logger.i('${_groups.length} grup yüklendi');
-    } catch (e) {
-      _status = GroupLoadStatus.error;
-      _errorMessage = e.toString();
-      _logger.e('Gruplar yüklenirken hata: $e');
-    } finally {
+      
+      // Grupları önbelleğe kaydet
+      await _storageService.cacheGroups(_groups);
+      
+      _logger.i('${_groups.length} grup yüklendi ve önbelleğe kaydedildi');
       _safeNotifyListeners();
+    } catch (e) {
+      // API'den yükleme sırasında hata oluşursa ve önbellekte veri yoksa hata göster
+      if (_groups.isEmpty) {
+        _status = GroupLoadStatus.error;
+        _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
+        _logger.e('Gruplar API\'den yüklenirken hata: $e');
+        _safeNotifyListeners();
+      }
+    } finally {
+      _isLoadingFromApi = false;
     }
   }
   
   // Grup oluşturma
   Future<bool> createGroup(String groupName, String groupDesc) async {
     try {
+      // Durum güncellemesi sadece UI'ı bloke etmek için kullanılıyor, 
+      // veri varsa silinmiyor
+      final previousStatus = _status;
+      final previousGroups = List<Group>.from(_groups);
+      
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
       _safeNotifyListeners();
@@ -69,14 +121,18 @@ class GroupViewModel with ChangeNotifier {
       
       if (success) {
         // Grup başarıyla oluşturulduğunda grupları yeniden yükle
-        await loadGroups();
+        await _loadGroupsFromApi();
         return true;
+      } else {
+        // Başarısız olursa önceki duruma geri dön
+        _status = previousStatus;
+        _groups = previousGroups;
+        _safeNotifyListeners();
+        return false;
       }
-      
-      return false;
     } catch (e) {
       _status = GroupLoadStatus.error;
-      _errorMessage = e.toString();
+      _errorMessage = "Grup oluşturulurken bir hata oluştu: ${e.toString()}";
       _logger.e('Grup oluşturulurken hata: $e');
       _safeNotifyListeners();
       return false;
@@ -86,6 +142,9 @@ class GroupViewModel with ChangeNotifier {
   // Grup güncelleme
   Future<bool> updateGroup(int groupID, String groupName, String groupDesc) async {
     try {
+      final previousStatus = _status;
+      final previousGroups = List<Group>.from(_groups);
+      
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
       _safeNotifyListeners();
@@ -94,14 +153,18 @@ class GroupViewModel with ChangeNotifier {
       
       if (success) {
         // Grup başarıyla güncellendiğinde grupları yeniden yükle
-        await loadGroups();
+        await _loadGroupsFromApi();
         return true;
+      } else {
+        // Başarısız olursa önceki duruma geri dön
+        _status = previousStatus;
+        _groups = previousGroups;
+        _safeNotifyListeners();
+        return false;
       }
-      
-      return false;
     } catch (e) {
       _status = GroupLoadStatus.error;
-      _errorMessage = e.toString();
+      _errorMessage = "Grup güncellenirken bir hata oluştu: ${e.toString()}";
       _logger.e('Grup güncellenirken hata: $e');
       _safeNotifyListeners();
       return false;
@@ -186,6 +249,9 @@ class GroupViewModel with ChangeNotifier {
   // Grup silme
   Future<bool> deleteGroup(int groupID) async {
     try {
+      final previousStatus = _status;
+      final previousGroups = List<Group>.from(_groups);
+      
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
       _safeNotifyListeners();
@@ -194,14 +260,18 @@ class GroupViewModel with ChangeNotifier {
       
       if (success) {
         // Grup başarıyla silindiğinde grupları yeniden yükle
-        await loadGroups();
+        await _loadGroupsFromApi();
         return true;
+      } else {
+        // Başarısız olursa önceki duruma geri dön
+        _status = previousStatus;
+        _groups = previousGroups;
+        _safeNotifyListeners();
+        return false;
       }
-      
-      return false;
     } catch (e) {
       _status = GroupLoadStatus.error;
-      _errorMessage = e.toString();
+      _errorMessage = "Grup silinirken bir hata oluştu: ${e.toString()}";
       _logger.e('Grup silinirken hata: $e');
       _safeNotifyListeners();
       return false;
@@ -546,6 +616,7 @@ class GroupViewModel with ChangeNotifier {
     _status = GroupLoadStatus.initial;
     _errorMessage = '';
     _groups = [];
+    _isLoadingFromApi = false;
     _safeNotifyListeners();
   }
 } 
