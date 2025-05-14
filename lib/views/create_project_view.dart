@@ -312,82 +312,75 @@ class _CreateProjectViewState extends State<CreateProjectView> {
             child: const Text('Proje durumları yüklenemedi'),
           )
         else
-          isIOS
-              ? Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: CupertinoColors.systemGrey4),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: CupertinoSlidingSegmentedControl<int>(
-                      groupValue: _selectedStatus,
-                      onValueChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            _selectedStatus = value;
-                          });
-                        }
-                      },
-                      children: Map.fromEntries(
-                        _projectStatuses.map((status) {
-                          final color = _hexToColor(status.statusColor);
-                          return MapEntry(
-                            status.statusID,
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-                              child: Text(
-                                status.statusName,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: _selectedStatus == status.statusID
-                                      ? color
-                                      : CupertinoColors.label,
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ),
-                )
-              : DropdownButtonFormField<int>(
-                  value: _selectedStatus,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  items: _projectStatuses.map((status) {
-                    final color = _hexToColor(status.statusColor);
-                    return DropdownMenuItem<int>(
-                      value: status.statusID,
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(status.statusName),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedStatus = value;
-                      });
-                    }
-                  },
+          DropdownButtonFormField<int>(
+            value: _selectedStatus,
+            decoration: InputDecoration(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: BorderSide(
+                  color: isIOS ? CupertinoColors.systemGrey4 : Colors.grey.shade400,
                 ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: BorderSide(
+                  color: isIOS ? CupertinoColors.systemGrey4 : Colors.grey.shade400,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: BorderSide(
+                  color: isIOS ? CupertinoTheme.of(context).primaryColor : Theme.of(context).primaryColor,
+                  width: 1.5,
+                ),
+              ),
+            ),
+            isExpanded: true,
+            icon: Icon(isIOS ? CupertinoIcons.chevron_down : Icons.arrow_drop_down, size: 20),
+            items: _projectStatuses.map((status) {
+              final color = _hexToColor(status.statusColor);
+              return DropdownMenuItem<int>(
+                value: status.statusID,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black.withOpacity(0.2),
+                          width: 0.5,
+                        )
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      status.statusName,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: CupertinoTheme.of(context).textTheme.textStyle.color,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _selectedStatus = value;
+                });
+              }
+            },
+            dropdownColor: isIOS ? CupertinoTheme.of(context).scaffoldBackgroundColor : null,
+            style: TextStyle(
+              fontSize: 15,
+              color: isIOS ? CupertinoTheme.of(context).textTheme.textStyle.color : null,
+            ),
+          ),
       ],
     );
   }

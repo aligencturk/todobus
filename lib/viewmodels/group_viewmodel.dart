@@ -27,7 +27,7 @@ class GroupViewModel with ChangeNotifier {
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
     if (!_isDisposed) {
-      notifyListeners();
+      Future.microtask(() => notifyListeners());
     }
   }
   

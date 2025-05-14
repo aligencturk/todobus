@@ -104,7 +104,8 @@ class _CreateGroupViewState extends State<CreateGroupView> {
                         'Grup oluşturuluyor...',
                         style: TextStyle(
                           fontSize: 16,
-                          color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                          color: isIOS ? CupertinoColors.systemGrey : Colors.grey[600],
+                          fontWeight: isIOS ? FontWeight.w500 : FontWeight.normal,
                         ),
                       ),
                     ],
@@ -184,9 +185,10 @@ class _CreateGroupViewState extends State<CreateGroupView> {
       padding: const EdgeInsets.only(left: 4, bottom: 8),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           color: CupertinoColors.secondaryLabel,
           fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
