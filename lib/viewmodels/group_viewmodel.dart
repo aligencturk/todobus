@@ -82,7 +82,7 @@ class GroupViewModel with ChangeNotifier {
     _isLoadingFromApi = true;
     try {
       _logger.i('Grup listesi API\'den yükleniyor');
-      final groups = await _apiService.getGroups();
+      final groups = await _apiService.group.getGroups();
       
       _groups = groups;
       _status = GroupLoadStatus.loaded;
@@ -117,7 +117,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.createGroup(groupName, groupDesc);
+      final success = await _apiService.group.createGroup(groupName, groupDesc);
       
       if (success) {
         // Grup başarıyla oluşturulduğunda grupları yeniden yükle
@@ -149,7 +149,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.updateGroup(groupID, groupName, groupDesc);
+      final success = await _apiService.group.updateGroup(groupID, groupName, groupDesc);
       
       if (success) {
         // Grup başarıyla güncellendiğinde grupları yeniden yükle
@@ -196,7 +196,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.removeUserFromGroup(groupID, userID);
+      final success = await _apiService.group.removeUserFromGroup(groupID, userID);
       
       if (success) {
         // Başarı durumunda grupları yeniden yükle
@@ -226,7 +226,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final result = await _apiService.inviteUserToGroup(
+      final result = await _apiService.group.inviteUserToGroup(
         groupID, 
         userEmail, 
         userRole, 
@@ -256,7 +256,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.deleteGroup(groupID);
+      final success = await _apiService.group.deleteGroup(groupID);
       
       if (success) {
         // Grup başarıyla silindiğinde grupları yeniden yükle
@@ -284,7 +284,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final reports = await _apiService.getGroupReports(groupID, isAdmin);
+      final reports = await _apiService.group.getGroupReports(groupID, isAdmin);
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
@@ -305,7 +305,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final projectDetail = await _apiService.getProjectDetail(projectID, groupID);
+      final projectDetail = await _apiService.project.getProjectDetail(projectID, groupID);
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
@@ -335,7 +335,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.createProject(
+      final success = await _apiService.project.createProject(
         groupID, 
         projectName, 
         projectDesc, 
@@ -373,7 +373,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.updateProject(
+      final success = await _apiService.project.updateProject(
         groupID, 
         projectID, 
         projectStatus,
@@ -403,7 +403,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.removeUserFromProject(groupID, projectID, userID);
+      final success = await _apiService.project.removeUserFromProject(groupID, projectID, userID);
       
       if (success) {
         _status = GroupLoadStatus.loaded;
@@ -427,7 +427,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final works = await _apiService.getProjectWorks(projectID);
+      final works = await _apiService.project.getProjectWorks(projectID);
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
@@ -448,7 +448,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final workDetail = await _apiService.getWorkDetail(projectID, workID);
+      final workDetail = await _apiService.project.getWorkDetail(projectID, workID);
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
@@ -470,7 +470,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();  
 
-      final success = await _apiService.deleteProject(projectID, workID);
+      final success = await _apiService.project.deleteProjectWork(projectID, workID);
       
       if (success) {
         _status = GroupLoadStatus.loaded;
@@ -494,7 +494,7 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final statuses = await _apiService.getProjectStatuses();
+      final statuses = await _apiService.project.getProjectStatuses();
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
@@ -523,7 +523,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.addProjectWork(
+      final success = await _apiService.project.addProjectWork(
         projectID,
         workName,
         workDesc,
@@ -561,7 +561,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.updateProjectWork(
+      final success = await _apiService.project.updateProjectWork(
         projectID,
         workID,
         workName,
@@ -592,7 +592,7 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.changeWorkCompletionStatus(
+      final success = await _apiService.project.changeWorkCompletionStatus(
         projectID,
         workID,
         isCompleted

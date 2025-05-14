@@ -316,76 +316,48 @@ class _EditProjectViewState extends State<EditProjectView> {
             child: const Text('Proje durumları yüklenemedi'),
           )
         else
-          isIOS
-              ? Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: CupertinoColors.systemGrey4),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: _projectStatuses.map((status) {
-                        final color = _hexToColor(status.statusColor);
-                        final isSelected = _selectedStatus == status.statusID;
-                        
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedStatus = status.statusID;
-                            });
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
-                            margin: const EdgeInsets.symmetric(vertical: 2.0),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: isIOS ? CupertinoColors.systemGrey4 : Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: isIOS
+                ? GestureDetector(
+                    onTap: () {
+                      _showStatusPicker(context);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          // Seçilen durumun renk dairesi
+                          Container(
+                            width: 16,
+                            height: 16,
                             decoration: BoxDecoration(
-                              color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    status.statusName,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                                      color: isSelected ? color : CupertinoColors.label,
-                                    ),
-                                  ),
-                                ),
-                                if (isSelected)
-                                  Icon(
-                                    CupertinoIcons.check_mark,
-                                    size: 20,
-                                    color: color,
-                                  ),
-                              ],
+                              color: _hexToColor(_getSelectedStatusColor()),
+                              shape: BoxShape.circle,
                             ),
                           ),
-                        );
-                      }).toList(),
+                          const SizedBox(width: 12),
+                          // Seçilen durum adı
+                          Expanded(
+                            child: Text(
+                              _getSelectedStatusName(),
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          // Dropdown ikonu
+                          const Icon(
+                            CupertinoIcons.chevron_down,
+                            size: 18,
+                            color: CupertinoColors.systemGrey,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                )
-              : Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButtonFormField<int>(
+                  )
+                : DropdownButtonFormField<int>(
                     value: _selectedStatus,
                     decoration: InputDecoration(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -434,8 +406,88 @@ class _EditProjectViewState extends State<EditProjectView> {
                       }
                     },
                   ),
-                ),
+          ),
       ],
+    );
+  }
+  
+  // Seçili durum rengini döndür
+  String _getSelectedStatusColor() {
+    final status = _projectStatuses.firstWhere(
+      (s) => s.statusID == _selectedStatus,
+      orElse: () => _projectStatuses.first,
+    );
+    return status.statusColor;
+  }
+  
+  // Seçili durum adını döndür
+  String _getSelectedStatusName() {
+    final status = _projectStatuses.firstWhere(
+      (s) => s.statusID == _selectedStatus,
+      orElse: () => _projectStatuses.first,
+    );
+    return status.statusName;
+  }
+  
+  // iOS için durum seçici
+  void _showStatusPicker(BuildContext context) {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (_) => Container(
+        height: 250,
+        color: CupertinoColors.systemBackground,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                CupertinoButton(
+                  child: const Text('İptal'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                CupertinoButton(
+                  child: const Text('Tamam'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Expanded(
+              child: CupertinoPicker(
+                scrollController: FixedExtentScrollController(
+                  initialItem: _projectStatuses.indexWhere((s) => s.statusID == _selectedStatus),
+                ),
+                itemExtent: 40,
+                onSelectedItemChanged: (index) {
+                  setState(() {
+                    _selectedStatus = _projectStatuses[index].statusID;
+                  });
+                },
+                children: _projectStatuses.map((status) {
+                  final color = _hexToColor(status.statusColor);
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        status.statusName,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
   

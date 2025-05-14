@@ -26,11 +26,19 @@ class QuickEventTemplate {
 class CreateEventView extends StatefulWidget {
   final int? initialGroupID;
   final DateTime? initialDate;
+  final bool isEditing;
+  final int? eventID;
+  final String? initialTitle;
+  final String? initialDescription;
   
   const CreateEventView({
     Key? key,
     this.initialGroupID,
     this.initialDate,
+    this.isEditing = false,
+    this.eventID,
+    this.initialTitle,
+    this.initialDescription,
   }) : super(key: key);
 
   @override
@@ -200,13 +208,7 @@ class _CreateEventViewState extends State<CreateEventView> {
   @override
   void initState() {
     super.initState();
-    
-    // Tarih bilgisini ayarla
-    final initialDateTime = widget.initialDate ?? DateTime.now().add(const Duration(days: 1));
-    _dateController.text = '${initialDateTime.day.toString().padLeft(2, '0')}.${initialDateTime.month.toString().padLeft(2, '0')}.${initialDateTime.year}';
-    _timeController.text = '12:00';
-    
-    // Grupları yükle
+    _initializeControllers();
     _loadGroups();
     
     // Eğer başlangıç grup ID'si verilmişse, o grubu seç
@@ -215,6 +217,26 @@ class _CreateEventViewState extends State<CreateEventView> {
         _setInitialGroup();
       });
     }
+  }
+  
+  void _initializeControllers() {
+    // Eğer düzenleme modundaysa, mevcut verileri doldur
+    if (widget.isEditing) {
+      if (widget.initialTitle != null) {
+        _titleController.text = widget.initialTitle!;
+      }
+      if (widget.initialDescription != null) {
+        _descController.text = widget.initialDescription!;
+      }
+    }
+    
+    // Tarih ve saat bilgilerini ayarla
+    final date = widget.initialDate ?? DateTime.now();
+    final dateFormat = DateFormat('dd.MM.yyyy');
+    final timeFormat = DateFormat('HH:mm');
+    
+    _dateController.text = dateFormat.format(date);
+    _timeController.text = timeFormat.format(date);
   }
   
   @override
@@ -642,15 +664,32 @@ class _CreateEventViewState extends State<CreateEventView> {
     
     try {
       final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
-      final success = await eventViewModel.createEvent(
-        groupID: groupID,
-        eventTitle: _titleController.text,
-        eventDesc: _descController.text,
-        eventDate: eventDate,
-      );
+      bool success;
+      
+      if (widget.isEditing && widget.eventID != null) {
+        // Etkinlik güncelleme
+        success = await eventViewModel.updateEvent(
+          eventID: widget.eventID!,
+          eventTitle: _titleController.text,
+          eventDesc: _descController.text,
+          eventDate: eventDate,
+          eventStatus: 1, // Aktif etkinlik
+          groupID: groupID,
+        );
+      } else {
+        // Yeni etkinlik oluşturma
+        success = await eventViewModel.createEvent(
+          groupID: groupID,
+          eventTitle: _titleController.text,
+          eventDesc: _descController.text,
+          eventDate: eventDate,
+        );
+      }
       
       if (success) {
-        _logger.i('Etkinlik başarıyla oluşturuldu');
+        _logger.i(widget.isEditing 
+          ? 'Etkinlik başarıyla güncellendi' 
+          : 'Etkinlik başarıyla oluşturuldu');
         
         if (mounted) {
           // iOS tarzında başarı mesajı göster
@@ -659,14 +698,16 @@ class _CreateEventViewState extends State<CreateEventView> {
               context: context,
               builder: (BuildContext context) => CupertinoAlertDialog(
                 title: const Text('Başarılı'),
-                content: const Text('Etkinlik başarıyla oluşturuldu'),
+                content: Text(widget.isEditing 
+                  ? 'Etkinlik başarıyla güncellendi' 
+                  : 'Etkinlik başarıyla oluşturuldu'),
                 actions: <CupertinoDialogAction>[
                   CupertinoDialogAction(
                     isDefaultAction: true,
                     child: const Text('Tamam'),
                     onPressed: () {
                       Navigator.pop(context);
-                      // Etkinlik oluşturulduğunda önceki sayfaya başarı bilgisi ile dön
+                      // Etkinlik işlemi başarılı olduğunda önceki sayfaya başarı bilgisi ile dön
                       Navigator.of(context).pop(true);
                     },
                   ),
@@ -675,27 +716,37 @@ class _CreateEventViewState extends State<CreateEventView> {
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Etkinlik başarıyla oluşturuldu')),
+              SnackBar(content: Text(widget.isEditing 
+                ? 'Etkinlik başarıyla güncellendi' 
+                : 'Etkinlik başarıyla oluşturuldu')),
             );
-            // Oluşturma başarılı olduğunda geri dön
+            // İşlem başarılı olduğunda geri dön
             Navigator.of(context).pop(true);
           }
         }
       } else {
-        _logger.e('Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}');
+        _logger.e(widget.isEditing 
+          ? 'Etkinlik güncellenemedi: ${eventViewModel.errorMessage}'
+          : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}');
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}')),
+            SnackBar(content: Text(widget.isEditing 
+              ? 'Etkinlik güncellenemedi: ${eventViewModel.errorMessage}'
+              : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}')),
           );
         }
       }
     } catch (e) {
-      _logger.e('Etkinlik oluşturulurken hata: $e');
+      _logger.e(widget.isEditing 
+        ? 'Etkinlik güncellenirken hata: $e'
+        : 'Etkinlik oluşturulurken hata: $e');
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Etkinlik oluşturulurken hata: $e')),
+          SnackBar(content: Text(widget.isEditing 
+            ? 'Etkinlik güncellenirken hata: $e'
+            : 'Etkinlik oluşturulurken hata: $e')),
         );
       }
     } finally {
@@ -713,7 +764,7 @@ class _CreateEventViewState extends State<CreateEventView> {
     
     return PlatformScaffold(
       appBar: PlatformAppBar(
-        title: const Text('Yeni Etkinlik'),
+        title: Text(widget.isEditing ? 'Etkinlik Düzenle' : 'Yeni Etkinlik'),
         trailingActions: [
           PlatformIconButton(
             icon: Icon(isIOS ? CupertinoIcons.check_mark : Icons.check),

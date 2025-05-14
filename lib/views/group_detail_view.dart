@@ -60,7 +60,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     });
     
     try {
-      final groupDetail = await _apiService.getGroupDetail(widget.groupId);
+      final groupDetail = await _apiService.group.getGroupDetail(widget.groupId);
       _safeSetState(() {
         _groupDetail = groupDetail;
         _isLoading = false;
@@ -1007,9 +1007,9 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               style: TextButton.styleFrom(
                 foregroundColor: Colors.red,
               ),
-              onPressed: () {
+              onPressed: () async {
                 Navigator.pop(dialogContext);
-                _removeUser(user.userID);
+                await _removeUser(user.userID);
               },
               child: const Text('Çıkar'),
             ),
@@ -1398,11 +1398,18 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                           ],
                         ),
                         onPressed: () {
-                          Clipboard.setData(ClipboardData(text: inviteUrl));
-                          final messenger = ScaffoldMessenger.of(context);
-                          messenger.showSnackBar(
-                            const SnackBar(content: Text('Davet bağlantısı panoya kopyalandı')),
-                          );
+                          Clipboard.setData(ClipboardData(text: inviteUrl)).then((_) {
+                            if (!_isDisposed && mounted) {
+                              _safeSetState(() {});
+                              final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
+                              if (scaffoldMessengerState != null) {
+                                scaffoldMessengerState.showSnackBar(
+                                  const SnackBar(content: Text('QR verisi panoya kopyalandı')),
+                                );
+                              }
+                              Navigator.pop(context);
+                            }
+                          });
                         },
                       ),
                       CupertinoButton(
@@ -1522,11 +1529,18 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                           icon: const Icon(Icons.copy, size: 18),
                           label: const Text('Kopyala', style: TextStyle(color: Colors.white)),
                           onPressed: () {
-                            Clipboard.setData(ClipboardData(text: inviteUrl));
-                            final messenger = ScaffoldMessenger.of(context);
-                            messenger.showSnackBar(
-                              const SnackBar(content: Text('Davet bağlantısı panoya kopyalandı')),
-                            );
+                            Clipboard.setData(ClipboardData(text: inviteUrl)).then((_) {
+                              if (!_isDisposed && mounted) {
+                                _safeSetState(() {});
+                                final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
+                                if (scaffoldMessengerState != null) {
+                                  scaffoldMessengerState.showSnackBar(
+                                    const SnackBar(content: Text('QR verisi panoya kopyalandı')),
+                                  );
+                                }
+                                Navigator.pop(context);
+                              }
+                            });
                           },
                         ),
                         ElevatedButton.icon(
@@ -1618,8 +1632,14 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     final errorColor = isIOS ? CupertinoColors.systemRed : Colors.red;
     
     try {
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.showSnackBar(
+      // ScaffoldMessenger.of çağrılmadan önce geçerli bir Scaffold olduğundan emin olalım
+      final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
+      if (scaffoldMessengerState == null) {
+        _logger.w('ScaffoldMessenger bulunamadı, SnackBar gösterilemiyor');
+        return;
+      }
+      
+      scaffoldMessengerState.showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: errorColor,
@@ -1664,12 +1684,18 @@ class _GroupDetailViewState extends State<GroupDetailView> {
           actions: [
             CupertinoDialogAction(
               onPressed: () {
-                Clipboard.setData(ClipboardData(text: inviteUrl));
-                final messenger = ScaffoldMessenger.of(context);
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('URL panoya kopyalandı')),
-                );
-                Navigator.pop(context);
+                Clipboard.setData(ClipboardData(text: inviteUrl)).then((_) {
+                  if (!_isDisposed && mounted) {
+                    _safeSetState(() {});
+                    final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
+                    if (scaffoldMessengerState != null) {
+                      scaffoldMessengerState.showSnackBar(
+                        const SnackBar(content: Text('URL panoya kopyalandı')),
+                      );
+                    }
+                    Navigator.pop(context);
+                  }
+                });
               },
               child: const Text('Kopyala', style: TextStyle(color: CupertinoColors.white)),
             ),
@@ -1706,12 +1732,18 @@ class _GroupDetailViewState extends State<GroupDetailView> {
           actions: [
             TextButton(
               onPressed: () {
-                Clipboard.setData(ClipboardData(text: inviteUrl));
-                final messenger = ScaffoldMessenger.of(context);
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('URL panoya kopyalandı')),
-                );
-                Navigator.pop(context);
+                Clipboard.setData(ClipboardData(text: inviteUrl)).then((_) {
+                  if (!_isDisposed && mounted) {
+                    _safeSetState(() {});
+                    final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
+                    if (scaffoldMessengerState != null) {
+                      scaffoldMessengerState.showSnackBar(
+                        const SnackBar(content: Text('URL panoya kopyalandı')),
+                      );
+                    }
+                    Navigator.pop(context);
+                  }
+                });
               },
               child: const Text('Kopyala', style: TextStyle(color: Colors.white)),
             ),
@@ -1727,6 +1759,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   
   Widget _buildProjectsTab(BuildContext context) {
     final group = _groupDetail!;
+    final hasAdminRights = group.users.any((user) => user.isAdmin);
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -1787,9 +1820,27 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               ),
               title: Text(project.projectName),
               subtitle: Text('${project.projectStatusID} görev'),
-              trailing: Icon(
-                isCupertino(context) ? CupertinoIcons.chevron_right : Icons.chevron_right,
-              ),
+              trailing: hasAdminRights 
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      PlatformIconButton(
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          isCupertino(context) ? CupertinoIcons.delete : Icons.delete_outline,
+                          color: isCupertino(context) ? CupertinoColors.systemRed : Colors.red,
+                          size: 20,
+                        ),
+                        onPressed: () => _confirmDeleteProject(project.projectID),
+                      ),
+                      Icon(
+                        isCupertino(context) ? CupertinoIcons.chevron_right : Icons.chevron_right,
+                      ),
+                    ],
+                  )
+                : Icon(
+                    isCupertino(context) ? CupertinoIcons.chevron_right : Icons.chevron_right,
+                  ),
               onTap: () {
                 // Proje detayına gitme işlevi
                 Navigator.of(context).push(
@@ -2180,8 +2231,14 @@ class _GroupDetailViewState extends State<GroupDetailView> {
             CupertinoDialogAction(
               isDestructiveAction: true,
               onPressed: () async {
+                // Dialog'u kapatalım, daha sonra silme işlemini yapalım
                 Navigator.pop(dialogContext);
-                await _deleteProject(projectID);
+                
+                // Ana sayfa bağlamında SnackBar göstermek için silme işlemini ana sayfada çalıştıralım
+                // Bu sayede Scaffold Context hatası önlenmiş olur
+                if (mounted) {
+                  await _deleteProject(projectID);
+                }
               },
               child: const Text('Sil'),
             ),
@@ -2204,8 +2261,13 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 foregroundColor: Colors.red,
               ),
               onPressed: () async {
+                // Dialog'u kapatalım, daha sonra silme işlemini yapalım
                 Navigator.pop(dialogContext);
-                await _deleteProject(projectID);
+                
+                // Ana sayfa bağlamında SnackBar göstermek için silme işlemini ana sayfada çalıştıralım
+                if (mounted) {
+                  await _deleteProject(projectID);
+                }
               },
               child: const Text('Sil'),
             ),
@@ -2217,30 +2279,64 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   
   // Proje silme işlemini gerçekleştir
   Future<void> _deleteProject(int projectID) async {
+    if (!mounted || _isDisposed) return;
+    
     _safeSetState(() {
       _isLoading = true;
     });
     
     try {
-      // Proje silme API çağrısı (henüz implement edilmedi)
-      await Future.delayed(const Duration(seconds: 1)); // API simülasyonu
+      // Proje silme API çağrısı
+      final result = await _apiService.project.deleteProject(projectID, widget.groupId);
       
       if (!_isDisposed && mounted) {
+        _safeSetState(() {
+          _isLoading = false;
+        });
+        
+        // Detayları yenile
         await _loadGroupDetail();
         
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Proje başarıyla silindi')),
-        );
+        // SnackBar gösterimi için daha güvenli bir yaklaşım
+        if (!_isDisposed && mounted) {
+          // Ana sayfada bir Scaffold var ve onu kullanabiliriz
+          try {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Proje başarıyla silindi')),
+            );
+          } catch (e) {
+            _logger.w('SnackBar gösterilemiyor: $e');
+          }
+        }
       }
     } catch (e) {
       if (!_isDisposed && mounted) {
         _safeSetState(() {
           _isLoading = false;
-          _errorMessage = 'Proje silinirken bir hata oluştu: $e';
+          _errorMessage = _formatErrorMessage(e.toString());
         });
+        
+        // Hata durumunu logla
+        _logger.e('Proje silme hatası: $_errorMessage');
       }
     }
+  }
+
+  // Güvenli hata mesajı göster
+  void _showSafeErrorMessage(String message) {
+    if (!mounted || _isDisposed) return;
+    
+    _logger.w('Hata mesajı: $message');
+    
+    // Toast mesajı göstermeyi deneyebiliriz, ya da UI'da bir banner/text gösterebiliriz
+    // Şimdilik sadece log ile yetinelim ve kullanıcıya görsel feedback verelim
+    
+    // Toast mesajı için fluttertoast paketini kullanabilirsiniz
+    
+    // Alternatif olarak, ana sayfaya bir hata banner'ı ekleyebiliriz
+    _safeSetState(() {
+      _errorMessage = message;
+    });
   }
 
   // QR kodunu göster
@@ -2279,10 +2375,12 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 Clipboard.setData(ClipboardData(text: qrData)).then((_) {
                   if (!_isDisposed && mounted) {
                     _safeSetState(() {});
-                    final messenger = ScaffoldMessenger.of(context);
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('QR verisi panoya kopyalandı')),
-                    );
+                    final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
+                    if (scaffoldMessengerState != null) {
+                      scaffoldMessengerState.showSnackBar(
+                        const SnackBar(content: Text('QR verisi panoya kopyalandı')),
+                      );
+                    }
                     Navigator.pop(context);
                   }
                 });
@@ -2329,10 +2427,12 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 Clipboard.setData(ClipboardData(text: qrData)).then((_) {
                   if (!_isDisposed && mounted) {
                     _safeSetState(() {});
-                    final messenger = ScaffoldMessenger.of(context);
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('QR verisi panoya kopyalandı')),
-                    );
+                    final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
+                    if (scaffoldMessengerState != null) {
+                      scaffoldMessengerState.showSnackBar(
+                        const SnackBar(content: Text('QR verisi panoya kopyalandı')),
+                      );
+                    }
                     Navigator.pop(context);
                   }
                 });

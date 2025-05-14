@@ -46,7 +46,7 @@ class EventViewModel with ChangeNotifier {
     
     try {
       _logger.i('Etkinlikler yükleniyor (Grup ID: $groupID)');
-      final response = await _apiService.getEvents(groupID: groupID);
+      final response = await _apiService.event.getEvents(groupID: groupID);
       
       if (response.success && response.data != null) {
         _events = response.data!.events;
@@ -76,7 +76,7 @@ class EventViewModel with ChangeNotifier {
     
     try {
       _logger.i('Etkinlik detayı yükleniyor (ID: $eventID)');
-      final response = await _apiService.getEventDetail(eventID);
+      final response = await _apiService.event.getEventDetail(eventID);
       
       if (response.success && response.data != null) {
         _selectedEvent = response.data;
@@ -114,7 +114,7 @@ class EventViewModel with ChangeNotifier {
     
     try {
       _logger.i('Etkinlik oluşturuluyor: $eventTitle');
-      final response = await _apiService.createEvent(
+      final response = await _apiService.event.createEvent(
         groupID: groupID,
         eventTitle: eventTitle,
         eventDesc: eventDesc,
@@ -156,7 +156,7 @@ class EventViewModel with ChangeNotifier {
     
     try {
       _logger.i('Etkinlik güncelleniyor (ID: $eventID): $eventTitle');
-      final response = await _apiService.updateEvent(
+      final response = await _apiService.event.updateEvent(
         eventID: eventID,
         eventTitle: eventTitle,
         eventDesc: eventDesc,
@@ -189,7 +189,7 @@ class EventViewModel with ChangeNotifier {
   Future<bool> deleteEvent(int eventID, {int groupID = 0}) async {
     try {
       _logger.i('Etkinlik siliniyor (ID: $eventID)');
-      final response = await _apiService.deleteEvent(eventID);
+      final response = await _apiService.event.deleteEvent(eventID);
       
       if (response['success'] == true) {
         // Etkinlik silindikten sonra listeyi yenile

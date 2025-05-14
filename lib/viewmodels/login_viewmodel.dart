@@ -52,7 +52,7 @@ class LoginViewModel with ChangeNotifier {
       _safeNotifyListeners();
 
       _logger.i('Giriş denemesi: $email');
-      final response = await _apiService.login(email, password);
+      final response = await _apiService.auth.login(email, password);
 
       if (response.success) {
         _logger.i('Giriş başarılı: Kullanıcı ID: ${response.data?.userID}');

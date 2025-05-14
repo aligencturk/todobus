@@ -133,6 +133,8 @@ class _EventsViewState extends State<EventsView> {
                             onPageChanged: (focusedDay) => _focusedDay = focusedDay,
                             onEventTap: _navigateToEventDetail,
                             onCreateEventTap: _navigateToCreateEventView,
+                            onDeleteEvent: _showDeleteConfirmation,
+                            onEditEvent: _navigateToEditEventView,
                           ),
                   ),
                 ],
@@ -163,6 +165,80 @@ class _EventsViewState extends State<EventsView> {
     ).then((result) {
       if (result == true) _loadEvents();
     });
+  }
+  
+  void _navigateToEditEventView(Event event) {
+    final eventDate = event.eventDateTime;
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (context) => CreateEventView(
+          initialDate: eventDate,
+          initialGroupID: event.groupID,
+          initialTitle: event.eventTitle,
+          initialDescription: event.eventDesc,
+          isEditing: true,
+          eventID: event.eventID,
+        ),
+      ),
+    ).then((result) {
+      if (result == true) _loadEvents();
+    });
+  }
+  
+  void _showDeleteConfirmation(Event event) {
+    showCupertinoDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return CupertinoAlertDialog(
+          title: const Text('Etkinliği Sil'),
+          content: Text('${event.eventTitle} etkinliğini silmek istediğinize emin misiniz?'),
+          actions: <Widget>[
+            CupertinoDialogAction(
+              child: const Text('İptal'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _deleteEvent(event);
+              },
+              child: const Text('Sil'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  Future<void> _deleteEvent(Event event) async {
+    setState(() => _isLoading = true);
+    try {
+      final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
+      final success = await eventViewModel.deleteEvent(event.eventID, groupID: widget.groupID);
+      if (success) {
+        _loadEvents();
+        _showSnackBar('Etkinlik başarıyla silindi.');
+      } else {
+        _showSnackBar('Etkinlik silinemedi: ${eventViewModel.errorMessage}');
+      }
+    } catch (e) {
+      _logger.e('Etkinlik silinirken hata: $e');
+      _showSnackBar('Etkinlik silinirken bir hata oluştu.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+  
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 }
 
@@ -281,6 +357,8 @@ class _EventCalendarList extends StatelessWidget {
   final Function(DateTime) onPageChanged;
   final Function(Event) onEventTap;
   final Function({DateTime? initialDate}) onCreateEventTap;
+  final Function(Event) onDeleteEvent;
+  final Function(Event) onEditEvent;
 
   const _EventCalendarList({
     Key? key,
@@ -295,6 +373,8 @@ class _EventCalendarList extends StatelessWidget {
     required this.onPageChanged,
     required this.onEventTap,
     required this.onCreateEventTap,
+    required this.onDeleteEvent,
+    required this.onEditEvent,
   }) : super(key: key);
 
   @override
@@ -336,6 +416,8 @@ class _EventCalendarList extends StatelessWidget {
                     return _EventCard(
                       event: eventsForSelectedDay[index],
                       onTap: onEventTap,
+                      onDelete: onDeleteEvent,
+                      onEdit: onEditEvent,
                     );
                   },
                 ),
@@ -457,11 +539,15 @@ class _EventCalendarList extends StatelessWidget {
 class _EventCard extends StatelessWidget {
   final Event event;
   final Function(Event) onTap;
+  final Function(Event) onDelete;
+  final Function(Event)? onEdit;
 
   const _EventCard({
     Key? key,
     required this.event,
     required this.onTap,
+    required this.onDelete,
+    this.onEdit,
   }) : super(key: key);
 
   @override
@@ -491,148 +577,195 @@ class _EventCard extends StatelessWidget {
     
     return GestureDetector(
       onTap: () => onTap(event),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: CupertinoColors.systemBackground,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: CupertinoColors.systemGrey5.withOpacity(0.3),
-              blurRadius: 6,
-              offset: const Offset(0, 1),
-            ),
-          ],
-          border: isCompanyEvent ? Border.all(
-            color: CupertinoColors.activeBlue.withOpacity(0.3),
-            width: 1,
-          ) : null,
+      child: Dismissible(
+        key: Key('event_${event.eventID}'),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          color: CupertinoColors.destructiveRed,
+          child: const Icon(
+            CupertinoIcons.delete,
+            color: CupertinoColors.white,
+          ),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0), // Subtle blur effect for iOS feel
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: Row(
+        confirmDismiss: (direction) async {
+          onDelete(event);
+          return false; // İletişim kutusu ile onay alacağız
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemBackground,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: CupertinoColors.systemGrey5.withOpacity(0.3),
+                blurRadius: 6,
+                offset: const Offset(0, 1),
+              ),
+            ],
+            border: isCompanyEvent ? Border.all(
+              color: CupertinoColors.activeBlue.withOpacity(0.3),
+              width: 1,
+            ) : null,
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+              child: Stack(
                 children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: isCompanyEvent 
-                          ? CupertinoColors.activeBlue.withOpacity(0.1)
-                          : statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    child: Row(
                       children: [
-                        Text(
-                          eventTime,
-                          style: TextStyle(
-                            color: isCompanyEvent 
-                                ? CupertinoColors.activeBlue
-                                : statusColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
                         Container(
-                          width: 4,
-                          height: 4,
+                          width: 46,
+                          height: 46,
                           decoration: BoxDecoration(
                             color: isCompanyEvent 
-                                ? CupertinoColors.activeBlue
-                                : statusColor,
-                            shape: BoxShape.circle,
+                                ? CupertinoColors.activeBlue.withOpacity(0.1)
+                                : statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                event.eventTitle,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                statusText,
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                eventTime,
                                 style: TextStyle(
-                                  color: statusColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
+                                  color: isCompanyEvent 
+                                      ? CupertinoColors.activeBlue
+                                      : statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          event.eventDesc,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: CupertinoColors.label,
+                              const SizedBox(height: 2),
+                              Container(
+                                width: 4,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: isCompanyEvent 
+                                      ? CupertinoColors.activeBlue
+                                      : statusColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Icon(
-                              isCompanyEvent
-                                  ? CupertinoIcons.briefcase
-                                  : CupertinoIcons.person,
-                              size: 12,
-                              color: CupertinoColors.secondaryLabel,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                isCompanyEvent ? 'Şirket Etkinliği' : event.userFullname,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      event.eventTitle,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      statusText,
+                                      style: TextStyle(
+                                        color: statusColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                event.eventDesc,
                                 style: const TextStyle(
-                                  color: CupertinoColors.secondaryLabel,
-                                  fontSize: 11,
+                                  fontSize: 13,
+                                  color: CupertinoColors.label,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.all(3),
-                              decoration: BoxDecoration(
-                                color: CupertinoColors.systemGrey6,
-                                borderRadius: BorderRadius.circular(10),
+                              const SizedBox(height: 5),
+                              Row(
+                                children: [
+                                  Icon(
+                                    isCompanyEvent
+                                        ? CupertinoIcons.briefcase
+                                        : CupertinoIcons.person,
+                                    size: 12,
+                                    color: CupertinoColors.secondaryLabel,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      isCompanyEvent ? 'Şirket Etkinliği' : event.userFullname,
+                                      style: const TextStyle(
+                                        color: CupertinoColors.secondaryLabel,
+                                        fontSize: 11,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      CupertinoButton(
+                                        padding: EdgeInsets.zero,
+                                        minSize: 0,
+                                        child: const Icon(
+                                          CupertinoIcons.delete,
+                                          size: 18,
+                                          color: CupertinoColors.systemRed,
+                                        ),
+                                        onPressed: () => onDelete(event),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      CupertinoButton(
+                                        padding: EdgeInsets.zero,
+                                        minSize: 0,
+                                        child: const Icon(
+                                          CupertinoIcons.pencil,
+                                          size: 18,
+                                          color: CupertinoColors.activeBlue,
+                                        ),
+                                        onPressed: () => onEdit != null ? onEdit!(event) : null,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.all(3),
+                                        decoration: BoxDecoration(
+                                          color: CupertinoColors.systemGrey6,
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: const Icon(
+                                          CupertinoIcons.chevron_right,
+                                          size: 10,
+                                          color: CupertinoColors.systemGrey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              child: const Icon(
-                                CupertinoIcons.chevron_right,
-                                size: 10,
-                                color: CupertinoColors.systemGrey,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),

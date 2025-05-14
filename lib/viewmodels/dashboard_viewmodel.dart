@@ -74,7 +74,7 @@ class DashboardViewModel with ChangeNotifier {
       
       // Güncel veriyi sunucudan al
       _logger.i('Dashboard kullanıcı bilgileri yükleniyor');
-      final response = await _apiService.getUser();
+      final response = await _apiService.user.getUser();
       
       if (response.success && response.data != null) {
         _user = response.data!.user;
@@ -150,7 +150,7 @@ class DashboardViewModel with ChangeNotifier {
       }
       
       _logger.i('Kullanıcı görevleri yükleniyor...');
-      final response = await _apiService.getUserWorks();
+      final response = await _apiService.user.getUserWorks();
       
       if (response.success && response.data != null) {
         _userTasks = response.data!.works;
@@ -216,13 +216,13 @@ class DashboardViewModel with ChangeNotifier {
   // Yeni metod: Tüm grupları yükle ve detayları al
   Future<void> _loadUserGroups() async {
     try {
-      final groups = await _apiService.getGroups();
+      final groups = await _apiService.group.getGroups();
       _userGroups = [];
       
       // Her grup için detay bilgilerini getir
       for (final group in groups) {
         try {
-          final groupDetail = await _apiService.getGroupDetail(group.groupID);
+          final groupDetail = await _apiService.group.getGroupDetail(group.groupID);
           _userGroups.add(groupDetail);
         } catch (e) {
           _logger.w('Grup detayı yüklenemedi (ID: ${group.groupID}): $e');

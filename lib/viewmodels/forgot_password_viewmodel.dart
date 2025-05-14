@@ -51,7 +51,7 @@ class ForgotPasswordViewModel with ChangeNotifier {
       notifyListeners();
 
       _logger.i('Şifre sıfırlama isteği: $email');
-      final response = await _apiService.forgotPassword(email);
+      final response = await _apiService.auth.forgotPassword(email);
 
       if (response.success) {
         _logger.i('Şifre sıfırlama isteği başarılı: ${response.message}');
@@ -105,7 +105,7 @@ class ForgotPasswordViewModel with ChangeNotifier {
       notifyListeners();
 
       _logger.i('Doğrulama kodu kontrolü: $code');
-      final response = await _apiService.checkVerificationCode(code, _verificationToken);
+      final response = await _apiService.auth.checkVerificationCode(code, _verificationToken);
 
       if (response.success) {
         _logger.i('Doğrulama kodu kontrolü başarılı');
@@ -166,7 +166,7 @@ class ForgotPasswordViewModel with ChangeNotifier {
       notifyListeners();
 
       _logger.i('Şifre sıfırlama işlemi yapılıyor');
-      final response = await _apiService.updatePassword(_passToken, password, passwordConfirm);
+      final response = await _apiService.auth.updatePassword(_passToken, password, passwordConfirm);
 
       if (response.success) {
         _logger.i('Şifre sıfırlama başarılı');

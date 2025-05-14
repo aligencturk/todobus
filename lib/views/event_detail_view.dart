@@ -70,7 +70,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
         return;
       }
       
-      final groupDetail = await _apiService.getGroupDetail(widget.groupId);
+      final groupDetail = await _apiService.group.getGroupDetail(widget.groupId);
       
       if (mounted && !_isDisposed) {
         _safeSetState(() {

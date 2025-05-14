@@ -56,7 +56,7 @@ class ProfileViewModel with ChangeNotifier {
       }
       
       _logger.i('Kullanıcı profili yükleniyor');
-      final response = await _apiService.getUser();
+      final response = await _apiService.user.getUser();
       
       if (response.success && response.data != null) {
         _user = response.data!.user;

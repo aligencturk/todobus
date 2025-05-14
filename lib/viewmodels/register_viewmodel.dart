@@ -83,7 +83,7 @@ class RegisterViewModel with ChangeNotifier {
       _safeNotifyListeners();
 
       _logger.i('Kayıt denemesi: $email');
-      final response = await _apiService.register(
+      final response = await _apiService.auth.register(
         firstName: firstName,
         lastName: lastName,
         email: email,
