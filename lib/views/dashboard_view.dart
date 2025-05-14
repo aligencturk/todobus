@@ -42,9 +42,7 @@ class _DashboardViewState extends State<DashboardView> {
         final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
         final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
         
-        // Her seferinde tüm verileri yeniden yüklüyoruz, önbelleği kullanmıyoruz
-        dashboardViewModel.loadDashboardData(forceRefresh: true);
-        dashboardViewModel.loadUserTasks(forceRefresh: true);
+        dashboardViewModel.loadDashboardData();
         
         groupViewModel.loadGroups().then((_) {
           if (mounted) {
@@ -59,23 +57,11 @@ class _DashboardViewState extends State<DashboardView> {
     });
   }
   
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    
-    final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
-    // Kullanıcı her sayfaya eriştiğinde görevleri ve diğer verileri tazelemek için
-    // Özellikle logout/login sonrası önbellek sorunlarını engellemek amacıyla
-    dashboardViewModel.loadUserTasks(forceRefresh: true);
-  }
-
   Future<void> _refreshData() async {
     final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
     final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
 
-    // Yenileme işleminde her zaman taze veri alıyoruz
-    await dashboardViewModel.loadDashboardData(forceRefresh: true);
-    await dashboardViewModel.loadUserTasks(forceRefresh: true);
+    await dashboardViewModel.loadDashboardData();
     await groupViewModel.loadGroups();
     
     if (mounted) {
@@ -85,10 +71,6 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _logout() async {
-    // Önce tüm önbelleği temizle
-    await _storageService.clearAllCache();
-    
-    // Sonra kullanıcı oturum verilerini temizle
     await _storageService.clearUserData();
     _logger.i('Kullanıcı çıkış yaptı');
     

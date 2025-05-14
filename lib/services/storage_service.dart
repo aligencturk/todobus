@@ -101,26 +101,6 @@ class StorageService {
     return _prefs.getString('user_email');
   }
 
-  // Kullanıcı oturumunu kapattığında tüm önbelleği temizler
-  Future<void> clearAllCache() async {
-    try {
-      // Tüm önbellek verilerini temizleme işlemleri burada gerçekleştirilebilir
-      // Örneğin, SharedPreferences'teki önbellek anahtarlarını temizlemek
-      final prefs = await SharedPreferences.getInstance();
-      
-      // Kullanıcı verileri dışındaki tüm önbelleğin tutulduğu anahtar değerlerini temizlemek için
-      // Not: userToken gibi oturum bilgileri clearUserData ile temizlenir, burada sadece önbellek
-      await prefs.remove('dashboard_cache');
-      await prefs.remove('tasks_cache');
-      await prefs.remove('groups_cache');
-      await prefs.remove('events_cache');
-      
-      _logger.i('Tüm önbellek başarıyla temizlendi');
-    } catch (e) {
-      _logger.e('Önbellek temizleme hatası: $e');
-    }
-  }
-
   // Servisin başlatıldığından emin olma
   Future<void> _ensureInitialized() async {
     if (!_initialized) {
