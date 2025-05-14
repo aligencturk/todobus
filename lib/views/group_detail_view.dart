@@ -1056,83 +1056,88 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         context: context,
         builder: (_) => StatefulBuilder(
           builder: (context, setState) {
+            // Klavye yüksekliğini almak için
+            final keyboardPadding = MediaQuery.of(context).viewInsets.bottom;
             return CupertinoActionSheet(
               title: const Text('Kullanıcı Davet Et'),
-              message: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'E-posta Adresi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: CupertinoColors.secondaryLabel,
+              message: SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16.0, 0, 16.0, keyboardPadding + 16.0), // Klavye için alttan boşluk
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16), // Üst başlıkla boşluk için eklendi
+                      const Text(
+                        'E-posta Adresi',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: CupertinoColors.secondaryLabel,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    CupertinoTextField(
-                      controller: emailController,
-                      placeholder: 'E-posta adresi',
-                      keyboardType: TextInputType.emailAddress,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: CupertinoColors.systemGrey4),
-                        borderRadius: BorderRadius.circular(8),
+                      const SizedBox(height: 8),
+                      CupertinoTextField(
+                        controller: emailController,
+                        placeholder: 'E-posta adresi',
+                        keyboardType: TextInputType.emailAddress,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: CupertinoColors.systemGrey4),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Kullanıcı Rolü',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: CupertinoColors.secondaryLabel,
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Kullanıcı Rolü',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: CupertinoColors.secondaryLabel,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    CupertinoSlidingSegmentedControl<int>(
-                      groupValue: selectedRole,
-                      children: const {
-                        1: Text('Yönetici'),
-                        2: Text('Üye'),
-                      },
-                      onValueChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            selectedRole = value;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Davet Yöntemi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: CupertinoColors.secondaryLabel,
+                      const SizedBox(height: 8),
+                      CupertinoSlidingSegmentedControl<int>(
+                        groupValue: selectedRole,
+                        children: const {
+                          1: Text('Yönetici'),
+                          2: Text('Üye'),
+                        },
+                        onValueChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              selectedRole = value;
+                            });
+                          }
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    CupertinoSlidingSegmentedControl<String>(
-                      groupValue: selectedInviteType,
-                      children: const {
-                        'email': Text('E-posta'),
-                        'qr': Text('QR Kod'),
-                      },
-                      onValueChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            selectedInviteType = value;
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Davet Yöntemi',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: CupertinoColors.secondaryLabel,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      CupertinoSlidingSegmentedControl<String>(
+                        groupValue: selectedInviteType,
+                        children: const {
+                          'email': Text('E-posta'),
+                          'qr': Text('QR Kod'),
+                        },
+                        onValueChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              selectedInviteType = value;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -1161,78 +1166,84 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         context: context,
         builder: (_) => StatefulBuilder(
           builder: (context, setState) {
+            // Klavye yüksekliğini almak için
+            final keyboardPadding = MediaQuery.of(context).viewInsets.bottom;
             return AlertDialog(
               title: const Text('Kullanıcı Davet Et'),
               content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: emailController,
-                      decoration: const InputDecoration(
-                        labelText: 'E-posta Adresi',
-                        border: OutlineInputBorder(),
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: keyboardPadding), // Klavye için alttan boşluk
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: emailController,
+                        decoration: const InputDecoration(
+                          labelText: 'E-posta Adresi',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
                       ),
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Kullanıcı Rolü',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Kullanıcı Rolü',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    SegmentedButton<int>(
-                      segments: const [
-                        ButtonSegment<int>(
-                          value: 1,
-                          label: Text('Yönetici'),
-                        ),
-                        ButtonSegment<int>(
-                          value: 2,
-                          label: Text('Üye'),
-                        ),
-                      ],
-                      selected: {selectedRole},
-                      onSelectionChanged: (Set<int> selection) {
-                        setState(() {
-                          selectedRole = selection.first;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Davet Yöntemi',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(height: 8),
+                      SegmentedButton<int>(
+                        segments: const [
+                          ButtonSegment<int>(
+                            value: 1,
+                            label: Text('Yönetici'),
+                          ),
+                          ButtonSegment<int>(
+                            value: 2,
+                            label: Text('Üye'),
+                          ),
+                        ],
+                        selected: {selectedRole},
+                        onSelectionChanged: (Set<int> selection) {
+                          setState(() {
+                            selectedRole = selection.first;
+                          });
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment<String>(
-                          value: 'email',
-                          label: Text('E-posta'),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Davet Yöntemi',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
                         ),
-                        ButtonSegment<String>(
-                          value: 'qr',
-                          label: Text('QR Kod'),
-                        ),
-                      ],
-                      selected: {selectedInviteType},
-                      onSelectionChanged: (Set<String> selection) {
-                        setState(() {
-                          selectedInviteType = selection.first;
-                        });
-                      },
-                    ),
-                  ],
+                      ),
+                      const SizedBox(height: 8),
+                      SegmentedButton<String>(
+                        segments: const [
+                          ButtonSegment<String>(
+                            value: 'email',
+                            label: Text('E-posta'),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'qr',
+                            label: Text('QR Kod'),
+                          ),
+                        ],
+                        selected: {selectedInviteType},
+                        onSelectionChanged: (Set<String> selection) {
+                          setState(() {
+                            selectedInviteType = selection.first;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
+              actionsPadding: EdgeInsets.only(bottom: keyboardPadding > 0 ? 8.0 : 16.0, right: 16.0, left: 16.0), // Aksiyonlar için de boşluk ayarı
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
