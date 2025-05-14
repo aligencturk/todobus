@@ -231,11 +231,11 @@ class _WorkDetailViewState extends State<WorkDetailView> {
                         padding: EdgeInsets.zero,
                         icon: Icon(
                           work.workCompleted
-                              ? (isIOS ? CupertinoIcons.square : Icons.check_box_outline_blank)
-                              : (isIOS ? CupertinoIcons.checkmark_square : Icons.check_box),
+                              ? (isIOS ? CupertinoIcons.checkmark_square_fill : Icons.check_box)
+                              : (isIOS ? CupertinoIcons.square : Icons.check_box_outline_blank),
                           color: work.workCompleted
-                              ? (isIOS ? CupertinoColors.systemGrey : Colors.grey)
-                              : (isIOS ? CupertinoColors.systemGreen : Colors.green),
+                              ? (isIOS ? CupertinoColors.systemGreen : Colors.green)
+                              : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
                         ),
                         onPressed: _toggleWorkCompletionStatus,
                       ),

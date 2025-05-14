@@ -7,7 +7,6 @@ import '../models/user_model.dart';
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import 'login_view.dart';
-import 'dart:io' show Platform;
 
 class ProfileView extends StatefulWidget {
   const ProfileView({Key? key}) : super(key: key);
@@ -54,7 +53,7 @@ class _ProfileViewState extends State<ProfileView> {
             material: (_, __) => MaterialAppBarData(
               actions: <Widget>[
                 IconButton(
-                  icon: Icon(context.platformIcons.share),
+                  icon: const Icon(Icons.exit_to_app),
                   onPressed: _logout,
                   tooltip: 'Çıkış Yap',
                 ),
@@ -64,7 +63,7 @@ class _ProfileViewState extends State<ProfileView> {
               transitionBetweenRoutes: false,
               trailing: CupertinoButton(
                 padding: EdgeInsets.zero,
-                child: Icon(context.platformIcons.share),
+                child: const Icon(CupertinoIcons.square_arrow_right),
                 onPressed: _logout,
               ),
             ),
