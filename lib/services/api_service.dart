@@ -1154,6 +1154,9 @@ class ApiService {
     }
   }
 
+  
+
+
   // Etkinlikleri getir
   Future<EventsResponse> getEvents({int groupID = 0}) async {
     try {

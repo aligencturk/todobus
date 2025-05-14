@@ -80,69 +80,119 @@ class _CreateGroupViewState extends State<CreateGroupView> {
     
     return WillPopScope(
       onWillPop: () async {
-        // Eğer form gönderimi devam ediyorsa, geri tuşunu devre dışı bırak
         return !_isLoading;
       },
       child: PlatformScaffold(
+        backgroundColor: isIOS ? CupertinoColors.systemBackground : Colors.white,
         appBar: PlatformAppBar(
-          title: const Text('Yeni Grup Oluştur'),
+          title: Text('Yeni Grup Oluştur', 
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           cupertino: (_, __) => CupertinoNavigationBarData(
             transitionBetweenRoutes: false,
+            backgroundColor: CupertinoColors.systemBackground,
           ),
-          // İslem devam ederken geri düğmesini devre dışı bırak
+          material: (_, __) => MaterialAppBarData(
+            elevation: 0,
+            backgroundColor: Colors.white,
+          ),
           automaticallyImplyLeading: !_isLoading,
         ),
         body: SafeArea(
-          child: _isLoading
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      PlatformCircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Grup oluşturuluyor...',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: isIOS ? CupertinoColors.systemGrey : Colors.grey[600],
-                          fontWeight: isIOS ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            if (_errorMessage.isNotEmpty)
-                              _buildErrorMessage(isIOS),
-                            
-                            // Grup Adı Alanı
-                            if (isIOS)
-                              _buildIOSLabel('Grup Adı'),
-                            _buildGroupNameField(isIOS),
-                            
-                            const SizedBox(height: 16),
-                            
-                            // Grup Açıklaması Alanı
-                            if (isIOS)
-                              _buildIOSLabel('Grup Açıklaması'),
-                            _buildGroupDescField(isIOS),
-                            
-                            const SizedBox(height: 32),
-                            
-                            // Oluştur Butonu
-                            _buildCreateButton(isIOS),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: _isLoading
+              ? _buildLoadingState(isIOS)
+              : _buildForm(isIOS),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildLoadingState(bool isIOS) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          PlatformCircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            'Grup oluşturuluyor...',
+            style: TextStyle(
+              fontSize: 16,
+              color: isIOS ? CupertinoColors.systemGrey : Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildForm(bool isIOS) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Form başlığı
+              const Text(
+                'Grup Bilgileri',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Grubu oluşturmak için aşağıdaki bilgileri doldurun.',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: isIOS ? CupertinoColors.systemGrey : Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 32),
+              
+              // Hata mesajı
+              if (_errorMessage.isNotEmpty)
+                _buildErrorMessage(isIOS),
+              
+              // Grup Adı Alanı
+              const Text(
+                'Grup Adı',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildGroupNameField(isIOS),
+              
+              const SizedBox(height: 24),
+              
+              // Grup Açıklaması Alanı
+              const Text(
+                'Grup Açıklaması',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildGroupDescField(isIOS),
+              
+              const SizedBox(height: 40),
+              
+              // Oluştur Butonu
+              _buildCreateButton(isIOS),
+            ],
+          ),
         ),
       ),
     );
@@ -150,14 +200,11 @@ class _CreateGroupViewState extends State<CreateGroupView> {
   
   Widget _buildErrorMessage(bool isIOS) {
     return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 24.0),
       decoration: BoxDecoration(
         color: isIOS ? CupertinoColors.systemRed.withOpacity(0.1) : Colors.red.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isIOS ? CupertinoColors.systemRed.withOpacity(0.3) : Colors.red.withOpacity(0.3),
-        ),
       ),
       child: Row(
         children: [
@@ -172,6 +219,7 @@ class _CreateGroupViewState extends State<CreateGroupView> {
               _errorMessage,
               style: TextStyle(
                 color: isIOS ? CupertinoColors.systemRed : Colors.red,
+                fontSize: 14,
               ),
             ),
           ),
@@ -180,65 +228,111 @@ class _CreateGroupViewState extends State<CreateGroupView> {
     );
   }
   
-  Widget _buildIOSLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: CupertinoColors.secondaryLabel,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-  
   Widget _buildGroupNameField(bool isIOS) {
-    return PlatformTextFormField(
-      controller: _groupNameController,
-      hintText: 'Grup Adı',
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Lütfen bir grup adı girin';
-        }
-        return null;
-      },
-      material: (_, __) => MaterialTextFormFieldData(
-        decoration: const InputDecoration(
-          labelText: 'Grup Adı',
-          border: OutlineInputBorder(),
+    return Container(
+      decoration: BoxDecoration(
+        color: isIOS ? CupertinoColors.systemGrey6 : Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: PlatformTextFormField(
+        controller: _groupNameController,
+        hintText: 'Grup adını girin',
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Lütfen bir grup adı girin';
+          }
+          return null;
+        },
+        material: (_, __) => MaterialTextFormFieldData(
+          decoration: InputDecoration(
+            hintText: 'Grup adını girin',
+            prefixIcon: Icon(Icons.group, size: 22, color: Colors.grey[700]),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+        cupertino: (_, __) => CupertinoTextFormFieldData(
+          prefix: Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Icon(CupertinoIcons.person_2_fill, size: 22, color: CupertinoColors.systemGrey),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemGrey6,
+            borderRadius: BorderRadius.circular(8),
+          ),
         ),
       ),
     );
   }
   
   Widget _buildGroupDescField(bool isIOS) {
-    return PlatformTextFormField(
-      controller: _groupDescController,
-      hintText: 'Grup Açıklaması',
-      material: (_, __) => MaterialTextFormFieldData(
-        decoration: const InputDecoration(
-          labelText: 'Grup Açıklaması',
-          border: OutlineInputBorder(),
-        ),
-        minLines: 3,
-        maxLines: 5,
+    return Container(
+      decoration: BoxDecoration(
+        color: isIOS ? CupertinoColors.systemGrey6 : Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
       ),
-      cupertino: (_, __) => CupertinoTextFormFieldData(
-        placeholder: 'Grup Açıklaması (isteğe bağlı)',
-        minLines: 3,
-        maxLines: 5,
+      child: PlatformTextFormField(
+        controller: _groupDescController,
+        hintText: isIOS ? 'Grup hakkında kısa bir açıklama girin (isteğe bağlı)' : 'Grup açıklaması (isteğe bağlı)',
+        material: (_, __) => MaterialTextFormFieldData(
+          decoration: InputDecoration(
+            hintText: 'Grup açıklaması (isteğe bağlı)',
+            prefixIcon: Icon(Icons.description, size: 22, color: Colors.grey[700]),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          minLines: 3,
+          maxLines: 5,
+        ),
+        cupertino: (_, __) => CupertinoTextFormFieldData(
+          prefix: Padding(
+            padding: const EdgeInsets.only(left: 8.0, top: 8.0),
+            child: Icon(CupertinoIcons.doc_text, size: 22, color: CupertinoColors.systemGrey),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+          decoration: BoxDecoration(
+            color: CupertinoColors.systemGrey6,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          minLines: 3,
+          maxLines: 4,
+        ),
       ),
     );
   }
   
   Widget _buildCreateButton(bool isIOS) {
-    return PlatformElevatedButton(
-      onPressed: _submitForm,
-      child: const Text('Grubu Oluştur'),
-      material: (_, __) => MaterialElevatedButtonData(
-        icon: const Icon(Icons.group_add),
+    final Color buttonColor = isIOS 
+        ? const Color(0xFF3478F6) // iOS mavi
+        : Colors.blue;
+        
+    return SizedBox(
+      width: double.infinity,
+      child: PlatformElevatedButton(
+        onPressed: _submitForm,
+        material: (_, __) => MaterialElevatedButtonData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: buttonColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            elevation: 0,
+          ),
+        ),
+        cupertino: (_, __) => CupertinoElevatedButtonData(
+          color: buttonColor,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+        child: Text(
+          'Grubu Oluştur',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
