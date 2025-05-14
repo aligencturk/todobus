@@ -6,6 +6,7 @@ import 'package:todobus/viewmodels/profile_viewmodel.dart';
 import 'dart:io' show Platform;
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
+import '../services/snackbar_service.dart';
 import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import '../models/group_models.dart';
@@ -26,6 +27,7 @@ class DashboardView extends StatefulWidget {
 class _DashboardViewState extends State<DashboardView> {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
+  final SnackBarService _snackBarService = SnackBarService();
   
   List<GroupLog> _recentLogs = [];
   bool _isLoadingLogs = false;
@@ -1238,19 +1240,13 @@ class _DashboardViewState extends State<DashboardView> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            CupertinoButton(
-              padding: EdgeInsets.zero,
-              minSize: 0,
-              onPressed: () {
-                _logger.i("Görev tamamlama durumu değiştirme istendi: ${task.workName}");
-                // TODO: Implement task completion toggle logic here
-                // e.g., context.read<GroupViewModel>().toggleTaskCompletion(...);
-              },
+            GestureDetector(
+              onTap: () => _toggleTaskCompletion(task),
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(color: statusColor, width: 1.5),
-                   color: isCompleted ? statusColor.withOpacity(0.2) : Colors.transparent,
+                  color: isCompleted ? statusColor.withOpacity(0.2) : Colors.transparent,
                 ),
                 padding: const EdgeInsets.all(2),
                 child: isCompleted 
@@ -1326,6 +1322,100 @@ class _DashboardViewState extends State<DashboardView> {
         ),
       ),
     );
+  }
+
+  Future<void> _toggleTaskCompletion(UserProjectWork task) async {
+    _logger.i("Görev tamamlama durumu değiştiriliyor: ${task.workName}");
+    
+    final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+    final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
+    
+    try {
+      final success = await groupViewModel.changeWorkCompletionStatus(
+        task.projectID,
+        task.workID,
+        !task.workCompleted, // Mevcut durumun tersini gönder
+      );
+      
+      if (mounted) {
+        if (success) {
+          // İşlem başarılıysa dashboard verilerini yenile
+          await dashboardViewModel.loadUserTasks();
+          
+          _showTaskStatusMessage(
+            !task.workCompleted ? 'Görev tamamlandı olarak işaretlendi' : 'Görev tamamlanmadı olarak işaretlendi',
+            isError: false
+          );
+        } else {
+          _showTaskStatusMessage('Görev durumu değiştirilemedi', isError: true);
+        }
+      }
+    } catch (e) {
+      _logger.e('Görev durumu değiştirilirken hata: $e');
+      if (mounted) {
+        _showTaskStatusMessage('Hata: ${e.toString()}', isError: true);
+      }
+    }
+  }
+
+  void _showTaskStatusMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    
+    final isIOS = Platform.isIOS;
+    
+    if (isIOS) {
+      // iOS için CupertinoDialog kullanımı - Scaffold bağımlılığını ortadan kaldırır
+      showCupertinoDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (BuildContext context) {
+          return CupertinoAlertDialog(
+            content: Text(message),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.of(context).pop(),
+                isDefaultAction: true,
+                child: const Text('Tamam'),
+              ),
+            ],
+          );
+        },
+      );
+      
+      // Otomatik kapanma için Timer kullanımı
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted && Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
+      });
+    } else {
+      try {
+        // SnackBarService kullanımı - doğrudan context'e bağlı değil
+        if (isError) {
+          _snackBarService.showError(message);
+        } else {
+          _snackBarService.showSuccess(message);
+        }
+      } catch (e) {
+        // Fallback olarak basit bir dialog gösterimi
+        _logger.e('SnackBar gösterilirken hata: $e');
+        showDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              content: Text(message),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Tamam'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+    }
   }
 
   void _loadUserProjects(GroupViewModel groupViewModel) {
