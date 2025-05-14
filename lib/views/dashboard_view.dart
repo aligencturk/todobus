@@ -336,7 +336,7 @@ class _DashboardViewState extends State<DashboardView> {
   
   Widget _buildWelcomeSection() {
     final profileViewModel = Provider.of<ProfileViewModel>(context);
-    final userName = profileViewModel.user?.userFullname;
+    final userName = profileViewModel.user?.userFirstname;
     final bool isIOS = Platform.isIOS;
     
     return Padding(
