@@ -444,6 +444,7 @@ class _EventCalendarList extends StatelessWidget {
         focusedDay: focusedDay,
         calendarFormat: calendarFormat,
         rowHeight: 45,
+        startingDayOfWeek: StartingDayOfWeek.monday,
         headerStyle: const HeaderStyle(
           titleCentered: true,
           formatButtonVisible: false,
