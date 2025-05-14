@@ -16,6 +16,7 @@ import 'profile_view.dart';
 import 'group_detail_view.dart';
 import 'project_detail_view.dart';
 import 'work_detail_view.dart';
+import 'event_detail_view.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({Key? key}) : super(key: key);
@@ -450,7 +451,15 @@ class _DashboardViewState extends State<DashboardView> {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
-          CupertinoPageRoute(builder: (context) => GroupDetailView(groupId: groupId)),
+          CupertinoPageRoute(
+            builder: (context) => EventDetailPage(
+              groupId: groupId,
+              eventTitle: title,
+              eventDescription: description,
+              eventDate: date,
+              eventUser: user,
+            ),
+          ),
         );
       },
       child: Container(

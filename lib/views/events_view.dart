@@ -144,7 +144,13 @@ class _EventsViewState extends State<EventsView> {
   void _navigateToEventDetail(Event event) {
     Navigator.of(context).push(
       CupertinoPageRoute(
-        builder: (context) => EventDetailView(eventID: event.eventID),
+        builder: (context) => EventDetailPage(
+          groupId: widget.groupID,
+          eventTitle: event.eventTitle,
+          eventDescription: event.eventDesc,
+          eventDate: event.eventDateTime.toString(),
+          eventUser: event.userFullname,
+        ),
       ),
     );
   }

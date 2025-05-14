@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
+import '../services/snackbar_service.dart';
 
 enum ForgotPasswordStatus { initial, loading, success, error, codeVerification, resetPassword }
 
@@ -68,7 +69,13 @@ class ForgotPasswordViewModel with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _errorMessage = 'Bir hata oluştu: ${e.toString()}';
+      // Hata mesajını temizle - Exception: prefix'i kaldır
+      String cleanErrorMessage = e.toString();
+      if (cleanErrorMessage.startsWith('Exception: ')) {
+        cleanErrorMessage = cleanErrorMessage.substring('Exception: '.length);
+      }
+      
+      _errorMessage = 'Bir hata oluştu: $cleanErrorMessage';
       _logger.e('Şifre sıfırlama hatası:', e);
       _status = ForgotPasswordStatus.error;
       notifyListeners();
@@ -116,7 +123,13 @@ class ForgotPasswordViewModel with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _errorMessage = 'Bir hata oluştu: ${e.toString()}';
+      // Hata mesajını temizle
+      String cleanErrorMessage = e.toString();
+      if (cleanErrorMessage.startsWith('Exception: ')) {
+        cleanErrorMessage = cleanErrorMessage.substring('Exception: '.length);
+      }
+      
+      _errorMessage = 'Bir hata oluştu: $cleanErrorMessage';
       _logger.e('Doğrulama kodu kontrolü hatası:', e);
       _status = ForgotPasswordStatus.error;
       notifyListeners();
@@ -168,7 +181,13 @@ class ForgotPasswordViewModel with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _errorMessage = 'Bir hata oluştu: ${e.toString()}';
+      // Hata mesajını temizle
+      String cleanErrorMessage = e.toString();
+      if (cleanErrorMessage.startsWith('Exception: ')) {
+        cleanErrorMessage = cleanErrorMessage.substring('Exception: '.length);
+      }
+      
+      _errorMessage = 'Bir hata oluştu: $cleanErrorMessage';
       _logger.e('Şifre sıfırlama hatası:', e);
       _status = ForgotPasswordStatus.error;
       notifyListeners();

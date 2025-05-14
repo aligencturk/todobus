@@ -1,8 +1,93 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/register_viewmodel.dart';
 import 'login_view.dart';
+import 'dart:math' as math;
+
+// Telefon numarası formatlayıcı sınıf
+class TurkeyPhoneFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue, 
+    TextEditingValue newValue
+  ) {
+    // Sadece rakamları alıyoruz
+    String text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    
+    // Telefon numarası girilmemişse boş dön
+    if (text.isEmpty) {
+      return const TextEditingValue(
+        text: "",
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+    
+    // Başa 0 ekle (yoksa)
+    if (!text.startsWith('0') && text.isNotEmpty) {
+      text = '0$text';
+    }
+    
+    // Telefon numarasını formatla
+    String formattedText = '';
+    
+    // İlk basamak (0)
+    if (text.length >= 1) {
+      formattedText = text.substring(0, 1);
+    }
+    
+    // Alan kodu
+    if (text.length > 1) {
+      formattedText += '(' + text.substring(1, math.min(4, text.length));
+    }
+    
+    // Alan kodu sonrası kapanış parantezi
+    if (text.length > 4) {
+      formattedText += ') ';
+    }
+    
+    // İlk üç rakam
+    if (text.length > 4) {
+      formattedText += text.substring(4, math.min(7, text.length));
+    }
+    
+    // İkinci üç rakam (arada boşlukla)
+    if (text.length > 7) {
+      formattedText += ' ' + text.substring(7, math.min(9, text.length));
+    }
+    
+    // Son iki rakam (arada boşlukla)
+    if (text.length > 9) {
+      formattedText += ' ' + text.substring(9, math.min(11, text.length));
+    }
+    
+    return TextEditingValue(
+      text: formattedText,
+      selection: TextSelection.collapsed(offset: formattedText.length),
+    );
+  }
+}
+
+// Telefon numarası input validatörü
+String? validatePhoneNumber(String? value) {
+  if (value == null || value.isEmpty) {
+    return 'Telefon numarası gerekli';
+  }
+  
+  // Sadece rakamları alarak kontrol et
+  final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
+  
+  if (digitsOnly.length != 11) {
+    return 'Geçerli bir telefon numarası girin';
+  }
+  
+  if (!digitsOnly.startsWith('0')) {
+    return 'Telefon numarası 0 ile başlamalıdır';
+  }
+  
+  return null;
+}
 
 class RegisterView extends StatefulWidget {
   const RegisterView({Key? key}) : super(key: key);
@@ -187,7 +272,7 @@ class _RegisterViewState extends State<RegisterView> {
                                 CupertinoTextField(
                                   controller: _phoneController,
                                   keyboardType: TextInputType.phone,
-                                  placeholder: 'Telefon numaranızı girin',
+                                  placeholder: '0(555) 555 55 55',
                                   padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                                   style: const TextStyle(
                                     color: Color(0xFF2C3E50),
@@ -205,6 +290,10 @@ class _RegisterViewState extends State<RegisterView> {
                                       size: 20,
                                     ),
                                   ),
+                                  inputFormatters: [
+                                    LengthLimitingTextInputFormatter(18), // Format uzunluğu kısıtlaması
+                                    TurkeyPhoneFormatter(), // Özel formatımız
+                                  ],
                                 ),
                                 
                                 const SizedBox(height: 16),
@@ -355,6 +444,28 @@ class _RegisterViewState extends State<RegisterView> {
                               onPressed: viewModel.status == RegisterStatus.loading
                                   ? null
                                   : () async {
+                                      // Telefon validasyonu ekle
+                                      final phoneError = validatePhoneNumber(_phoneController.text);
+                                      if (phoneError != null) {
+                                        // setError fonksiyonu yerine bir CupertinoDialog gösterelim
+                                        showCupertinoDialog(
+                                          context: context,
+                                          builder: (context) => CupertinoAlertDialog(
+                                            title: const Text('Telefon Numarası Hatası'),
+                                            content: Text(phoneError),
+                                            actions: [
+                                              CupertinoDialogAction(
+                                                child: const Text('Tamam'),
+                                                onPressed: () {
+                                                  Navigator.of(context).pop();
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      
                                       final success = await viewModel.register(
                                         firstName: _firstNameController.text.trim(),
                                         lastName: _lastNameController.text.trim(),

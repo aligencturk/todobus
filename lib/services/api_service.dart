@@ -354,7 +354,7 @@ class ApiService {
       return forgotResponse;
     } catch (e) {
       _logger.e('Şifre sıfırlama isteği sırasında hata: $e');
-      throw Exception('Şifre sıfırlama isteği sırasında bir hata oluştu: $e');
+      throw Exception('Bir hata oluştu, lütfen tekrar deneyin.');
     }
   }
   
@@ -384,7 +384,7 @@ class ApiService {
       return codeResponse;
     } catch (e) {
       _logger.e('Doğrulama kodu kontrolü sırasında hata: $e');
-      throw Exception('Doğrulama kodu kontrolü sırasında bir hata oluştu: $e');
+      throw Exception('Bir hata oluştu, lütfen tekrar deneyin.');
     }
   }
   
@@ -415,7 +415,7 @@ class ApiService {
       return updateResponse;
     } catch (e) {
       _logger.e('Şifre güncelleme sırasında hata: $e');
-      throw Exception('Şifre güncelleme sırasında bir hata oluştu: $e');
+      throw Exception('Bir hata oluştu, lütfen tekrar deneyin.');
     }
   }
 

@@ -118,33 +118,18 @@ class _ProfileViewState extends State<ProfileView> {
           const SizedBox(height: 24),
           
           _buildSectionHeader(context, 'Hesap Bilgileri'),
-          _buildListItem(context, 'Kullanıcı ID', '${user?.userID ?? ""}'),
-          _buildListItem(context, 'Kullanıcı Adı', user?.username ?? ""),
-          _buildListItem(context, 'Ad', user?.userFirstname ?? ""),
-          _buildListItem(context, 'Soyad', user?.userLastname ?? ""),
-          _buildListItem(context, 'Tam Ad', user?.userFullname ?? ""),
+          _buildListItem(context, 'Ad Soyad', user?.userFullname ?? ""),
           _buildListItem(context, 'E-posta', user?.userEmail ?? ""),
           _buildListItem(context, 'Doğum Tarihi', user?.userBirthday ?? ""),
           _buildListItem(context, 'Telefon', user?.userPhone ?? ""),
           _buildListItem(context, 'Cinsiyet', user?.userGender ?? ""),
-          _buildListItem(context, 'Durum', user?.userStatus ?? ""),
-          _buildListItem(context, 'Rütbe', user?.userRank ?? ""),
           
-          const SizedBox(height: 24),
-          _buildSectionHeader(context, 'Cihaz Bilgileri'),
-          _buildListItem(context, 'Platform', viewModel.platformInfo),
-          _buildListItem(context, 'Cihaz Modeli', viewModel.deviceModel),
-          _buildListItem(context, 'İşletim Sistemi', viewModel.osVersion),
-          _buildListItem(context, 'Platform Türü', user?.userPlatform ?? ""),
-          _buildListItem(context, 'Versiyon', user?.userVersion ?? ""),
-          _buildListItem(context, 'iOS Versiyonu', user?.iosVersion ?? ""),
-          _buildListItem(context, 'Android Versiyonu', user?.androidVersion ?? ""),
+         
           
           const SizedBox(height: 24),
           _buildSectionHeader(context, 'Uygulama Bilgileri'),
           _buildListItem(context, 'Uygulama Adı', viewModel.appName),
           _buildListItem(context, 'Versiyon', '${viewModel.appVersion} (${viewModel.buildNumber})'),
-          _buildListItem(context, 'Paket Adı', viewModel.packageName),
           
           const SizedBox(height: 32),
           PlatformElevatedButton(
@@ -219,15 +204,7 @@ class _ProfileViewState extends State<ProfileView> {
               cupertino: (data) => data.textTheme.navLargeTitleTextStyle.copyWith(fontSize: 24),
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            user?.userRank ?? 'TodoBus Kullanıcısı',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-              cupertino: (data) => data.textTheme.textStyle.copyWith(color: CupertinoColors.secondaryLabel),
-            ),
-          ),
+         
         ],
       ),
     );

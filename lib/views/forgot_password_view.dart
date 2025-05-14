@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/forgot_password_viewmodel.dart';
+import '../services/snackbar_service.dart';
 import 'login_view.dart';
 
 class ForgotPasswordView extends StatefulWidget {
@@ -17,6 +18,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _passwordConfirmController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _snackbarService = SnackBarService();
 
   @override
   void dispose() {
@@ -496,5 +498,39 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
       default:
         break;
     }
+    
+    // Hata durumunda kullanıcıya Snackbar ile bildirim göster
+    if (viewModel.status == ForgotPasswordStatus.error) {
+      String formattedMessage = _formatErrorMessage(viewModel.errorMessage);
+      _snackbarService.showError(formattedMessage);
+    }
+  }
+  
+  // Hata mesajını formatla
+  String _formatErrorMessage(String errorMessage) {
+    // Exception: hatası gibi prefix'leri kaldır
+    if (errorMessage.startsWith('Exception: ')) {
+      errorMessage = errorMessage.substring('Exception: '.length);
+    }
+    
+    // Şifre sıfırlama hatası gibi tekrarlanan mesajları kaldır
+    if (errorMessage.contains('Şifre sıfırlama isteği sırasında bir hata oluştu:')) {
+      errorMessage = errorMessage.replaceAll('Şifre sıfırlama isteği sırasında bir hata oluştu:', '');
+    }
+    
+    if (errorMessage.contains('Bir hata oluştu:')) {
+      errorMessage = errorMessage.replaceAll('Bir hata oluştu:', '');
+    }
+    
+    // HTTP kodlarını temizle
+    final regExp = RegExp(r'\b\d{3}\b');
+    errorMessage = errorMessage.replaceAll(regExp, '');
+    
+    // Teknik detayları içeren uzun hataları kısalt
+    if (errorMessage.length > 120) {
+      return '${errorMessage.substring(0, 120)}...';
+    }
+    
+    return errorMessage.trim();
   }
 } 

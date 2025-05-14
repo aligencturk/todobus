@@ -784,7 +784,7 @@ class _GroupsViewState extends State<GroupsView> {
         children: [
           _buildFilterChip(0, 'Tüm Gruplar'),
           const SizedBox(width: 8),
-          _buildFilterChip(1, 'Admin Olduğum'),
+          _buildFilterChip(1, 'Yönetici Olduğum'),
           const SizedBox(width: 8),
           _buildFilterChip(2, 'Üye Olduğum'),
         ],
