@@ -29,6 +29,9 @@ class DashboardViewModel with ChangeNotifier {
   bool _isLoadingTasks = false;
   String _tasksErrorMessage = '';
   
+  bool _isLoadingUserInfo = false;
+  bool _isLoadingEvents = false;
+  
   // Getters
   DashboardLoadStatus get status => _status;
   String get errorMessage => _errorMessage;
@@ -54,8 +57,15 @@ class DashboardViewModel with ChangeNotifier {
   }
   
   // Kullanıcı bilgilerini yükle
-  Future<void> loadUserInfo() async {
-    if (_status == DashboardLoadStatus.loading) return;
+  Future<void> loadUserInfo({bool forceRefresh = false}) async {
+    if (_isLoadingUserInfo && !forceRefresh) return;
+    
+    _isLoadingUserInfo = true;
+    
+    if (forceRefresh) {
+      _user = null;
+      _safeNotifyListeners();
+    }
     
     try {
       _status = DashboardLoadStatus.loading;
@@ -80,6 +90,7 @@ class DashboardViewModel with ChangeNotifier {
       _status = DashboardLoadStatus.error;
       _logger.e('Kullanıcı bilgileri yükleme hatası:', e);
     } finally {
+      _isLoadingUserInfo = false;
       _safeNotifyListeners();
     }
   }
@@ -92,15 +103,22 @@ class DashboardViewModel with ChangeNotifier {
   }
   
   // Tüm verileri yükle
-  Future<void> loadDashboardData() async {
+  Future<void> loadDashboardData({bool forceRefresh = false}) async {
+    if (_status == DashboardLoadStatus.loading && !forceRefresh) return;
+    
+    if (forceRefresh) {
+      _user = null;
+      _upcomingEvents = [];
+    }
+    
     _status = DashboardLoadStatus.loading;
     _errorMessage = '';
     _safeNotifyListeners();
     
     try {
-      await loadUserInfo();
-      await loadUserTasks();
-      await _loadUpcomingEvents();
+      await loadUserInfo(forceRefresh: forceRefresh);
+      await loadUserTasks(forceRefresh: forceRefresh);
+      await _loadUpcomingEvents(forceRefresh: forceRefresh);
       
       _status = DashboardLoadStatus.loaded;
       _safeNotifyListeners();
@@ -113,8 +131,12 @@ class DashboardViewModel with ChangeNotifier {
   }
   
   // Kullanıcı görevlerini yükle
-  Future<void> loadUserTasks() async {
-    if (_isLoadingTasks) return;
+  Future<void> loadUserTasks({bool forceRefresh = false}) async {
+    if (_isLoadingTasks && !forceRefresh) return;
+    
+    if (forceRefresh) {
+      _userTasks = [];
+    }
     
     _isLoadingTasks = true;
     _tasksErrorMessage = '';
@@ -198,7 +220,16 @@ class DashboardViewModel with ChangeNotifier {
   }
   
   // Yaklaşan etkinlikleri yükle
-  Future<void> _loadUpcomingEvents() async {
+  Future<void> _loadUpcomingEvents({bool forceRefresh = false}) async {
+    if (_isLoadingEvents && !forceRefresh) return;
+    
+    _isLoadingEvents = true;
+    
+    if (forceRefresh) {
+      _upcomingEvents = [];
+      _safeNotifyListeners();
+    }
+    
     try {
       await _loadUserGroups(); // Önce tüm grupları yükle
       
@@ -235,6 +266,9 @@ class DashboardViewModel with ChangeNotifier {
       _logger.e('Etkinlikler yüklenirken hata: $e');
       // Ana process'i durdurmamak için hata fırlatma
       _upcomingEvents = [];
+    } finally {
+      _isLoadingEvents = false;
+      _safeNotifyListeners();
     }
   }
   

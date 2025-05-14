@@ -2,13 +2,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
+import 'package:todobus/viewmodels/profile_viewmodel.dart';
 import 'dart:io' show Platform;
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import '../models/group_models.dart';
-import '../models/user_model.dart';
 import '../main_app.dart';
 import 'login_view.dart';
 import 'profile_view.dart';
@@ -30,7 +30,6 @@ class _DashboardViewState extends State<DashboardView> {
   List<GroupLog> _recentLogs = [];
   bool _isLoadingLogs = false;
   
-  bool _hasTasksError = false;
   
   List<ProjectPreviewItem> _userProjects = [];
 
@@ -43,7 +42,9 @@ class _DashboardViewState extends State<DashboardView> {
         final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
         final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
         
-        dashboardViewModel.loadDashboardData();
+        // Her seferinde tüm verileri yeniden yüklüyoruz, önbelleği kullanmıyoruz
+        dashboardViewModel.loadDashboardData(forceRefresh: true);
+        dashboardViewModel.loadUserTasks(forceRefresh: true);
         
         groupViewModel.loadGroups().then((_) {
           if (mounted) {
@@ -58,11 +59,23 @@ class _DashboardViewState extends State<DashboardView> {
     });
   }
   
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
+    // Kullanıcı her sayfaya eriştiğinde görevleri ve diğer verileri tazelemek için
+    // Özellikle logout/login sonrası önbellek sorunlarını engellemek amacıyla
+    dashboardViewModel.loadUserTasks(forceRefresh: true);
+  }
+
   Future<void> _refreshData() async {
     final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
     final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
 
-    await dashboardViewModel.loadDashboardData();
+    // Yenileme işleminde her zaman taze veri alıyoruz
+    await dashboardViewModel.loadDashboardData(forceRefresh: true);
+    await dashboardViewModel.loadUserTasks(forceRefresh: true);
     await groupViewModel.loadGroups();
     
     if (mounted) {
@@ -72,6 +85,10 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _logout() async {
+    // Önce tüm önbelleği temizle
+    await _storageService.clearAllCache();
+    
+    // Sonra kullanıcı oturum verilerini temizle
     await _storageService.clearUserData();
     _logger.i('Kullanıcı çıkış yaptı');
     
@@ -327,8 +344,8 @@ class _DashboardViewState extends State<DashboardView> {
   }
   
   Widget _buildWelcomeSection() {
-    final dashboardViewModel = Provider.of<DashboardViewModel>(context);
-    final userName = dashboardViewModel.user?.userFullname ?? 'Kullanıcı';
+    final profileViewModel = Provider.of<ProfileViewModel>(context);
+    final userName = profileViewModel.user?.userFullname;
     final bool isIOS = Platform.isIOS;
     
     return Padding(
@@ -1013,8 +1030,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Widget _buildProjectsList(bool isLoadingOverall) {
-    final groupViewModel = Provider.of<GroupViewModel>(context);
-    
+        
     if (isLoadingOverall && _userProjects.isEmpty) {
         return SizedBox(height: 120, child: Center(child: CupertinoActivityIndicator()));
     }

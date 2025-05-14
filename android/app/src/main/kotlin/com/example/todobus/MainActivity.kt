@@ -1,4 +1,4 @@
-package com.example.todobus
+package com.rivorya.todobus
 
 import io.flutter.embedding.android.FlutterActivity
 
