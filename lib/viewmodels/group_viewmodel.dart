@@ -17,12 +17,16 @@ class GroupViewModel with ChangeNotifier {
   bool _isDisposed = false;
   bool _isLoadingFromApi = false;
   
+  // Proje durumları için önbellek
+  List<ProjectStatus> _cachedProjectStatuses = [];
+  
   // Getters
   GroupLoadStatus get status => _status;
   String get errorMessage => _errorMessage;
   List<Group> get groups => _groups;
   bool get hasGroups => _groups.isNotEmpty;
   int get totalProjects => _groups.fold(0, (sum, group) => sum + group.projects.length);
+  List<ProjectStatus> get cachedProjectStatuses => _cachedProjectStatuses;
   
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
@@ -491,10 +495,28 @@ class GroupViewModel with ChangeNotifier {
   // Proje durumlarını getir
   Future<List<ProjectStatus>> getProjectStatuses() async {
     try {
+      // Her zaman API'den yeni durumları alalım
+      _cachedProjectStatuses = []; // Önbelleği temizle
+      _logger.i('Proje durumları için API çağrısı yapılıyor, önbellek temizlendi');
+      
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
       final statuses = await _apiService.project.getProjectStatuses();
+      
+      if (statuses.isEmpty) {
+        _logger.w('API\'den boş proje durumları listesi alındı');
+      } else {
+        _logger.i('${statuses.length} proje durumu API\'den alındı');
+        
+        // Durum ID'lerini ve renklerini logla
+        for (var status in statuses) {
+          _logger.i('Durum ID: ${status.statusID}, Ad: ${status.statusName}, Renk: ${status.statusColor}');
+        }
+      }
+      
+      // Önbelleğe al
+      _cachedProjectStatuses = statuses;
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();

@@ -40,22 +40,29 @@ class _DashboardViewState extends State<DashboardView> {
   void initState() {
     super.initState();
     
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (mounted) {
         final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
         final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+        
+        // Proje durumlarını önce yükle (diğer verilere bağlı olarak doğru gösterilmesi için)
+        await groupViewModel.getProjectStatuses();
+        _logger.i('Proje durumları yüklendi');
         
         // İlk veri yüklemeleri - önbellekten ve sunucudan
         dashboardViewModel.loadDashboardData();
         
         // Grup verilerinin yüklenmesi ve ilgili projeksiyonlar
-        groupViewModel.loadGroups().then((_) {
-          if (mounted) {
-            _loadRecentLogs(groupViewModel);
-            _loadUserProjects(groupViewModel);
-            _logger.i('Gruplar yüklendi, loglar ve projeler istendi');
-          }
-        });
+        await groupViewModel.loadGroups();
+        
+        if (mounted) {
+          _loadRecentLogs(groupViewModel);
+          _loadUserProjects(groupViewModel);
+          _logger.i('Gruplar yüklendi, loglar ve projeler istendi');
+          
+          // Yüklenen verilerle UI'ı güncelle
+          setState(() {});
+        }
         
         _logger.i('Dashboard açıldı: Veriler yükleniyor...');
       }
@@ -70,6 +77,10 @@ class _DashboardViewState extends State<DashboardView> {
     final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
     final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
 
+    // Proje durumlarını yeniden yükle
+    await groupViewModel.getProjectStatuses();
+    _logger.i('Proje durumları yenilendi');
+    
     // Önce dashboardViewModel verilerini güncelle
     await dashboardViewModel.loadDashboardData();
     
@@ -80,6 +91,7 @@ class _DashboardViewState extends State<DashboardView> {
     if (mounted) {
       await _loadRecentLogs(groupViewModel);
       _loadUserProjects(groupViewModel);
+      setState(() {}); // UI'ı güncelle
     }
     
     _logger.i('Dashboard verileri yenilendi');
@@ -1055,11 +1067,17 @@ class _DashboardViewState extends State<DashboardView> {
   
   Widget _buildProjectCard(ProjectPreviewItem project) {
     final bool isIOS = Platform.isIOS;
+    final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+    final LoggerService _projectLogger = LoggerService();
     
     Color baseColor;
     IconData projectIconData;
     String statusText;
     
+    // API'den yüklenen proje durumlarını kontrol et
+    final statuses = groupViewModel.cachedProjectStatuses;
+    
+    // Status ID'sine göre varsayılan değerler ata (API'den bulunamazsa kullanılır)
     switch (project.projectStatusID) {
       case 1:
         baseColor = isIOS ? CupertinoColors.systemBlue : Colors.blue;
@@ -1091,6 +1109,23 @@ class _DashboardViewState extends State<DashboardView> {
         projectIconData = isIOS ? CupertinoIcons.doc_plaintext : Icons.description;
         statusText = 'Bilinmiyor';
         break;
+    }
+
+    // API'den durumlar yüklendiyse, statuses içinde ilgili durum var mı kontrol et 
+    if (statuses.isNotEmpty) {
+      // İlgili durumu ara
+      final matchingStatus = statuses.where((s) => s.statusID == project.projectStatusID).toList();
+      if (matchingStatus.isNotEmpty) {
+        // Durumun renk ve adını API'den kullan
+        final status = matchingStatus.first;
+        baseColor = _hexToColor(status.statusColor);
+        statusText = status.statusName;
+        _projectLogger.i('Proje ${project.projectName} için API durumu bulundu: ${status.statusName}, Color: ${status.statusColor}');
+      } else {
+        _projectLogger.w('Proje ${project.projectName} (ID: ${project.projectStatusID}) için uygun durum bulunamadı. Varsayılan değer kullanılıyor.');
+      }
+    } else {
+      _projectLogger.w('API proje durumları yüklenmemiş. Varsayılan değerler kullanılıyor.');
     }
 
     final cardBackgroundColor = isIOS 
@@ -1165,6 +1200,15 @@ class _DashboardViewState extends State<DashboardView> {
         ),
       ),
     );
+  }
+
+  // Hex renk kodunu Color nesnesine çevirme
+  Color _hexToColor(String hexColor) {
+    hexColor = hexColor.replaceAll('#', '');
+    if (hexColor.length == 6) {
+      hexColor = 'FF' + hexColor;
+    }
+    return Color(int.parse(hexColor, radix: 16));
   }
 
   Widget _buildMyTasksSection() {
@@ -1442,6 +1486,15 @@ class _DashboardViewState extends State<DashboardView> {
         setState(() {
           _userProjects = allProjects;
         });
+        
+        // Log ekleyelim - hangi durumlara sahip projeler yüklendiğini görelim
+        if (_userProjects.isNotEmpty) {
+          _logger.i('Projeler ve durumları yüklendi: ${_userProjects.map((p) => '${p.projectName}: ${p.projectStatusID}').join(', ')}');
+          
+          // Statuses içinde bu durumlar var mı kontrol edelim
+          final statuses = groupViewModel.cachedProjectStatuses;
+          _logger.i('Mevcut durumlar: ${statuses.map((s) => '${s.statusID}: ${s.statusName} (${s.statusColor})').join(', ')}');
+        }
     }
   }
 }
@@ -1460,4 +1513,9 @@ class ProjectPreviewItem {
     required this.groupID,
     required this.groupName,
   });
+  
+  @override
+  String toString() {
+    return 'ProjectPreviewItem{projectID: $projectID, projectName: $projectName, projectStatusID: $projectStatusID, groupID: $groupID, groupName: $groupName}';
+  }
 } 

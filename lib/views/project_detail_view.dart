@@ -42,6 +42,15 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
   void initState() {
     super.initState();
     _loadProjectDetail();
+    
+    // Proje durumlarını yükle
+    Provider.of<GroupViewModel>(context, listen: false).getProjectStatuses().then((_) {
+      if (mounted) {
+        setState(() {
+          // Durum güncellemesi
+        });
+      }
+    });
   }
   
   Future<void> _loadProjectDetail() async {
@@ -374,20 +383,69 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
   }
   
   Color _getStatusColor(int statusID, bool isIOS) {
+    // GroupViewModel üzerinden durumları kontrol et
+    final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+    final statuses = groupViewModel.cachedProjectStatuses;
+    final LoggerService _logger = LoggerService();
+    
+    // Status ID'sine göre varsayılan renkler (API'den bulunamazsa kullanılır)
+    Color defaultColor;
     switch (statusID) {
-      case 1: // Yeni Proje
-        return isIOS ? CupertinoColors.systemBlue : Colors.blue;
-      case 2: // Devam Ediyor
-        return isIOS ? CupertinoColors.systemOrange : Colors.orange;
-      case 3: // Tamamlandı
-        return isIOS ? CupertinoColors.systemGreen : Colors.green;
-      case 4: // İptal Edildi
-        return isIOS ? CupertinoColors.systemRed : Colors.red;
-      case 5: // Beklemede
-        return isIOS ? CupertinoColors.systemGrey : Colors.grey;
+      case 1:
+        defaultColor = isIOS ? CupertinoColors.systemBlue : Colors.blue;
+        break;
+      case 2:
+        defaultColor = isIOS ? CupertinoColors.systemOrange : Colors.orange;
+        break;
+      case 3:
+        defaultColor = isIOS ? CupertinoColors.systemGreen : Colors.green;
+        break;
+      case 4:
+        defaultColor = isIOS ? CupertinoColors.systemRed : Colors.red;
+        break;
+      case 5:
+        defaultColor = isIOS ? CupertinoColors.systemGrey : Colors.grey;
+        break;
       default:
-        return isIOS ? CupertinoColors.systemBlue : Colors.blue;
+        defaultColor = isIOS ? CupertinoColors.activeBlue : Theme.of(context).colorScheme.primary;
+        break;
     }
+    
+    // API'den durumlar yüklendiyse, statuses içinde ilgili durum var mı kontrol et
+    if (statuses.isNotEmpty) {
+      // İlgili durumu ara
+      final matchingStatus = statuses.where((s) => s.statusID == statusID).toList();
+      if (matchingStatus.isNotEmpty) {
+        // Durumun rengini API'den kullan
+        final status = matchingStatus.first;
+        _logger.i('StatusID $statusID için API durumu bulundu: ${status.statusName}, Color: ${status.statusColor}');
+        return _hexToColor(status.statusColor);
+      } else {
+        _logger.w('StatusID $statusID için uygun durum bulunamadı. Varsayılan renk kullanılıyor.');
+      }
+    } else {
+      _logger.w('API proje durumları yüklenmemiş. Varsayılan renkler kullanılıyor.');
+      
+      // API durumlarını yüklemeyi dene
+      if (mounted) {
+        groupViewModel.getProjectStatuses().then((_) {
+          if (mounted) {
+            setState(() {});
+          }
+        });
+      }
+    }
+    
+    return defaultColor;
+  }
+  
+  // Hex renk kodunu Color nesnesine çevirme
+  Color _hexToColor(String hexColor) {
+    hexColor = hexColor.replaceAll('#', '');
+    if (hexColor.length == 6) {
+      hexColor = 'FF' + hexColor;
+    }
+    return Color(int.parse(hexColor, radix: 16));
   }
   
   Widget _buildSegmentedControl(BuildContext context) {

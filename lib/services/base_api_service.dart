@@ -161,8 +161,14 @@ class BaseApiService {
     final url = Uri.parse('$baseUrl$endpoint');
     final headers = getHeaders(withToken: requiresToken);
     
+    // Önbellek önlemek için headers ekle
+    headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    headers['Pragma'] = 'no-cache';
+    headers['Expires'] = '0';
+    
     _logger.d('GET isteği: $url');
     _logger.d('Query Params: ${queryParams ?? ''}');  
+    _logger.d('Headers: $headers');
 
     try {
       final response = await http.get(

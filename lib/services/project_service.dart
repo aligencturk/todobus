@@ -181,8 +181,11 @@ class ProjectService {
     try {
       _logger.i('Proje durumları getiriliyor...');
       
+      // Önbellek önlemek için timestamp parametresi ekle
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      
       final response = await _apiService.get(
-        'service/general/general/proStatuses',
+        'service/general/general/proStatuses?t=$timestamp', // Önbellek önleme
         requiresToken: false,
       );
       
