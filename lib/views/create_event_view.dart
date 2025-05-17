@@ -324,8 +324,12 @@ class _CreateEventViewState extends State<CreateEventView> {
         int.parse(parts[1]), // Ay
         int.parse(parts[0]), // Gün
       );
+      // Eğer seçilen tarih bugünden önceyse, bugünü kullan
+      if (initialDate.isBefore(DateTime(now.year, now.month, now.day))) {
+        initialDate = DateTime(now.year, now.month, now.day);
+      }
     } catch (e) {
-      initialDate = now;
+      initialDate = DateTime(now.year, now.month, now.day);
     }
     
     if (isIOS) {
@@ -341,7 +345,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                   height: 240,
                   child: CupertinoDatePicker(
                     initialDateTime: initialDate,
-                    minimumDate: now,
+                    minimumDate: DateTime(now.year, now.month, now.day),
                     maximumDate: DateTime(now.year + 2, now.month, now.day),
                     mode: CupertinoDatePickerMode.date,
                     onDateTimeChanged: (DateTime dateTime) {
@@ -398,6 +402,16 @@ class _CreateEventViewState extends State<CreateEventView> {
       showCupertinoModalPopup(
         context: context,
         builder: (context) {
+          // Zaman seçici için bugün tarihi olarak kullan
+          final today = DateTime.now();
+          final initialDateTime = DateTime(
+            today.year,
+            today.month,
+            today.day,
+            initialTime.hour,
+            initialTime.minute,
+          );
+          
           return Container(
             height: 300,
             color: CupertinoColors.systemBackground,
@@ -406,13 +420,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                 SizedBox(
                   height: 240,
                   child: CupertinoDatePicker(
-                    initialDateTime: DateTime(
-                      DateTime.now().year,
-                      DateTime.now().month,
-                      DateTime.now().day,
-                      initialTime.hour,
-                      initialTime.minute,
-                    ),
+                    initialDateTime: initialDateTime,
                     mode: CupertinoDatePickerMode.time,
                     use24hFormat: true,
                     onDateTimeChanged: (DateTime dateTime) {

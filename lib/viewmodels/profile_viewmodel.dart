@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../services/device_info_service.dart';
+import '../services/refresh_service.dart';
 
 enum ProfileStatus { initial, loading, loaded, error, updating, updateSuccess, updateError }
 
@@ -10,11 +12,13 @@ class ProfileViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LoggerService _logger = LoggerService();
   final DeviceInfoService _deviceInfoService = DeviceInfoService();
+  final RefreshService _refreshService = RefreshService();
   
   ProfileStatus _status = ProfileStatus.initial;
   String _errorMessage = '';
   User? _user;
   bool _isDisposed = false;
+  StreamSubscription? _refreshSubscription;
   
   // Cihaz bilgileri
   String _deviceModel = 'Yükleniyor...';
@@ -28,6 +32,18 @@ class ProfileViewModel with ChangeNotifier {
   String get deviceModel => _deviceModel;
   String get osVersion => _osVersion;
   
+  ProfileViewModel() {
+    _initRefreshListener();
+  }
+  
+  void _initRefreshListener() {
+    _refreshSubscription = _refreshService.refreshStream.listen((refreshType) {
+      if (refreshType == 'profile' || refreshType == 'all') {
+        loadUserProfile();
+      }
+    });
+  }
+  
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
     if (!_isDisposed) {
@@ -38,6 +54,7 @@ class ProfileViewModel with ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _refreshSubscription?.cancel();
     super.dispose();
   }
   
@@ -114,6 +131,9 @@ class ProfileViewModel with ChangeNotifier {
         // Kullanıcı bilgilerini tekrar yükle
         await loadUserProfile();
         _status = ProfileStatus.updateSuccess;
+        // Tüm uygulamaya profil güncelleme bildirimi gönder
+        _refreshService.refreshProfile();
+        _refreshService.refreshAll();
         _logger.i('Kullanıcı profili başarıyla güncellendi');
       } else {
         _errorMessage = response.errorMessage ?? 'Profil güncellenirken bir hata oluştu';
