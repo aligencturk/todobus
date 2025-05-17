@@ -1,5 +1,6 @@
 import '../models/user_model.dart';
 import '../models/group_models.dart';
+import '../models/notification_model.dart';
 import '../services/logger_service.dart';
 import '../services/storage_service.dart';
 import 'base_api_service.dart';
@@ -101,6 +102,47 @@ class UserService {
     }
   }
 
+  // FCM token'ı sunucuya kaydet
+  Future<bool> updateFcmToken(String fcmToken) async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        _logger.w('FCM token kaydedilemedi: Oturum bilgisi bulunamadı');
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final platform = _apiService.getPlatform();
+      
+      _logger.i('-------------------------------------------------------------------------');
+      _logger.i('FCM Token Sunucuya Gönderiliyor:');
+      _logger.i('Platform: $platform');
+      _logger.i('Token: $fcmToken');
+      _logger.i('-------------------------------------------------------------------------');
+      
+      final body = {
+        'userToken': token,
+        'fcmToken': fcmToken,
+        'platform': platform,
+      };
+
+      final response = await _apiService.put('service/user/update/fcmtoken', body: body);
+      
+      final success = response['success'] == true;
+      if (success) {
+        _logger.i('FCM token başarıyla kaydedildi');
+        _logger.i('Sunucu Yanıtı: $response');
+      } else {
+        _logger.w('FCM token kaydedilemedi: ${response['errorMessage']}');
+        _logger.w('Sunucu Yanıtı: $response');
+      }
+      
+      return success;
+    } catch (e) {
+      _logger.e('FCM token kaydedilirken hata: $e');
+      return false;
+    }
+  }
+
   // Kullanıcının görevlerini getir
   Future<UserWorksResponse> getUserWorks() async {
     try {
@@ -123,6 +165,73 @@ class UserService {
     } catch (e) {
       _logger.e('Kullanıcı görevleri yüklenirken hata: $e');
       throw Exception('Kullanıcı görevleri yüklenemedi: $e');
+    }
+  }
+
+  // Kullanıcı bildirimlerini getir
+  Future<NotificationResponse> getNotifications() async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      // Kullanıcı ID'sini al
+      final userResponse = await getUser();
+      if (!userResponse.success || userResponse.data == null) {
+        throw Exception('Kullanıcı bilgileri alınamadı');
+      }
+
+      final userId = userResponse.data!.user.userID;
+
+      final body = {
+        'userToken': token,
+      };
+
+      _logger.i('Kullanıcı bildirimleri getiriliyor...');
+      final response = await _apiService.put('service/user/account/$userId/notifications', body: body);
+      
+      final notificationResponse = NotificationResponse.fromJson(response);
+      if (notificationResponse.success) {
+        _logger.i('Kullanıcı bildirimleri başarıyla getirildi: ${notificationResponse.notifications?.length ?? 0} bildirim');
+      } else {
+        _logger.w('Kullanıcı bildirimleri getirilemedi: ${notificationResponse.errorMessage}');
+      }
+      
+      return notificationResponse;
+    } catch (e) {
+      _logger.e('Bildirimler yüklenirken hata: $e');
+      throw Exception('Bildirimler yüklenemedi: $e');
+    }
+  }
+
+  // Bildirimi okundu olarak işaretle
+  Future<bool> markNotificationAsRead(int notificationId) async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+        'notificationId': notificationId,
+      };
+
+      _logger.i('Bildirim okundu olarak işaretleniyor: $notificationId');
+      final response = await _apiService.put('service/user/account/notification/read', body: body);
+      
+      final success = response['success'] == true;
+      if (success) {
+        _logger.i('Bildirim başarıyla okundu olarak işaretlendi');
+      } else {
+        _logger.w('Bildirim okundu olarak işaretlenemedi: ${response['errorMessage']}');
+      }
+      
+      return success;
+    } catch (e) {
+      _logger.e('Bildirim okundu olarak işaretlenirken hata: $e');
+      return false;
     }
   }
 } 
