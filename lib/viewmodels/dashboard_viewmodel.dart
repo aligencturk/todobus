@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../services/storage_service.dart';
 import '../models/group_models.dart';
+import '../services/refresh_service.dart';
 
 enum DashboardLoadStatus { initial, loading, loaded, error }
 
@@ -11,10 +13,12 @@ class DashboardViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LoggerService _logger = LoggerService();
   final StorageService _storageService = StorageService();
+  final RefreshService _refreshService = RefreshService();
   
   DashboardLoadStatus _status = DashboardLoadStatus.initial;
   String _errorMessage = '';
   bool _isDisposed = false;
+  StreamSubscription? _refreshSubscription;
   
   User? _user;
   int _taskCount = 0;
@@ -40,6 +44,24 @@ class DashboardViewModel with ChangeNotifier {
   bool get isLoadingTasks => _isLoadingTasks;
   String get tasksErrorMessage => _tasksErrorMessage;
   
+  DashboardViewModel() {
+    _initRefreshListener();
+  }
+  
+  void _initRefreshListener() {
+    _refreshSubscription = _refreshService.refreshStream.listen((refreshType) {
+      if (refreshType == 'all') {
+        loadDashboardData();
+      } else if (refreshType == 'projects' || refreshType == 'works') {
+        loadUserTasks();
+      } else if (refreshType == 'events') {
+        _loadUpcomingEvents();
+      } else if (refreshType == 'profile') {
+        loadUserInfo();
+      }
+    });
+  }
+  
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
     if (!_isDisposed) {
@@ -50,6 +72,7 @@ class DashboardViewModel with ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _refreshSubscription?.cancel();
     super.dispose();
   }
   
