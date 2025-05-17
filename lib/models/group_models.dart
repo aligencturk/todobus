@@ -289,23 +289,37 @@ class GroupEvent {
 
   DateTime get eventDateTime {
     // Örnek tarih formatı: "27.04.2025 19:00"
-    final parts = eventDate.split(' ');
-    if (parts.length != 2) return DateTime.now();
-    
-    final dateParts = parts[0].split('.');
-    final timeParts = parts[1].split(':');
-    
-    if (dateParts.length != 3 || timeParts.length != 2) return DateTime.now();
-    
     try {
-      return DateTime(
-        int.parse(dateParts[2]), // Yıl
-        int.parse(dateParts[1]), // Ay
-        int.parse(dateParts[0]), // Gün
-        int.parse(timeParts[0]), // Saat
-        int.parse(timeParts[1]), // Dakika
-      );
+      final parts = eventDate.split(' ');
+      if (parts.length != 2) {
+        throw FormatException('Geçersiz tarih formatı: $eventDate');
+      }
+      
+      final dateParts = parts[0].split('.');
+      final timeParts = parts[1].split(':');
+      
+      if (dateParts.length != 3 || timeParts.length != 2) {
+        throw FormatException('Geçersiz tarih/saat formatı: $eventDate');
+      }
+      
+      final year = int.parse(dateParts[2]);
+      final month = int.parse(dateParts[1]);
+      final day = int.parse(dateParts[0]);
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      
+      // Değerlerin geçerli olup olmadığını kontrol et
+      if (year < 2000 || year > 2100 ||
+          month < 1 || month > 12 ||
+          day < 1 || day > 31 ||
+          hour < 0 || hour > 23 ||
+          minute < 0 || minute > 59) {
+        throw FormatException('Geçersiz tarih/saat değerleri: $eventDate');
+      }
+      
+      return DateTime(year, month, day, hour, minute);
     } catch (e) {
+      // Herhangi bir hatada şimdiki zamanı dön
       return DateTime.now();
     }
   }

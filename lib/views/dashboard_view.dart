@@ -10,6 +10,7 @@ import '../services/snackbar_service.dart';
 import '../services/user_service.dart';
 import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
+import '../viewmodels/event_viewmodel.dart';
 import '../models/group_models.dart';
 import '../main_app.dart';
 import 'login_view.dart';
@@ -47,6 +48,7 @@ class _DashboardViewState extends State<DashboardView> {
         final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
         final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
         final profileViewModel = Provider.of<ProfileViewModel>(context, listen: false);
+        final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
         
         // Önce kullanıcı bilgilerini yükle
         try {
@@ -65,6 +67,10 @@ class _DashboardViewState extends State<DashboardView> {
         // Proje durumlarını önce yükle (diğer verilere bağlı olarak doğru gösterilmesi için)
         await groupViewModel.getProjectStatuses();
         _logger.i('Proje durumları yüklendi');
+        
+        // Etkinlikleri yükle
+        await eventViewModel.loadEvents();
+        _logger.i('Etkinlikler yüklendi: ${eventViewModel.events.length} adet');
         
         // İlk veri yüklemeleri - önbellekten ve sunucudan
         dashboardViewModel.loadDashboardData();
@@ -141,6 +147,7 @@ class _DashboardViewState extends State<DashboardView> {
   Widget build(BuildContext context) {
     final groupViewModel = Provider.of<GroupViewModel>(context);
     final dashboardViewModel = Provider.of<DashboardViewModel>(context);
+    final eventViewModel = Provider.of<EventViewModel>(context);
 
     return PlatformScaffold(
       backgroundColor: Platform.isIOS ? CupertinoColors.systemGroupedBackground : Theme.of(context).colorScheme.background,
@@ -208,9 +215,7 @@ class _DashboardViewState extends State<DashboardView> {
               child: _buildWelcomeSection(),
             ),
             
-            SliverToBoxAdapter(
-              child: _buildUserQuickInfoCard(),
-            ),
+         
             
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -246,7 +251,7 @@ class _DashboardViewState extends State<DashboardView> {
                   _buildInfoCard(
                     context,
                     title: 'Etkinlikler',
-                    value: '${dashboardViewModel.upcomingEvents.length}',
+                    value: '${eventViewModel.events.length}',
                     icon: CupertinoIcons.calendar_badge_plus,
                     color: CupertinoColors.systemPurple,
                   ),
@@ -277,12 +282,12 @@ class _DashboardViewState extends State<DashboardView> {
             }),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              sliver: dashboardViewModel.isLoading && dashboardViewModel.upcomingEvents.isEmpty
+              sliver: eventViewModel.isLoading && eventViewModel.events.isEmpty
                 ? SliverToBoxAdapter(child: Center(child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: CupertinoActivityIndicator(),
                   )))
-                : dashboardViewModel.upcomingEvents.isEmpty
+                : eventViewModel.events.isEmpty
                   ? SliverToBoxAdapter(
                       child: _buildEmptyState(
                         icon: CupertinoIcons.calendar_badge_minus,
@@ -292,7 +297,8 @@ class _DashboardViewState extends State<DashboardView> {
                   : SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          final event = dashboardViewModel.upcomingEvents[index];
+                          if (index >= eventViewModel.events.length) return null;
+                          final event = eventViewModel.events[index];
                           return _buildEventItem(
                             context, 
                             title: event.eventTitle,
@@ -302,7 +308,7 @@ class _DashboardViewState extends State<DashboardView> {
                             groupId: event.groupID,
                           );
                         },
-                        childCount: dashboardViewModel.upcomingEvents.length,
+                        childCount: eventViewModel.events.length > 5 ? 5 : eventViewModel.events.length,
                       ),
                     ),
             ),
@@ -572,104 +578,7 @@ class _DashboardViewState extends State<DashboardView> {
       ),
     );
   }
-  
-  Widget _buildUserQuickInfoCard() {
-    final dashboardViewModel = Provider.of<DashboardViewModel>(context);
-    final bool isIOS = Platform.isIOS;
-    final user = dashboardViewModel.user;
-    
-    if (user == null) {
-      return const SizedBox.shrink();
-    }
-    
-    final cardBackgroundColor = isIOS 
-        ? (CupertinoTheme.of(context).brightness == Brightness.light ? CupertinoColors.white : CupertinoColors.darkBackgroundGray)
-        : Theme.of(context).cardColor;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: GestureDetector(
-        onTap: _goToProfile,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-          decoration: BoxDecoration(
-            color: cardBackgroundColor,
-            borderRadius: BorderRadius.circular(12),
-            border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.3), width: 0.5) : null,
-            boxShadow: isIOS ? [
-              BoxShadow(
-                color: CupertinoColors.systemGrey5.withOpacity(0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              )
-            ] : [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                blurRadius: 6,
-                offset: const Offset(0, 1),
-              )
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isIOS ? CupertinoIcons.person_fill : Icons.person,
-                  color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.userFullname,
-                       style: isIOS 
-                          ? CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontWeight: FontWeight.w600, fontSize: 16)
-                          : Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      user.userEmail,
-                      style: (isIOS 
-                          ? CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(fontSize: 13)
-                          : Theme.of(context).textTheme.bodySmall
-                      )?.copyWith(color: CupertinoColors.secondaryLabel, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: (isIOS ? CupertinoColors.systemIndigo : Colors.indigo).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  user.userRank,
-                  style: TextStyle(
-                    color: isIOS ? CupertinoColors.systemIndigo : Colors.indigo,
-                    fontWeight: FontWeight.w500,
-                    fontSize: 11,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
   Widget _buildRecentGroupsList(bool isLoadingOverall) {
     final groupViewModel = Provider.of<GroupViewModel>(context);
     

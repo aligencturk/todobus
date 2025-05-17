@@ -617,8 +617,8 @@ class _EditProfileViewState extends State<EditProfileView> {
       
       if (mounted) {
         if (context.read<ProfileViewModel>().status == ProfileStatus.updateSuccess) {
-          Navigator.pop(context);
-          _showSuccessMessage('Profil başarıyla güncellendi');
+          // Başarı mesajını göster
+          _showSuccessDialog('Profil başarıyla güncellendi');
         } else {
           setState(() {
             _errorMessage = context.read<ProfileViewModel>().errorMessage;
@@ -639,16 +639,22 @@ class _EditProfileViewState extends State<EditProfileView> {
     }
   }
   
-  // Başarı mesajı göster
-  void _showSuccessMessage(String message) {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    
-    scaffoldMessenger.showSnackBar(
-      SnackBar(
+  // Başarı mesajı diyalog olarak göster
+  void _showSuccessDialog(String message) {
+    showPlatformDialog(
+      context: context,
+      builder: (dialogContext) => PlatformAlertDialog(
+        title: const Text('Başarılı'),
         content: Text(message),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+        actions: <Widget>[
+          PlatformDialogAction(
+            child: const Text('Tamam'),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              Navigator.of(context).pop(); // Ana sayfaya dön
+            },
+          ),
+        ],
       ),
     );
   }

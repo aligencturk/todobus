@@ -264,7 +264,7 @@ class _CreateEventViewState extends State<CreateEventView> {
         // Kendime seçeneğini ekle
         _groups.insert(0, Group(
           groupID: 0,
-          groupName: '',
+          groupName: 'Kendime',
           groupDesc: '',
           createdBy: '', 
           packageName: '',
@@ -751,12 +751,7 @@ class _CreateEventViewState extends State<CreateEventView> {
               ),
             );
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(widget.isEditing 
-                ? 'Etkinlik başarıyla güncellendi' 
-                : 'Etkinlik başarıyla oluşturuldu')),
-            );
-            // İşlem başarılı olduğunda geri dön
+            // İşlem başarılı mesajını göster ve sonra geri dön
             Navigator.of(context).pop(true);
           }
         }
@@ -766,11 +761,38 @@ class _CreateEventViewState extends State<CreateEventView> {
           : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}');
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(widget.isEditing 
-              ? 'Etkinlik güncellenemedi: ${eventViewModel.errorMessage}'
-              : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}')),
-          );
+          // Scaffold hatasını önlemek için sadece iOS için 
+          // CupertinoAlertDialog gösterelim, diğer platformlar için de uyarlayalım
+          if (isCupertino(context)) {
+            showCupertinoDialog(
+              context: context,
+              builder: (BuildContext context) => CupertinoAlertDialog(
+                title: const Text('Hata', 
+                  style: TextStyle(decoration: TextDecoration.none)),
+                content: Text(widget.isEditing 
+                  ? 'Etkinlik güncellenemedi: ${eventViewModel.errorMessage}'
+                  : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}',
+                  style: const TextStyle(decoration: TextDecoration.none)),
+                actions: <CupertinoDialogAction>[
+                  CupertinoDialogAction(
+                    isDefaultAction: true,
+                    child: const Text('Tamam', 
+                      style: TextStyle(decoration: TextDecoration.none)),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            );
+          } else {
+            // Android için SnackBar kullanmaya devam edelim
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(widget.isEditing 
+                ? 'Etkinlik güncellenemedi: ${eventViewModel.errorMessage}'
+                : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}')),
+            );
+          }
         }
       }
     } catch (e) {
@@ -779,11 +801,36 @@ class _CreateEventViewState extends State<CreateEventView> {
         : 'Etkinlik oluşturulurken hata: $e');
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.isEditing 
-            ? 'Etkinlik güncellenirken hata: $e'
-            : 'Etkinlik oluşturulurken hata: $e')),
-        );
+        // Aynı şekilde hata mesajlarını da hem iOS hem Android için uygun şekilde gösterelim
+        if (isCupertino(context)) {
+          showCupertinoDialog(
+            context: context,
+            builder: (BuildContext context) => CupertinoAlertDialog(
+              title: const Text('Hata', 
+                style: TextStyle(decoration: TextDecoration.none)),
+              content: Text(widget.isEditing 
+                ? 'Etkinlik güncellenirken hata: $e'
+                : 'Etkinlik oluşturulurken hata: $e',
+                style: const TextStyle(decoration: TextDecoration.none)),
+              actions: <CupertinoDialogAction>[
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  child: const Text('Tamam', 
+                    style: TextStyle(decoration: TextDecoration.none)),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(widget.isEditing 
+              ? 'Etkinlik güncellenirken hata: $e'
+              : 'Etkinlik oluşturulurken hata: $e')),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -1131,7 +1178,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                             children: _groups.map((Group group) {
                               return Center(
                                 child: Text(
-                                  group.groupName,
+                                  group.groupName.isNotEmpty ? group.groupName : 'Kendime',
                                   style: const TextStyle(fontSize: 16, decoration: TextDecoration.none),
                                 ),
                               );
