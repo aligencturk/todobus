@@ -1569,7 +1569,6 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
               ),
               title: Text(project.projectName),
-              subtitle: Text('${project.projectStatusID} görev'),
               trailing: hasAdminRights 
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
