@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/group_models.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../services/storage_service.dart';
+import '../services/refresh_service.dart';
 
 enum GroupLoadStatus { initial, loading, loaded, error }
 
@@ -10,12 +12,14 @@ class GroupViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LoggerService _logger = LoggerService();
   final StorageService _storageService = StorageService();
+  final RefreshService _refreshService = RefreshService();
   
   GroupLoadStatus _status = GroupLoadStatus.initial;
   String _errorMessage = '';
   List<Group> _groups = [];
   bool _isDisposed = false;
   bool _isLoadingFromApi = false;
+  StreamSubscription? _refreshSubscription;
   
   // Proje durumları için önbellek
   List<ProjectStatus> _cachedProjectStatuses = [];
@@ -28,6 +32,18 @@ class GroupViewModel with ChangeNotifier {
   int get totalProjects => _groups.fold(0, (sum, group) => sum + group.projects.length);
   List<ProjectStatus> get cachedProjectStatuses => _cachedProjectStatuses;
   
+  GroupViewModel() {
+    _initRefreshListener();
+  }
+  
+  void _initRefreshListener() {
+    _refreshSubscription = _refreshService.refreshStream.listen((refreshType) {
+      if (refreshType == 'groups' || refreshType == 'all') {
+        loadGroups();
+      }
+    });
+  }
+  
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
     if (!_isDisposed) {
@@ -38,6 +54,7 @@ class GroupViewModel with ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _refreshSubscription?.cancel();
     super.dispose();
   }
   
@@ -104,6 +121,8 @@ class GroupViewModel with ChangeNotifier {
       if (success) {
         // Grup başarıyla oluşturulduğunda grupları yeniden yükle
         await _loadGroupsFromApi();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshGroups();
         return true;
       } else {
         // Başarısız olursa önceki duruma geri dön
@@ -136,6 +155,8 @@ class GroupViewModel with ChangeNotifier {
       if (success) {
         // Grup başarıyla güncellendiğinde grupları yeniden yükle
         await _loadGroupsFromApi();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshGroups();
         return true;
       } else {
         // Başarısız olursa önceki duruma geri dön
@@ -183,6 +204,8 @@ class GroupViewModel with ChangeNotifier {
       if (success) {
         // Başarı durumunda grupları yeniden yükle
         await loadGroups();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshGroups();
         return true;
       }
       
@@ -243,6 +266,8 @@ class GroupViewModel with ChangeNotifier {
       if (success) {
         // Grup başarıyla silindiğinde grupları yeniden yükle
         await _loadGroupsFromApi();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshGroups();
         return true;
       } else {
         // Başarısız olursa önceki duruma geri dön
@@ -338,6 +363,14 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
       
+      if (success) {
+        // Başarılı olduğunda verileri yenile
+        await loadGroups();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshProjects();
+        _refreshService.refreshGroups();
+      }
+      
       return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
@@ -375,6 +408,14 @@ class GroupViewModel with ChangeNotifier {
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
+      
+      if (success) {
+        // Başarılı olduğunda verileri yenile
+        await loadGroups();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshProjects();
+        _refreshService.refreshGroups();
+      }
       
       return success;
     } catch (e) {
