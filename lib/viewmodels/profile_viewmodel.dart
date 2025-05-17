@@ -4,7 +4,7 @@ import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../services/device_info_service.dart';
 
-enum ProfileStatus { initial, loading, loaded, error }
+enum ProfileStatus { initial, loading, loaded, error, updating, updateSuccess, updateError }
 
 class ProfileViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -71,6 +71,51 @@ class ProfileViewModel with ChangeNotifier {
       _errorMessage = 'Bir hata oluştu: ${e.toString()}';
       _status = ProfileStatus.error;
       _logger.e('Profil yükleme hatası:', e);
+    } finally {
+      _safeNotifyListeners();
+    }
+  }
+
+  // Kullanıcı profilini güncelle
+  Future<void> updateUserProfile({
+    required String userFullname,
+    required String userEmail,
+    required String userBirthday,
+    required String userPhone,
+    required int userGender,
+    String profilePhoto = '',
+  }) async {
+    if (_status == ProfileStatus.updating) return;
+    
+    try {
+      _status = ProfileStatus.updating;
+      _errorMessage = '';
+      _safeNotifyListeners();
+      
+      _logger.i('Kullanıcı profili güncelleniyor');
+      final response = await _apiService.user.updateUserProfile(
+        userFullname: userFullname,
+        userEmail: userEmail,
+        userBirthday: userBirthday,
+        userPhone: userPhone,
+        userGender: userGender,
+        profilePhoto: profilePhoto,
+      );
+      
+      if (response.success) {
+        // Kullanıcı bilgilerini tekrar yükle
+        await loadUserProfile();
+        _status = ProfileStatus.updateSuccess;
+        _logger.i('Kullanıcı profili başarıyla güncellendi');
+      } else {
+        _errorMessage = response.errorMessage ?? 'Profil güncellenirken bir hata oluştu';
+        _status = ProfileStatus.updateError;
+        _logger.w('Profil güncelleme başarısız: $_errorMessage');
+      }
+    } catch (e) {
+      _errorMessage = 'Güncelleme hatası: ${e.toString()}';
+      _status = ProfileStatus.updateError;
+      _logger.e('Profil güncelleme hatası:', e);
     } finally {
       _safeNotifyListeners();
     }

@@ -54,6 +54,20 @@ class _ProfileViewState extends State<ProfileView> {
     _logger.i('Todobus web sitesi açılıyor');
   }
 
+  // Profil düzenleme ekranını aç
+  void _navigateToEditProfile() {
+    final user = context.read<ProfileViewModel>().user;
+    if (user != null) {
+      Navigator.push(
+        context,
+        platformPageRoute(
+          context: context,
+          builder: (context) => EditProfileView(user: user),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ProfileViewModel>(
@@ -64,6 +78,11 @@ class _ProfileViewState extends State<ProfileView> {
             material: (_, __) => MaterialAppBarData(
               actions: <Widget>[
                 IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: viewModel.user != null ? _navigateToEditProfile : null,
+                  tooltip: 'Profili Düzenle',
+                ),
+                IconButton(
                   icon: const Icon(Icons.exit_to_app),
                   onPressed: _logout,
                   tooltip: 'Çıkış Yap',
@@ -72,10 +91,20 @@ class _ProfileViewState extends State<ProfileView> {
             ),
             cupertino: (_, __) => CupertinoNavigationBarData(
               transitionBetweenRoutes: false,
-              trailing: CupertinoButton(
-                padding: EdgeInsets.zero,
-                child: const Icon(CupertinoIcons.square_arrow_right),
-                onPressed: _logout,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(CupertinoIcons.pencil),
+                    onPressed: viewModel.user != null ? _navigateToEditProfile : null,
+                  ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    child: const Icon(CupertinoIcons.square_arrow_right),
+                    onPressed: _logout,
+                  ),
+                ],
               ),
             ),
           ),
@@ -128,6 +157,29 @@ class _ProfileViewState extends State<ProfileView> {
           _buildProfileHeader(context, user),
           const SizedBox(height: 24),
           
+          // Düzenle butonu
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: PlatformElevatedButton(
+              onPressed: _navigateToEditProfile,
+              child: Text(
+                'Profili Düzenle',
+                style: TextStyle(
+                  color: isCupertino(context) ? CupertinoColors.white : null,
+                ),
+              ),
+              material: (_, __) => MaterialElevatedButtonData(
+                icon: const Icon(Icons.edit),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+              cupertino: (_, __) => CupertinoElevatedButtonData(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          
           // Hesap Bilgileri bölümü - genişletilebilir panel
           _buildExpandableSection(
             context,
@@ -143,7 +195,7 @@ class _ProfileViewState extends State<ProfileView> {
               _buildListItem(context, 'E-posta', user?.userEmail ?? ""),
               _buildListItem(context, 'Doğum Tarihi', user?.userBirthday ?? ""),
               _buildListItem(context, 'Telefon', user?.userPhone ?? ""),
-              _buildListItem(context, 'Cinsiyet', user?.userGender ?? ""),
+              _buildListItem(context, 'Cinsiyet', _getGenderText(user?.userGender ?? "")),
             ],
           ),
           
@@ -254,6 +306,15 @@ class _ProfileViewState extends State<ProfileView> {
         ],
       ),
     );
+  }
+  
+  // Cinsiyet değerini metne çevir
+  String _getGenderText(String genderValue) {
+    switch(genderValue) {
+      case "1": return "Erkek";
+      case "2": return "Kadın";
+      default: return "Belirtilmemiş";
+    }
   }
   
   Widget _buildProfileHeader(BuildContext context, User? user) {
@@ -463,6 +524,378 @@ class _ProfileViewState extends State<ProfileView> {
                   material: (data) => Colors.grey,
                   cupertino: (data) => CupertinoColors.systemGrey,
                 ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Profil Düzenleme Ekranı
+class EditProfileView extends StatefulWidget {
+  final User user;
+  
+  const EditProfileView({Key? key, required this.user}) : super(key: key);
+
+  @override
+  _EditProfileViewState createState() => _EditProfileViewState();
+}
+
+class _EditProfileViewState extends State<EditProfileView> {
+  final LoggerService _logger = LoggerService();
+  final _formKey = GlobalKey<FormState>();
+  
+  late TextEditingController _fullNameController;
+  late TextEditingController _emailController;
+  late TextEditingController _phoneController;
+  late TextEditingController _birthdayController;
+  
+  int _selectedGender = 0;
+  bool _isLoading = false;
+  String _errorMessage = '';
+  
+  @override
+  void initState() {
+    super.initState();
+    _fullNameController = TextEditingController(text: widget.user.userFullname);
+    _emailController = TextEditingController(text: widget.user.userEmail);
+    _phoneController = TextEditingController(text: widget.user.userPhone);
+    _birthdayController = TextEditingController(text: widget.user.userBirthday);
+    
+    try {
+      _selectedGender = int.parse(widget.user.userGender);
+    } catch (e) {
+      _selectedGender = 0;
+    }
+  }
+  
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _birthdayController.dispose();
+    super.dispose();
+  }
+  
+  // Profil güncelleme işlemi
+  Future<void> _updateProfile() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    
+    try {
+      await context.read<ProfileViewModel>().updateUserProfile(
+        userFullname: _fullNameController.text,
+        userEmail: _emailController.text,
+        userBirthday: _birthdayController.text,
+        userPhone: _phoneController.text,
+        userGender: _selectedGender,
+        profilePhoto: widget.user.profilePhoto,
+      );
+      
+      if (mounted) {
+        if (context.read<ProfileViewModel>().status == ProfileStatus.updateSuccess) {
+          Navigator.pop(context);
+          _showSuccessMessage('Profil başarıyla güncellendi');
+        } else {
+          setState(() {
+            _errorMessage = context.read<ProfileViewModel>().errorMessage;
+          });
+        }
+      }
+    } catch (e) {
+      _logger.e('Profil güncellenirken hata: $e');
+      setState(() {
+        _errorMessage = 'Bir hata oluştu: ${e.toString()}';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  // Başarı mesajı göster
+  void _showSuccessMessage(String message) {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return PlatformScaffold(
+      appBar: PlatformAppBar(
+        title: const Text('Profili Düzenle'),
+        material: (_, __) => MaterialAppBarData(
+          actions: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _isLoading ? null : _updateProfile,
+              tooltip: 'Kaydet',
+            ),
+          ],
+        ),
+        cupertino: (_, __) => CupertinoNavigationBarData(
+          transitionBetweenRoutes: false,
+          trailing: _isLoading 
+          ? const CupertinoActivityIndicator()
+          : CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Text('Kaydet'),
+              onPressed: _updateProfile,
+            ),
+        ),
+      ),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              if (_errorMessage.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: platformThemeData(
+                      context,
+                      material: (data) => Colors.red.shade100,
+                      cupertino: (data) => CupertinoColors.systemRed.withOpacity(0.2),
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _errorMessage,
+                    style: TextStyle(
+                      color: platformThemeData(
+                        context,
+                        material: (data) => Colors.red,
+                        cupertino: (data) => CupertinoColors.systemRed,
+                      ),
+                    ),
+                  ),
+                ),
+              
+              _buildTextFormField(
+                context: context,
+                controller: _fullNameController,
+                label: 'Ad Soyad',
+                keyboardType: TextInputType.name,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ad Soyad boş olamaz';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              _buildTextFormField(
+                context: context,
+                controller: _emailController,
+                label: 'E-posta',
+                keyboardType: TextInputType.emailAddress,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'E-posta boş olamaz';
+                  }
+                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                    return 'Geçerli bir e-posta adresi giriniz';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              _buildTextFormField(
+                context: context,
+                controller: _birthdayController,
+                label: 'Doğum Tarihi (GG.AA.YYYY)',
+                keyboardType: TextInputType.datetime,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return null; // İsteğe bağlı
+                  }
+                  // Tarih formatı kontrolü
+                  if (!RegExp(r'^\d{2}\.\d{2}\.\d{4}$').hasMatch(value)) {
+                    return 'Geçerli bir tarih formatı giriniz (GG.AA.YYYY)';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              _buildTextFormField(
+                context: context,
+                controller: _phoneController,
+                label: 'Telefon',
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return null; // İsteğe bağlı
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 24),
+              
+              _buildGenderSelection(context),
+              
+              const SizedBox(height: 32),
+              
+              if (_isLoading)
+                Center(child: PlatformCircularProgressIndicator())
+              else
+                PlatformElevatedButton(
+                  onPressed: _updateProfile,
+                  child: const Text('Profili Güncelle'),
+                  material: (_, __) => MaterialElevatedButtonData(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                  cupertino: (_, __) => CupertinoElevatedButtonData(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Form alanı widget'ı
+  Widget _buildTextFormField({
+    required BuildContext context,
+    required TextEditingController controller,
+    required String label,
+    required TextInputType keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    return isCupertino(context)
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 8),
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+              CupertinoTextFormFieldRow(
+                controller: controller,
+                keyboardType: keyboardType,
+                validator: validator,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: CupertinoColors.systemGrey4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ],
+          )
+        : TextFormField(
+            controller: controller,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            ),
+            keyboardType: keyboardType,
+            validator: validator,
+          );
+  }
+  
+  // Cinsiyet seçim widget'ı
+  Widget _buildGenderSelection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          child: Text(
+            'Cinsiyet',
+            style: platformThemeData(
+              context,
+              material: (data) => data.textTheme.titleMedium,
+              cupertino: (data) => data.textTheme.textStyle.copyWith(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            border: isCupertino(context) 
+              ? Border.all(color: CupertinoColors.systemGrey4) 
+              : null,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            children: [
+              _buildGenderOption(context, 'Belirtilmemiş', 0),
+              const Divider(height: 1),
+              _buildGenderOption(context, 'Erkek', 1),
+              const Divider(height: 1),
+              _buildGenderOption(context, 'Kadın', 2),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // Cinsiyet seçim opsiyonu
+  Widget _buildGenderOption(BuildContext context, String label, int value) {
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedGender = value;
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(label),
+            ),
+            if (isCupertino(context))
+              _selectedGender == value
+                  ? const Icon(CupertinoIcons.check_mark, color: CupertinoColors.activeBlue)
+                  : const SizedBox(width: 24)
+            else
+              Radio<int>(
+                value: value,
+                groupValue: _selectedGender,
+                onChanged: (int? newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedGender = newValue;
+                    });
+                  }
+                },
               ),
           ],
         ),
