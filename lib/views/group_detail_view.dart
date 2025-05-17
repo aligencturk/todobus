@@ -9,9 +9,12 @@ import '../models/group_models.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../viewmodels/group_viewmodel.dart';
+import '../viewmodels/event_viewmodel.dart'; // Eklendi
 import '../views/edit_group_view.dart';
 import '../views/project_detail_view.dart';
 import '../views/create_project_view.dart';
+import '../views/event_detail_view.dart'; // Eklendi
+import '../views/create_event_view.dart'; // Eklendi
 
 class GroupDetailView extends StatefulWidget {
   final int groupId;
@@ -105,301 +108,48 @@ class _GroupDetailViewState extends State<GroupDetailView> {
 
   // Etkinlik oluşturma işlevi
   void _createEvent() {
-    if (_groupDetail == null) return;
-    
-    final eventTitleController = TextEditingController();
-    final eventDescController = TextEditingController();
-    
-    final isIOS = isCupertino(context);
-    final now = DateTime.now();
-    DateTime selectedDate = now;
-    
-    if (isIOS) {
-      showCupertinoDialog(
+    _navigateToCreateEventView();
+  }
+
+  // Etkinlik detayına gitme işlevi
+  void _navigateToEventDetail(GroupEvent event) {
+    Navigator.of(context).push(
+      platformPageRoute(
         context: context,
-        builder: (_) => CupertinoAlertDialog(
-          title: const Text('Yeni Etkinlik Oluştur'),
-          content: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Etkinlik Adı',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
-                    controller: eventTitleController,
-                    padding: const EdgeInsets.all(10),
-                    placeholder: 'Etkinlik Adı',
-                    style: const TextStyle(
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Etkinlik Açıklaması',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
-                    controller: eventDescController,
-                    padding: const EdgeInsets.all(10),
-                    placeholder: 'Etkinlik Açıklaması',
-                    minLines: 2,
-                    maxLines: 3,
-                    style: const TextStyle(
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Etkinlik Tarihi',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () {
-                      showCupertinoModalPopup(
-                        context: context,
-                        builder: (_) => Container(
-                          height: 250,
-                          color: CupertinoColors.systemBackground,
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  CupertinoButton(
-                                    child: const Text('İptal'),
-                                    onPressed: () => Navigator.pop(context),
-                                  ),
-                                  CupertinoButton(
-                                    child: const Text('Tamam'),
-                                    onPressed: () {
-                                      _safeSetState(() {});
-                                      Navigator.pop(context);
-                                    },
-                                  ),
-                                ],
-                              ),
-                              Expanded(
-                                child: CupertinoDatePicker(
-                                  initialDateTime: selectedDate,
-                                  minimumDate: now,
-                                  mode: CupertinoDatePickerMode.date,
-                                  use24hFormat: true,
-                                  onDateTimeChanged: (date) {
-                                    selectedDate = date;
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: CupertinoColors.systemGrey4),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${selectedDate.day}.${selectedDate.month}.${selectedDate.year}',
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          const Icon(
-                            CupertinoIcons.calendar,
-                            color: CupertinoColors.activeBlue,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
-            ),
-            CupertinoDialogAction(
-              onPressed: () async {
-                final title = eventTitleController.text.trim();
-                final desc = eventDescController.text.trim();
-                
-                if (title.isEmpty) {
-                  return;
-                }
-                
-                Navigator.pop(context);
-                
-                try {
-                  _safeSetState(() {
-                    _isLoading = true;
-                  });
-                  
-                  // Burada etkinlik oluşturma API çağrısı yapılacak
-                  _logger.i('Etkinlik oluşturuluyor: $title');
-                  
-                  // API çağrısı tamamlandığında
-                  await Future.delayed(const Duration(seconds: 1)); // API çağrısı simülasyonu
-                  
-                  // Başarılı ise
-                  if (!_isDisposed && mounted) {
-                    _loadGroupDetail(); // Grup detayını yeniden yükle
-                  }
-                  
-                  if (mounted && !_isDisposed) {
-                    final messenger = ScaffoldMessenger.of(context);
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Etkinlik başarıyla oluşturuldu')),
-                    );
-                  }
-                } catch (e) {
-                  _safeSetState(() {
-                    _isLoading = false;
-                    _errorMessage = 'Etkinlik oluşturulurken hata: $e';
-                  });
-                }
-              },
-              isDefaultAction: true,
-              child: const Text('Oluştur'),
-            ),
-          ],
+        builder: (context) => EventDetailPage(
+          groupId: widget.groupId,
+          eventTitle: event.eventTitle,
+          eventDescription: event.eventDesc,
+          eventDate: event.eventDate,
+          eventUser: event.userFullname,
         ),
-      );
-    } else {
-      // Material tasarım için diyalog
-      showDialog(
+      ),
+    );
+  }
+
+  // Etkinlik oluşturma sayfasına gitme işlevi
+  void _navigateToCreateEventView() {
+    Navigator.of(context).push(
+      platformPageRoute(
         context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Yeni Etkinlik Oluştur'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: eventTitleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Etkinlik Adı',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: eventDescController,
-                  decoration: const InputDecoration(
-                    labelText: 'Etkinlik Açıklaması',
-                    border: OutlineInputBorder(),
-                  ),
-                  minLines: 2,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: now,
-                      lastDate: DateTime(now.year + 5),
-                    );
-                    if (date != null) {
-                      setState(() {
-                        selectedDate = date;
-                      });
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Etkinlik Tarihi',
-                      border: OutlineInputBorder(),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('${selectedDate.day}.${selectedDate.month}.${selectedDate.year}'),
-                        const Icon(Icons.calendar_today),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final title = eventTitleController.text.trim();
-                final desc = eventDescController.text.trim();
-                
-                if (title.isEmpty) {
-                  return;
-                }
-                
-                Navigator.pop(context);
-                
-                try {
-                  _safeSetState(() {
-                    _isLoading = true;
-                  });
-                  
-                  // Burada etkinlik oluşturma API çağrısı yapılacak
-                  _logger.i('Etkinlik oluşturuluyor: $title');
-                  
-                  // API çağrısı tamamlandığında
-                  await Future.delayed(const Duration(seconds: 1)); // API çağrısı simülasyonu
-                  
-                  // Başarılı ise
-                  if (!_isDisposed && mounted) {
-                    _loadGroupDetail(); // Grup detayını yeniden yükle
-                  }
-                  
-                  if (mounted && !_isDisposed) {
-                    final messenger = ScaffoldMessenger.of(context);
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Etkinlik başarıyla oluşturuldu')),
-                    );
-                  }
-                } catch (e) {
-                  _safeSetState(() {
-                    _isLoading = false;
-                    _errorMessage = 'Etkinlik oluşturulurken hata: $e';
-                  });
-                }
-              },
-              child: const Text('Oluştur'),
-            ),
-          ],
+        builder: (context) => CreateEventView(
+          initialGroupID: widget.groupId,
+          initialDate: DateTime.now(),
         ),
-      );
-    }
+      ),
+    ).then((result) {
+      if (result == true && mounted) {
+        _loadGroupDetail(); // Grup detaylarını yenile
+        try {
+          final messenger = ScaffoldMessenger.of(context);
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Etkinlik başarıyla oluşturuldu')),
+          );
+        } catch (e) {
+          _logger.e('ScaffoldMessenger hatası: $e');
+        }
+      }
+    });
   }
   
   @override
@@ -1889,179 +1639,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   
   Widget _buildEventsTab(BuildContext context) {
     final group = _groupDetail!;
-    
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Etkinlikler (${group.events.length})',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              cupertino: (data) => data.textTheme.navTitleTextStyle,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (group.events.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32.0),
-                child: Column(
-                  children: [
-                    Icon(
-                      isCupertino(context) ? CupertinoIcons.calendar : Icons.event_note_outlined,
-                      size: 48,
-                      color: isCupertino(context) ? CupertinoColors.systemGrey : Colors.grey,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Henüz etkinlik bulunmuyor',
-                      style: TextStyle(
-                        color: isCupertino(context) ? CupertinoColors.systemGrey : Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ...group.events.map((event) => Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Card(
-              elevation: isCupertino(context) ? 0 : 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: isCupertino(context) 
-                  ? BorderSide(color: CupertinoColors.systemGrey5) 
-                  : BorderSide.none,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          isCupertino(context) ? CupertinoIcons.calendar : Icons.event,
-                          color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          event.eventTitle,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (event.eventDesc.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        event.eventDesc,
-                        style: TextStyle(
-                          color: isCupertino(context) ? CupertinoColors.secondaryLabel : Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          isCupertino(context) ? CupertinoIcons.time : Icons.access_time,
-                          size: 14,
-                          color: isCupertino(context) ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Tarih: ${event.eventDate}', // Tarih formatı düzenlenebilir
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isCupertino(context) ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )).toList(),
-        ],
-      ),
-    );
-  }
-  
-  // Grup loglarını (raporlarını) yükle
-  Future<void> _loadGroupLogs() async {
-    if (_isLoadingLogs || _groupDetail == null) return;
-    
-    _safeSetState(() {
-      _isLoadingLogs = true;
-    });
-    
-    try {
-      final viewModel = Provider.of<GroupViewModel>(context, listen: false);
-      final logs = await viewModel.getGroupReports(
-        widget.groupId, 
-        _groupDetail!.users.any((user) => user.isAdmin),
-      );
-      
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _groupLogs = logs;
-          _isLoadingLogs = false;
-        });
-      }
-    } catch (e) {
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _errorMessage = 'Grup etkinlikleri yüklenemedi: $e';
-          _isLoadingLogs = false;
-        });
-      }
-    }
-  }
-
-  // Raporlar tab'i
-  Widget _buildReportsTab(BuildContext context) {
     final isIOS = isCupertino(context);
-    
-    if (_isLoadingLogs) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_groupLogs.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 32.0),
-          child: Column(
-            children: [
-              Icon(
-                isIOS ? CupertinoIcons.doc_text_search : Icons.assignment_late,
-                size: 48,
-                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Henüz log kaydı bulunmuyor',
-                style: TextStyle(
-                  color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 24),
-              PlatformElevatedButton(
-                onPressed: _loadGroupLogs,
-                child: const Text('Yenile'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -2072,7 +1650,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Grup Raporları (${_groupLogs.length})',
+                'Etkinlikler (${group.events.length})',
                 style: platformThemeData(
                   context,
                   material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -2082,133 +1660,119 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               PlatformIconButton(
                 padding: EdgeInsets.zero,
                 icon: Icon(
-                  isIOS ? CupertinoIcons.refresh : Icons.refresh,
-                  size: 20,
+                  isIOS ? CupertinoIcons.add : Icons.add,
+                  color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
                 ),
-                onPressed: _loadGroupLogs,
+                onPressed: () => _navigateToCreateEventView(),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _groupLogs.length,
-            itemBuilder: (context, index) {
-              final log = _groupLogs[index];
-              return _buildLogItem(context, log);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // Log öğesi
-  Widget _buildLogItem(BuildContext context, GroupLog log) {
-    final isIOS = isCupertino(context);
-    
-    // Log tipine göre ikon ve renk belirle
-    IconData logIcon;
-    Color logColor;
-    
-    if (log.logName.contains('Tamamlandı')) {
-      logIcon = isIOS ? CupertinoIcons.checkmark_circle : Icons.check_circle;
-      logColor = isIOS ? CupertinoColors.activeGreen : Colors.green;
-    } else if (log.logName.contains('Tamamlanmadı')) {
-      logIcon = isIOS ? CupertinoIcons.xmark_circle : Icons.cancel;
-      logColor = isIOS ? CupertinoColors.systemRed : Colors.red;
-    } else if (log.logName.contains('Açıldı')) {
-      logIcon = isIOS ? CupertinoIcons.add_circled : Icons.add_circle;
-      logColor = isIOS ? CupertinoColors.activeBlue : Colors.blue;
-    } else {
-      logIcon = isIOS ? CupertinoIcons.doc_text : Icons.article;
-      logColor = isIOS ? CupertinoColors.systemGrey : Colors.grey;
-    }
-    
-    return Card(
-      elevation: isIOS ? 0 : 1,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isIOS 
-          ? BorderSide(color: CupertinoColors.systemGrey5) 
-          : BorderSide.none,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  logIcon,
-                  color: logColor,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    log.logName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: logColor,
+          if (group.events.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      isIOS ? CupertinoIcons.calendar : Icons.event_note_outlined,
+                      size: 48,
+                      color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Henüz etkinlik bulunmuyor',
+                      style: TextStyle(
+                        color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    PlatformElevatedButton(
+                      onPressed: () => _navigateToCreateEventView(),
+                      child: const Text('Etkinlik Ekle'),
+                    ),
+                  ],
                 ),
-                Text(
-                  log.createDate,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              log.logDesc,
-              style: TextStyle(
-                fontSize: 13,
-                color: isIOS ? CupertinoColors.label : Colors.black87,
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  isIOS ? CupertinoIcons.folder : Icons.folder,
-                  size: 12,
-                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+          ...group.events.map((event) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: GestureDetector(
+              onTap: () => _navigateToEventDetail(event),
+              child: Card(
+                elevation: isIOS ? 0 : 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: isIOS 
+                    ? BorderSide(color: CupertinoColors.systemGrey5) 
+                    : BorderSide.none,
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  'Proje ID: ${log.projectID}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isIOS ? CupertinoIcons.calendar : Icons.event,
+                            color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            event.eventTitle,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (event.eventDesc.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          event.eventDesc,
+                          style: TextStyle(
+                            color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                isIOS ? CupertinoIcons.time : Icons.access_time,
+                                size: 14,
+                                color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Tarih: ${event.eventDate}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                          Icon(
+                            isIOS ? CupertinoIcons.chevron_right : Icons.arrow_forward_ios,
+                            size: 16,
+                            color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  isIOS ? CupertinoIcons.doc_text : Icons.assignment,
-                  size: 12,
-                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Görev ID: ${log.workID}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                  ),
-                ),
-              ],
+              ),
             ),
-          ],
-        ),
+          )).toList(),
+        ],
       ),
     );
   }
@@ -2448,6 +2012,223 @@ class _GroupDetailViewState extends State<GroupDetailView> {
           ],
         ),
       );
+    }
+  }
+
+  Widget _buildReportsTab(BuildContext context) {
+    final isIOS = isCupertino(context);
+    
+    if (_isLoadingLogs) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    if (_groupLogs.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 32.0),
+          child: Column(
+            children: [
+              Icon(
+                isIOS ? CupertinoIcons.doc_text_search : Icons.assignment_late,
+                size: 48,
+                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Henüz log kaydı bulunmuyor',
+                style: TextStyle(
+                  color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+                ),
+              ),
+              const SizedBox(height: 24),
+              PlatformElevatedButton(
+                onPressed: _loadGroupLogs,
+                child: const Text('Yenile'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Grup Raporları (${_groupLogs.length})',
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  cupertino: (data) => data.textTheme.navTitleTextStyle,
+                ),
+              ),
+              PlatformIconButton(
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  isIOS ? CupertinoIcons.refresh : Icons.refresh,
+                  size: 20,
+                ),
+                onPressed: _loadGroupLogs,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _groupLogs.length,
+            itemBuilder: (context, index) {
+              final log = _groupLogs[index];
+              return _buildLogItem(context, log);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Log öğesi
+  Widget _buildLogItem(BuildContext context, GroupLog log) {
+    final isIOS = isCupertino(context);
+    
+    // Log tipine göre ikon ve renk belirle
+    IconData logIcon;
+    Color logColor;
+    
+    if (log.logName.contains('Tamamlandı')) {
+      logIcon = isIOS ? CupertinoIcons.checkmark_circle : Icons.check_circle;
+      logColor = isIOS ? CupertinoColors.activeGreen : Colors.green;
+    } else if (log.logName.contains('Tamamlanmadı')) {
+      logIcon = isIOS ? CupertinoIcons.xmark_circle : Icons.cancel;
+      logColor = isIOS ? CupertinoColors.systemRed : Colors.red;
+    } else if (log.logName.contains('Açıldı')) {
+      logIcon = isIOS ? CupertinoIcons.add_circled : Icons.add_circle;
+      logColor = isIOS ? CupertinoColors.activeBlue : Colors.blue;
+    } else {
+      logIcon = isIOS ? CupertinoIcons.doc_text : Icons.article;
+      logColor = isIOS ? CupertinoColors.systemGrey : Colors.grey;
+    }
+    
+    return Card(
+      elevation: isIOS ? 0 : 1,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isIOS 
+          ? BorderSide(color: CupertinoColors.systemGrey5) 
+          : BorderSide.none,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  logIcon,
+                  color: logColor,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    log.logName,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: logColor,
+                    ),
+                  ),
+                ),
+                Text(
+                  log.createDate,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              log.logDesc,
+              style: TextStyle(
+                fontSize: 13,
+                color: isIOS ? CupertinoColors.label : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(
+                  isIOS ? CupertinoIcons.folder : Icons.folder,
+                  size: 12,
+                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Proje ID: ${log.projectID}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  isIOS ? CupertinoIcons.doc_text : Icons.assignment,
+                  size: 12,
+                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Görev ID: ${log.workID}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Grup loglarını (raporlarını) yükle
+  Future<void> _loadGroupLogs() async {
+    if (_isLoadingLogs || _groupDetail == null) return;
+    
+    _safeSetState(() {
+      _isLoadingLogs = true;
+    });
+    
+    try {
+      final viewModel = Provider.of<GroupViewModel>(context, listen: false);
+      final logs = await viewModel.getGroupReports(
+        widget.groupId, 
+        _groupDetail!.users.any((user) => user.isAdmin),
+      );
+      
+      if (!_isDisposed && mounted) {
+        _safeSetState(() {
+          _groupLogs = logs;
+          _isLoadingLogs = false;
+        });
+      }
+    } catch (e) {
+      if (!_isDisposed && mounted) {
+        _safeSetState(() {
+          _errorMessage = 'Grup etkinlikleri yüklenemedi: $e';
+          _isLoadingLogs = false;
+        });
+      }
     }
   }
 } 
