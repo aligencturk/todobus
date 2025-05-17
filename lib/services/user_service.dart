@@ -44,7 +44,7 @@ class UserService {
     final userResponse = UserResponse.fromJson(response);
     
     // Platform ve versiyon kontrolü
-    if (userResponse.success == true && userResponse.data != null) {
+    if (userResponse.success == true && userResponse.data != null && userResponse.code != 410) {
       final user = userResponse.data!.user;
       
       // Platform'a göre kontroller
@@ -129,7 +129,7 @@ class UserService {
       try {
         final response = await _apiService.put('service/user/update/fcmtoken', body: body);
         
-        final success = response['success'] == true || response[410] == true; 
+        final success = response['success'] == true || response['code'] == 410;
         if (success) {
           _logger.i('FCM token başarıyla kaydedildi');
           _logger.i('Sunucu Yanıtı: $response');
@@ -147,7 +147,7 @@ class UserService {
         try {
           _logger.i('FCM token kaydı tekrar deneniyor...');
           final response = await _apiService.put('service/user/update/fcmtoken', body: body);
-          final success = response['success'] == true;
+          final success = response['success'] == true || response['code'] == 410;
           
           if (success) {
             _logger.i('FCM token başarıyla kaydedildi (tekrar deneme)');
@@ -191,42 +191,55 @@ class UserService {
       throw Exception('Kullanıcı görevleri yüklenemedi: $e');
     }
   }
-
-  // Kullanıcı bildirimlerini getir
-  Future<NotificationResponse> getNotifications() async {
-    try {
-      final token = await _storageService.getToken();
-      if (token == null) {
-        throw Exception('Oturum bilgisi bulunamadı');
-      }
-
-      // Kullanıcı ID'sini al
-      final userResponse = await getUser();
-      if (!userResponse.success || userResponse.data == null) {
-        throw Exception('Kullanıcı bilgileri alınamadı');
-      }
-
-      final userId = userResponse.data!.user.userID;
-
-      final body = {
-        'userToken': token,
-      };
-
-      _logger.i('Kullanıcı bildirimleri getiriliyor...');
-      final response = await _apiService.put('service/user/account/$userId/notifications', body: body);
-      
-      final notificationResponse = NotificationResponse.fromJson(response);
-      if (notificationResponse.success) {
-        _logger.i('Kullanıcı bildirimleri başarıyla getirildi: ${notificationResponse.notifications?.length ?? 0} bildirim');
-      } else {
-        _logger.w('Kullanıcı bildirimleri getirilemedi: ${notificationResponse.errorMessage}');
-      }
-      
-      return notificationResponse;
-    } catch (e) {
-      _logger.e('Bildirimler yüklenirken hata: $e');
-      throw Exception('Bildirimler yüklenemedi: $e');
+Future<NotificationResponse> getNotifications() async {
+  try {
+    final token = await _storageService.getToken();
+    if (token == null) {
+      throw Exception('Oturum bilgisi bulunamadı');
     }
-  }
 
-} 
+    // Kullanıcı ID'sini al
+    final userResponse = await getUser();
+
+    // Backend 410 dönerse veya kullanıcı yoksa logout et
+    if (!userResponse.success || userResponse.data == null) {
+      _logger.w('Kullanıcı bilgileri alınamadı, oturum sonlandırılıyor...');
+      return NotificationResponse(
+        success: false,
+        errorMessage: 'Kullanıcı oturumu sonlandı (410)',
+        notifications: [],
+      );
+    }
+
+    final userId = userResponse.data!.user.userID;
+
+    final body = {
+      'userToken': token,
+    };
+
+    _logger.i('Kullanıcı bildirimleri getiriliyor...');
+    final response = await _apiService.put(
+      'service/user/account/$userId/notifications',
+      body: body,
+    );
+
+    final notificationResponse = NotificationResponse.fromJson(response);
+
+    if (notificationResponse.success) {
+      _logger.i('Kullanıcı bildirimleri başarıyla getirildi: ${notificationResponse.notifications?.length ?? 0} bildirim');
+    } else {
+      _logger.w('Kullanıcı bildirimleri getirilemedi: ${notificationResponse.errorMessage}');
+    }
+
+    return notificationResponse;
+  } catch (e) {
+    _logger.e('Bildirimler yüklenirken hata: $e');
+    return NotificationResponse(
+      success: false,
+      errorMessage: 'Bildirimler yüklenemedi: ${e.toString()}',
+      notifications: [],
+    );
+  }
+}
+
+}

@@ -128,10 +128,10 @@ class _NotificationsViewState extends State<NotificationsView> {
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(notification.message),
+                  Text(notification.body),
                   const SizedBox(height: 4),
                   Text(
-                    _formatDate(notification.createdAt),
+                    _formatDate(notification.createDate),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -153,9 +153,9 @@ class _NotificationsViewState extends State<NotificationsView> {
                 _logger.i('Bildirime tıklandı: ${notification.id}');
                
                 // Bildirim verilerine göre yönlendirme yapılabilir
-                if (notification.data != null && notification.data!.containsKey('screen')) {
-                  _logger.i('Bildirim yönlendirmesi: ${notification.data!['screen']}');
-                  // Navigator.of(context).pushNamed(notification.data!['screen']);
+                if (notification.url != null && notification.url!.isNotEmpty) {
+                  _logger.i('Bildirim yönlendirmesi: ${notification.url}');
+                  // Navigator.of(context).pushNamed(notification.url!);
                 }
               },
             ),

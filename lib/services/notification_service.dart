@@ -338,6 +338,11 @@ class NotificationService {
             return _notifications;
           } else {
             _logger.w('Bildirimler ikinci denemede de alınamadı: ${retryResponse.errorMessage}');
+            // Önceki bildirimleri kullan (varsa) - çevrimdışı erişimi desteklemek için
+            if (_notifications != null && _notifications!.isNotEmpty) {
+              _logger.i('Önbellekteki bildirimler kullanılıyor (${_notifications!.length} bildirim)');
+              return _notifications;
+            }
             return null;
           }
         } catch (retryError) {
@@ -391,7 +396,7 @@ class NotificationService {
         return false;
       }
       
-      // API için payload oluştur - kullanıcı örneğindeki JSON formatına benzer
+      // API için payload oluştur
       final Map<String, dynamic> payload = {
         'message': {
           'topic': topic,
@@ -404,11 +409,12 @@ class NotificationService {
       
       // Eğer data kısmı varsa ekle
       if (data != null && data.isNotEmpty) {
-        // String formatında JSON olarak gönderilmesi gerekiyor
-        payload['message']['data'] = {
-          'keysandvalues': jsonEncode(data)
-        };
+        payload['message']['data'] = data;
       }
+      
+      _logger.i('============= FCM GÖNDERİLEN BİLDİRİM PAYLOAD =============');
+      _logger.i(jsonEncode(payload));
+      _logger.i('=============================================================');
       
       // FCM API'ye POST isteği gönder
       final response = await http.post(
@@ -420,16 +426,44 @@ class NotificationService {
         body: jsonEncode(payload),
       );
       
+      _logger.i('FCM API Yanıt Kodu: ${response.statusCode}');
+      _logger.i('FCM API Yanıt: ${response.body}');
+      
       if (response.statusCode == 200) {
-        _logger.i('Bildirim başarıyla gönderildi: ${response.body}');
+        _logger.i('Bildirim başarıyla gönderildi');
         return true;
       } else {
         _logger.e('Bildirim gönderilemedi: ${response.statusCode} - ${response.body}');
+        
+        // HTTP v1 API'de 401 genellikle yetkilendirme hatasıdır, legacy API'yi deneyelim
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          _logger.i('Legacy API ile bildirim gönderme deneniyor...');
+          return sendPushNotificationLegacy(
+            topic: topic,
+            title: title,
+            body: body,
+            data: data
+          );
+        }
+        
         return false;
       }
     } catch (e) {
       _logger.e('Bildirim gönderilirken hata: $e');
-      return false;
+      
+      // Hata alındığında legacy API'yi dene
+      try {
+        _logger.i('Hata nedeniyle Legacy API ile bildirim gönderme deneniyor...');
+        return sendPushNotificationLegacy(
+          topic: topic,
+          title: title,
+          body: body,
+          data: data
+        );
+      } catch (legacyError) {
+        _logger.e('Legacy API ile bildirim gönderme de başarısız oldu: $legacyError');
+        return false;
+      }
     }
   }
   
@@ -460,20 +494,31 @@ class NotificationService {
         return false;
       }
       
+      // Topic formatını kontrol et
+      String formattedTopic = topic;
+      if (!topic.startsWith('/topics/')) {
+        formattedTopic = '/topics/$topic';
+      }
+      
       // Legacy API için daha basit payload
       final Map<String, dynamic> payload = {
-        'to': '/topics/$topic',
+        'to': formattedTopic,
         'notification': {
           'title': title,
           'body': body,
           'sound': 'default'
         },
+        'priority': 'high'
       };
       
       // Eğer data varsa ekle
       if (data != null && data.isNotEmpty) {
         payload['data'] = data;
       }
+      
+      _logger.i('============= LEGACY FCM GÖNDERİLEN BİLDİRİM PAYLOAD =============');
+      _logger.i(jsonEncode(payload));
+      _logger.i('====================================================================');
       
       // FCM Legacy API'ye POST isteği
       final response = await http.post(
@@ -485,13 +530,17 @@ class NotificationService {
         body: jsonEncode(payload),
       );
       
+      _logger.i('Legacy FCM API Yanıt Kodu: ${response.statusCode}');
+      _logger.i('Legacy FCM API Yanıt: ${response.body}');
+      
       if (response.statusCode == 200) {
         final responseData = jsonDecode(response.body);
         if (responseData['success'] == 1) {
-          _logger.i('Bildirim başarıyla gönderildi: ${response.body}');
+          _logger.i('Bildirim başarıyla gönderildi (Legacy API)');
           return true;
         } else {
-          _logger.w('Bildirim gönderildi ama başarısız olabilir: ${response.body}');
+          _logger.w('Bildirim gönderildi ama başarısız olabilir: ${responseData['results'] ?? response.body}');
+          _logger.w('Hata Nedeni: ${responseData['failure'] ?? "Bilinmiyor"}');
           return false;
         }
       } else {
@@ -499,7 +548,7 @@ class NotificationService {
         return false;
       }
     } catch (e) {
-      _logger.e('Bildirim gönderilirken hata: $e');
+      _logger.e('Bildirim gönderilirken hata (Legacy API): $e');
       return false;
     }
   }
@@ -548,14 +597,67 @@ class NotificationService {
   void setFcmServerKey(String key) {
     _fcmServerKey = key;
     _logger.i('FCM Server key ayarlandı');
+    
+    // FCM token bilgilerini logla (debug için)
+    printFcmTokenInfo();
+    
+    // Ayarlanan FCM Server Key'in bilgilerini göster
+    _logger.i('================ FCM SERVER KEY BİLGİLERİ ================');
+    _logger.i('Server Key: ${_fcmServerKey?.substring(0, 15)}...[gizlendi]');
+    _logger.i('=======================================================');
+  }
+  
+  // OAuth Bearer Token veya Server Key'i formatına göre otomatik ayarla
+  bool setFcmCredential(String credential) {
+    try {
+      // Geçersiz kimlik bilgisi kontrolü
+      if (credential.isEmpty || credential == 'YOUR_FCM_CREDENTIAL' || credential == 'AAAA-XXXXXX-XXXXXX') {
+        _logger.e('❌ Geçersiz FCM kimlik bilgisi! Firebase Console\'dan gerçek bir Server Key almalısınız.');
+        _logger.i('📋 FCM Server Key alım adımları:');
+        _logger.i('  1. Firebase Console\'a giriş yapın');
+        _logger.i('  2. Projenizi seçin');
+        _logger.i('  3. Proje Ayarları > Cloud Messaging');
+        _logger.i('  4. Server Key\'i kopyalayın (AAAA ile başlar)');
+        return false;
+      }
+      
+      if (credential.startsWith('AAAA') || credential.startsWith('AIza')) {
+        // Legacy API için server key formatı
+        _fcmServerKey = credential;
+        _logger.i('✅ FCM Legacy Server Key başarıyla ayarlandı');
+        
+        // Server key örnek test edin
+        _logger.i('🔍 FCM Server Key formatı doğru görünüyor, ancak geçerliliğini test etmelisiniz.');
+        _logger.i('📱 Postman veya cURL ile test mesajı göndererek doğrulayın.');
+        return true;
+      } else if (credential.contains('.') && credential.contains('_')) {
+        // OAuth Bearer Token formatı
+        _fcmServerKey = credential;
+        _logger.i('✅ FCM HTTP v1 API Bearer Token başarıyla ayarlandı');
+        return true;
+      } else {
+        _logger.e('❌ Geçersiz FCM kimlik bilgisi formatı!');
+        _logger.e('FCM Server Key "AAAA" ile başlamalıdır.');
+        _logger.i('Firebase Console > Project Settings > Cloud Messaging > Server Key');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('❌ FCM kimlik bilgisi ayarlanırken hata: $e');
+      return false;
+    }
   }
   
   // Kullanıcıyı kendi ID'sine göre FCM topic'ine abone et
   Future<bool> subscribeToUserTopic(int userId) async {
     try {
       final userIdStr = userId.toString();
-      await _firebaseMessaging.subscribeToTopic(userIdStr);
-      _logger.i('Kullanıcı kendi ID\'sine ($userIdStr) abone edildi');
+      // FCM topic isimlendirme kurallarına uygun topic oluştur
+      // Firebase sadece [a-zA-Z0-9-_.~%] karakterlerine izin verir
+      final topicName = "user_$userIdStr";
+      
+      _logger.i('Kullanıcı ID topic\'ine abone olunuyor: $topicName');
+      await _firebaseMessaging.subscribeToTopic(topicName);
+      _logger.i('Kullanıcı topic\'ine başarıyla abone edildi: $topicName');
       return true;
     } catch (e) {
       _logger.e('Kullanıcı topic aboneliği başarısız: $e');
@@ -565,14 +667,232 @@ class NotificationService {
   
   // Kullanıcıyı hızlıca gerekli tüm topic'lere abone et
   Future<void> subscribeUserToRequiredTopics(int userId, List<int> groupIds) async {
-    // Kullanıcı ID'sine abone et
-    await subscribeToUserTopic(userId);
-    _logger.i('Kullanıcı kendi ID\'sine abone edildi: $userId');
-    
-    // Kullanıcının gruplarına abone et
-    for (final groupId in groupIds) {
-      await subscribeUserToTopic(groupId.toString());
-      _logger.i('Kullanıcı grup ID\'sine abone edildi: $groupId');
+    try {
+      // Sadece kullanıcı ID'sine abone et
+      final userIdStr = userId.toString();
+      // FCM topic isimlendirme kurallarına uygun topic oluştur
+      final topicName = "user_$userIdStr";
+      
+      _logger.i('Kullanıcı topic\'ine abone olunuyor: $topicName');
+      await _firebaseMessaging.subscribeToTopic(topicName);
+      _logger.i('✅ Kullanıcı topic\'ine başarıyla abone edildi: $topicName');
+      
+      // Gruplar için topic aboneliği yapılmıyor - kullanıcı istemiyor
+      _logger.i('ℹ️ Grup topic abonelikleri yapılandırma nedeniyle atlandı');
+    } catch (e) {
+      _logger.e('❌ Kullanıcı topic aboneliği başarısız: $e');
     }
+  }
+  
+  // Topic aboneliği debug kodu
+  Future<void> debugTopics() async {
+    try {
+      // Mevcut token'ı log'la
+      final token = await _firebaseMessaging.getToken();
+      _logger.i('Mevcut FCM Token: $token');
+      
+      // Kullanıcı ID'sini UserService'ten al
+      try {
+        final userResponse = await _userService.getUser();
+        if (userResponse.success && userResponse.data != null) {
+          final userId = userResponse.data!.user.userID.toString();
+          
+          // Kullanıcının kendi ID'sine göre topic'e abone ol
+          // FCM topic isimlendirme kurallarına uygun topic oluştur
+          final topicName = "user_$userId";
+          await _firebaseMessaging.subscribeToTopic(topicName);
+          _logger.i('Topic "$topicName" aboneliği yapıldı');
+          
+          // Normal ID'ye de abone ol (eski format için)
+          await _firebaseMessaging.subscribeToTopic(userId);
+          _logger.i('Eski format topic "$userId" aboneliği yapıldı');
+          
+          // APNs token bilgisini log'la (iOS için)
+          if (Platform.isIOS) {
+            final apnsToken = await _firebaseMessaging.getAPNSToken();
+            _logger.i('APNs Token: $apnsToken');
+          }
+          
+          // Örnek Postman JSON formatını yazdır
+          _printSamplePostmanJson(topicName);
+        } else {
+          _logger.w('Kullanıcı bilgileri alınamadı, otomatik topic aboneliği yapılamadı');
+        }
+      } catch (e) {
+        _logger.e('Kullanıcı bilgileri alınırken hata: $e');
+      }
+    } catch (e) {
+      _logger.e('Topic debug hatası: $e');
+    }
+  }
+  
+  // Postman için örnek JSON formatı
+  void _printSamplePostmanJson(String topic) {
+    final fcmSample = {
+      "to": "/topics/$topic",
+      "notification": {
+        "title": "Test Bildirimi",
+        "body": "FCM topic test mesajı"
+      },
+      "data": {
+        "type": "test",
+        "id": "1234"
+      }
+    };
+    
+    _logger.i('======== FCM POSTMAN TEST JSON ========');
+    _logger.i(jsonEncode(fcmSample));
+    _logger.i('=======================================');
+    
+    final httpHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': 'key=YOUR_FCM_SERVER_KEY_HERE'
+    };
+    
+    _logger.i('======== FCM HTTP HEADERS ========');
+    _logger.i(jsonEncode(httpHeaders));
+    _logger.i('==================================');
+    
+    _logger.i('POST isteğini https://fcm.googleapis.com/fcm/send adresine yapabilirsiniz');
+  }
+  
+  // FCM bildirim sorunlarını teşhis et
+  Future<void> diagnosticFCM() async {
+    _logger.i('========== FCM TEŞHIS BAŞLIYOR ==========');
+    
+    try {
+      // 1. FCM token kontrolü
+      final token = await _firebaseMessaging.getToken();
+      if (token == null || token.isEmpty) {
+        _logger.e('❌ FCM Token alınamadı! Firebase yapılandırmanızı kontrol edin.');
+      } else {
+        _logger.i('✅ FCM Token mevcut: ${token.substring(0, 15)}...');
+      }
+      
+      // 2. Bildirim izinleri kontrolü
+      final settings = await _firebaseMessaging.getNotificationSettings();
+      _logger.i('📱 Bildirim izin durumu: ${settings.authorizationStatus}');
+      
+      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
+        _logger.e('❌ Bildirim izni verilmemiş! Kullanıcı bildirimlere izin vermeli.');
+      } else {
+        _logger.i('✅ Bildirim izinleri onaylanmış.');
+      }
+      
+      // 3. Platform özel kontroller
+      if (Platform.isIOS) {
+        final apnsToken = await _firebaseMessaging.getAPNSToken();
+        if (apnsToken == null || apnsToken.isEmpty) {
+          _logger.e('❌ APNs token alınamadı! iOS bildirim sorunları olabilir.');
+        } else {
+          _logger.i('✅ APNs token mevcut: $apnsToken');
+        }
+        
+        _logger.i('📋 iOS bildirim kontrol listesi:');
+        _logger.i('  1. Xcode\'da Push Notifications capability eklenmiş mi?');
+        _logger.i('  2. APN sertifikaları Firebase konsoluna yüklenmiş mi?');
+        _logger.i('  3. Gerçek cihaz kullanıyor musunuz? (Simulator\'da bildirimler çalışmaz)');
+      }
+      
+      // 4. Topic aboneliklerini kontrol et
+      try {
+        final userResponse = await _userService.getUser();
+        if (userResponse.success && userResponse.data != null) {
+          final userId = userResponse.data!.user.userID.toString();
+          _logger.i('✅ Kullanıcı ID: $userId');
+          
+          // Topic isimlerini yazdır
+          final userTopic = "user_$userId";
+          _logger.i('📌 Kullanıcı topic: $userTopic');
+          
+          // Topic abonelikleri (bunları kontrol edemeyiz ama log'layabiliriz)
+          _logger.i('📋 Topic abonelik kontrol listesi:');
+          _logger.i('  - Kullanıcı topic\'e abone olundu mu?');
+          _logger.i('  - Topic bildirim gönderirken tam olarak bu format kullanılıyor mu?');
+        } else {
+          _logger.e('❌ Kullanıcı bilgileri alınamadı!');
+        }
+      } catch (e) {
+        _logger.e('❌ Topic kontrolü sırasında hata: $e');
+      }
+      
+      // 5. Firebase Yapılandırma Kontrolü
+      _logger.i('📋 Firebase yapılandırma kontrol listesi:');
+      _logger.i('  1. google-services.json ve GoogleService-Info.plist dosyaları doğru mu?');
+      _logger.i('  2. Firebase Console\'da Cloud Messaging API etkin mi?');
+      _logger.i('  3. FCM server key güncel mi?');
+      
+      // 6. Öneri ve hata giderme adımları
+      _logger.i('🔍 Hata ayıklama adımları:');
+      _logger.i('  1. Uygulamayı kapatıp yeniden açmayı deneyin');
+      _logger.i('  2. FCM server key\'in doğru olduğundan emin olun');
+      _logger.i('  3. Bildirim payload formatını kontrol edin');
+      _logger.i('  4. iOS için arka plan bildirimleri etkinleştirin');
+      
+      // 7. Firebase token'ı yazdır (sunucuya gönderilmiş mi?)
+      try {
+        await sendTokenToServer();
+        _logger.i('✅ FCM token sunucuya gönderildi');
+      } catch (e) {
+        _logger.e('❌ FCM token sunucuya gönderilemedi: $e');
+      }
+      
+      // 8. Test bildirim JSON örneği
+      _printSamplePushMessage(token!);
+      
+      // 9. Backend/API durumu kontrolü
+      _logger.i('📋 Backend bildirim kontrolü:');
+      _logger.i('  1. Backend\'in FCM bildirim gönderme yetkisi var mı?');
+      _logger.i('  2. Backend log\'larında bildirim hataları var mı?');
+      _logger.i('  3. Backend\'de kullanıcı FCM token\'ı güncel mi?');
+    } catch (e) {
+      _logger.e('❌ FCM teşhis sırasında hata: $e');
+    }
+    
+    _logger.i('========== FCM TEŞHIS TAMAMLANDI ==========');
+  }
+  
+  // Test bildirimi için örnek
+  void _printSamplePushMessage(String token) {
+    // Doğrudan cihaza bildirim formatı
+    final directMessage = {
+      "message": {
+        "token": token,
+        "notification": {
+          "title": "Doğrudan Test",
+          "body": "Bu doğrudan cihaza gönderilen test bildirimidir"
+        },
+        "data": {
+          "type": "direct_test",
+          "click_action": "FLUTTER_NOTIFICATION_CLICK"
+        }
+      }
+    };
+    
+    // Topic'e bildirim formatı
+    final topicMessage = {
+      "message": {
+        "topic": "user_[KULLANICI_ID]",
+        "notification": {
+          "title": "Topic Test",
+          "body": "Bu topic üzerinden gönderilen test bildirimidir"
+        },
+        "data": {
+          "type": "topic_test",
+          "click_action": "FLUTTER_NOTIFICATION_CLICK"
+        }
+      }
+    };
+    
+    _logger.i('======== DOĞRUDAN FCM TEST MESAJI ========');
+    _logger.i(jsonEncode(directMessage));
+    _logger.i('==========================================');
+    
+    _logger.i('======== TOPIC FCM TEST MESAJI ========');
+    _logger.i(jsonEncode(topicMessage));
+    _logger.i('=======================================');
+    
+    _logger.i('Firebase Admin SDK veya FCM HTTP v1 API kullanarak bu mesajları gönderebilirsiniz.');
+    _logger.i('https://firebase.google.com/docs/cloud-messaging/send-message adresini ziyaret edin.');
   }
 } 

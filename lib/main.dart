@@ -13,7 +13,8 @@ import 'viewmodels/event_viewmodel.dart';
 import 'services/logger_service.dart';
 import 'services/storage_service.dart';
 import 'services/device_info_service.dart';
-import 'services/notification_service.dart';
+import 'services/firebase_messaging_service.dart';
+import 'services/notification_viewmodel.dart';
 import 'views/login_view.dart';
 import 'main_app.dart';
 import 'services/snackbar_service.dart';
@@ -27,14 +28,10 @@ void main() async {
   
   // Firebase başlatma
   try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      logger.i('Firebase başarıyla başlatıldı (main)');
-    } else {
-      logger.i('Firebase zaten başlatılmış (main)');
-    }
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    logger.i('Firebase başarıyla başlatıldı (main)');
     
     // Arka plan mesaj işleyicisini ayarla
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
@@ -51,15 +48,9 @@ void main() async {
   
   // Bildirim servisini başlat
   try {
-    await NotificationService.instance.init();
-    logger.i('Bildirim servisi başarıyla başlatıldı');
-    
-    // FCM server key ayarla (Firebase Console'dan alınmalı)
-    // NOT: Gerçek projelerde bu değer güvenli bir şekilde saklanmalıdır
-    NotificationService.instance.setFcmServerKey('YOUR_FCM_SERVER_KEY');
-    
-    // FCM token bilgilerini debug konsoluna yazdır
-    NotificationService.instance.printFcmTokenInfo();
+    // Firebase Messaging Servisi başlatılıyor
+    await FirebaseMessagingService.instance.initialize();
+    logger.i('Firebase Messaging servisi başarıyla başlatıldı');
   } catch (e) {
     logger.e('Bildirim servisi başlatılırken hata: $e');
   }
@@ -102,6 +93,9 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => DashboardViewModel()),
         ChangeNotifierProvider(create: (_) => GroupViewModel()),
         ChangeNotifierProvider(create: (_) => EventViewModel()),
+        ChangeNotifierProvider(
+          create: (_) => NotificationViewModel(FirebaseMessagingService.instance),
+        ),
       ],
       child: PlatformProvider(
         settings: PlatformSettingsData(

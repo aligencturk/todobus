@@ -86,7 +86,16 @@ class BaseApiService {
       // 410 Gone, bu API'de başarı yanıtı temsil ediyor
       if (response.statusCode == 410) {
         _logger.i('Başarılı yanıt alındı (410 Gone)');
-        return jsonDecode(response.body);
+        try {
+          final result = jsonDecode(response.body);
+          // 410 başarı kodunu ekle, böylece istemci tarafında kontrol edilebilir
+          result['code'] = 410;
+          return result;
+        } catch (e) {
+          // JSON parse hatası durumunda basit bir başarı yanıtı döndür
+          _logger.w('410 yanıtı için JSON parse hatası: $e, varsayılan başarı yanıtı dönüyor');
+          return {'success': true, 'code': 410};
+        }
       } else {
         final responseBody = jsonDecode(response.body);
         final userMessage = _getUserFriendlyErrorMessage(response.statusCode, responseBody);
@@ -127,11 +136,13 @@ class BaseApiService {
         // Boş body kontrolü
         if (response.body.isEmpty) {
           _logger.w('Yanıt içeriği boş, varsayılan başarı yanıtı dönüyor');
-          return {'success': true};
+          return {'success': true, 'code': 410};
         }
         
         try {
           final decodedJson = jsonDecode(response.body) as Map<String, dynamic>;
+          // 410 kodunu ekle
+          decodedJson['code'] = 410;
           return decodedJson;
         } catch (e) {
           _logger.e('JSON parse hatası: $e, response.body: ${response.body}');
@@ -184,7 +195,16 @@ class BaseApiService {
       // GET istekleri için 200 başarı durum kodudur
       if (response.statusCode == 200 || response.statusCode == 410) {
         _logger.i('Başarılı yanıt alındı (${response.statusCode})');
-        return jsonDecode(response.body);
+        try {
+          final result = jsonDecode(response.body);
+          // Yanıt kodunu ekle
+          result['code'] = response.statusCode;
+          return result;
+        } catch (e) {
+          // JSON parse hatası durumunda basit bir başarı yanıtı döndür
+          _logger.w('Yanıt için JSON parse hatası: $e, varsayılan başarı yanıtı dönüyor');
+          return {'success': true, 'code': response.statusCode};
+        }
       } else {
         final responseBody = jsonDecode(response.body);
         final userMessage = _getUserFriendlyErrorMessage(response.statusCode, responseBody);
@@ -217,10 +237,19 @@ class BaseApiService {
         body: body != null ? jsonEncode(body) : null,
       );
 
-      // 410 Gone, bu API'de başarı yanıtı temsil ediyor
-      if (response.statusCode == 410) {
-        _logger.i('Başarılı yanıt alındı (410 Gone)');
-        return jsonDecode(response.body);
+      // 410 Gone ve 200 OK, bu API'de başarı yanıtı temsil ediyor
+      if (response.statusCode == 410 || response.statusCode == 200) {
+        _logger.i('Başarılı yanıt alındı (${response.statusCode})');
+        try {
+          final result = jsonDecode(response.body);
+          // Durum kodunu ekle, böylece istemci tarafında kontrol edilebilir
+          result['code'] = response.statusCode;
+          return result;
+        } catch (e) {
+          // JSON parse hatası durumunda basit bir başarı yanıtı döndür
+          _logger.w('${response.statusCode} yanıtı için JSON parse hatası: $e, varsayılan başarı yanıtı dönüyor');
+          return {'success': true, 'code': response.statusCode};
+        }
       } else {
         final responseBody = jsonDecode(response.body);
         final userMessage = _getUserFriendlyErrorMessage(response.statusCode, responseBody);

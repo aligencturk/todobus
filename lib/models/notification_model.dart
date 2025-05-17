@@ -1,43 +1,47 @@
 class NotificationModel {
-  final int id;
-  final int userId;
+  final String id;
   final String title;
-  final String message;
-  final String createdAt;
+  final String body;
+  final String type;
+  final String typeId;
+  final String url;
+  final String createDate;
   final bool isRead;
-  final Map<String, dynamic>? data;
 
   NotificationModel({
     required this.id,
-    required this.userId,
     required this.title,
-    required this.message,
-    required this.createdAt,
-    required this.isRead,
-    this.data,
+    required this.body,
+    required this.type,
+    required this.typeId,
+    required this.url,
+    required this.createDate,
+    this.isRead = false,
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
     return NotificationModel(
-      id: json['id'] as int,
-      userId: json['userId'] as int,
+      id: json['id'] as String,
       title: json['title'] as String,
-      message: json['message'] as String,
-      createdAt: json['createdAt'] as String,
-      isRead: json['isRead'] as bool,
-      data: json['data'] != null ? Map<String, dynamic>.from(json['data']) : null,
+      body: json['body'] as String,
+      type: json['type'] as String,
+      typeId: json['type_id'] as String,
+      url: json['url'] as String,
+      createDate: json['create_date'] as String,
+      isRead: json['is_read'] == 1 || json['is_read'] == true,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'userId': userId,
       'title': title,
-      'message': message,
-      'createdAt': createdAt,
-      'isRead': isRead,
-      'data': data,
+      'body': body,
+      'type': type,
+      'type_id': typeId,
+      'url': url,
+      'create_date': createDate,
+      'is_read': isRead,
     };
   }
 }
