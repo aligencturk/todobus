@@ -41,6 +41,14 @@ class ProfileViewModel with ChangeNotifier {
     super.dispose();
   }
   
+  // Kullanıcı bilgisini doğrudan ayarla
+  void setUser(User user) {
+    _user = user;
+    _status = ProfileStatus.loaded;
+    _safeNotifyListeners();
+    _logger.i('Kullanıcı bilgileri ayarlandı: ${user.userFullname}');
+  }
+  
   // Kullanıcı bilgilerini getir
   Future<void> loadUserProfile() async {
     if (_status == ProfileStatus.loading) return;

@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../viewmodels/profile_viewmodel.dart';
 import '../models/user_model.dart';
 import '../services/storage_service.dart';
@@ -48,10 +49,49 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
-  void _launchWebsite() {
-    // Web sitesi bağlantısı açılacak
-    // URL launcher kullanılabilir
-    _logger.i('Todobus web sitesi açılıyor');
+  void _launchWebsite() async {
+    const websiteUrl = 'https://todobus.tr';
+    final Uri uri = Uri.parse(websiteUrl);
+    
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        _logger.e('Web sitesi açılamadı: $websiteUrl');
+        if (mounted) {
+          showPlatformDialog(
+            context: context,
+            builder: (context) => PlatformAlertDialog(
+              title: const Text('Hata'),
+              content: const Text('Web sitesi açılamadı. Lütfen daha sonra tekrar deneyin.'),
+              actions: <Widget>[
+                PlatformDialogAction(
+                  child: const Text('Tamam'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        _logger.i('Todobus web sitesi açıldı: $websiteUrl');
+      }
+    } catch (e) {
+      _logger.e('Web sitesi açılırken hata oluştu: $e');
+      if (mounted) {
+        showPlatformDialog(
+          context: context,
+          builder: (context) => PlatformAlertDialog(
+            title: const Text('Hata'),
+            content: Text('Web sitesi açılırken bir hata oluştu: ${e.toString()}'),
+            actions: <Widget>[
+              PlatformDialogAction(
+                child: const Text('Tamam'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   // Profil düzenleme ekranını aç
@@ -156,29 +196,6 @@ class _ProfileViewState extends State<ProfileView> {
         children: [
           _buildProfileHeader(context, user),
           const SizedBox(height: 24),
-          
-          // Düzenle butonu
-          Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: PlatformElevatedButton(
-              onPressed: _navigateToEditProfile,
-              child: Text(
-                'Profili Düzenle',
-                style: TextStyle(
-                  color: isCupertino(context) ? CupertinoColors.white : null,
-                ),
-              ),
-              material: (_, __) => MaterialElevatedButtonData(
-                icon: const Icon(Icons.edit),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-              cupertino: (_, __) => CupertinoElevatedButtonData(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
           
           // Hesap Bilgileri bölümü - genişletilebilir panel
           _buildExpandableSection(

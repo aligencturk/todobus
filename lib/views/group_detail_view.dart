@@ -95,20 +95,8 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     
     if (result == true && mounted && !_isDisposed) {
       await _loadGroupDetail();
-      try {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Grup başarıyla güncellendi')),
-        );
-      } catch (e) {
-        _logger.e('ScaffoldMessenger hatası: $e');
-      }
+      _showSnackBar('Grup başarıyla güncellendi');
     }
-  }
-
-  // Etkinlik oluşturma işlevi
-  void _createEvent() {
-    _navigateToCreateEventView();
   }
 
   // Etkinlik detayına gitme işlevi
@@ -140,24 +128,19 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     ).then((result) {
       if (result == true && mounted) {
         _loadGroupDetail(); // Grup detaylarını yenile
-        try {
-          final messenger = ScaffoldMessenger.of(context);
-          messenger.showSnackBar(
-            const SnackBar(content: Text('Etkinlik başarıyla oluşturuldu')),
-          );
-        } catch (e) {
-          _logger.e('ScaffoldMessenger hatası: $e');
-        }
+        _showSnackBar('Etkinlik başarıyla oluşturuldu');
       }
     });
   }
   
   @override
   Widget build(BuildContext context) {
+    final bool hasAdminRights = _groupDetail?.users.any((user) => user.isAdmin) ?? false;
+    
     return PlatformScaffold(
       appBar: PlatformAppBar(
         title: Text(_groupDetail?.groupName ?? 'Grup Detayı'),
-        trailingActions: _groupDetail != null && _groupDetail!.users.any((user) => user.isAdmin)
+        trailingActions: hasAdminRights
             ? [
                 PlatformIconButton(
                   icon: Icon(
@@ -248,18 +231,25 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   }
 
   Widget _buildGroupHeader(BuildContext context) {
+    if (_groupDetail == null) return const SizedBox();
+    
     final group = _groupDetail!;
     final isIOS = isCupertino(context);
+    final bool isAdmin = group.users.any((user) => user.isAdmin);
+    final Color headerColor = isIOS 
+        ? (isAdmin ? CupertinoColors.activeBlue.withOpacity(0.1) : CupertinoColors.systemBackground)
+        : (isAdmin ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface);
+    final TextStyle labelStyle = platformThemeData(
+      context,
+      material: (data) => data.textTheme.bodySmall ?? const TextStyle(),
+      cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
+        color: CupertinoColors.secondaryLabel,
+      ),
+    );
     
     return Container(
       padding: const EdgeInsets.all(16.0),
-      color: isIOS 
-        ? (group.users.any((user) => user.isAdmin) 
-            ? CupertinoColors.activeBlue.withOpacity(0.1) 
-            : CupertinoColors.systemBackground)
-        : (group.users.any((user) => user.isAdmin) 
-            ? Theme.of(context).colorScheme.primaryContainer 
-            : Theme.of(context).colorScheme.surface),
+      color: headerColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -294,70 +284,24 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: group.isFree
-                    ? isIOS 
-                        ? CupertinoColors.activeGreen.withOpacity(0.1)
-                        : Colors.green.withOpacity(0.1)
-                    : isIOS 
-                        ? CupertinoColors.systemOrange.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  group.packageName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: group.isFree
-                      ? isIOS 
-                          ? CupertinoColors.activeGreen
-                          : Colors.green
-                      : isIOS 
-                          ? CupertinoColors.systemOrange
-                          : Colors.orange,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              _buildPackageIndicator(context, group.isFree, group.packageName),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(
-                isIOS ? CupertinoIcons.person : Icons.person,
-                size: 14,
-                color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${group.totalUsers} Kullanıcı',
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall,
-                  cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
-                    color: CupertinoColors.secondaryLabel,
-                  ),
-                ),
+              _buildIconWithText(
+                context: context, 
+                icon: isIOS ? CupertinoIcons.person : Icons.person, 
+                text: '${group.totalUsers} Kullanıcı',
+                style: labelStyle
               ),
               const SizedBox(width: 16),
-              Icon(
-                isIOS ? CupertinoIcons.collections : Icons.collections_bookmark,
-                size: 14,
-                color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${group.projects.length} Proje',
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall,
-                  cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
-                    color: CupertinoColors.secondaryLabel,
-                  ),
-                ),
+              _buildIconWithText(
+                context: context, 
+                icon: isIOS ? CupertinoIcons.collections : Icons.collections_bookmark, 
+                text: '${group.projects.length} Proje',
+                style: labelStyle
               ),
             ],
           ),
@@ -365,58 +309,74 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       ),
     );
   }
+
+  Widget _buildPackageIndicator(BuildContext context, bool isFree, String packageName) {
+    final isIOS = isCupertino(context);
+    final Color bgColor = isFree
+        ? isIOS ? CupertinoColors.activeGreen.withOpacity(0.1) : Colors.green.withOpacity(0.1)
+        : isIOS ? CupertinoColors.systemOrange.withOpacity(0.1) : Colors.orange.withOpacity(0.1);
+    final Color textColor = isFree
+        ? isIOS ? CupertinoColors.activeGreen : Colors.green
+        : isIOS ? CupertinoColors.systemOrange : Colors.orange;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        packageName,
+        style: TextStyle(
+          fontSize: 12,
+          color: textColor,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIconWithText({
+    required BuildContext context, 
+    required IconData icon, 
+    required String text,
+    TextStyle? style
+  }) {
+    final Color iconColor = isCupertino(context) 
+        ? CupertinoColors.secondaryLabel 
+        : Colors.grey[600] ?? Colors.grey;
+    final double iconSize = 16;
+    
+    return Row(
+      children: [
+        Icon(icon, size: iconSize, color: iconColor),
+        const SizedBox(width: 4),
+        Text(text, style: style),
+      ],
+    );
+  }
   
   Widget _buildSegmentedControl(BuildContext context) {
     final isIOS = isCupertino(context);
     
     if (isIOS) {
-      final Map<int, Widget> segments = {
-        0: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 1),
-          child: Text('Bilgiler'),
-        ),
-        1: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 1),
-          child: Text('Üyeler'),
-        ),
-        2: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 1),
-          child: Text('Projeler'),
-        ),
-        3: const Padding(
-          padding: EdgeInsets.symmetric(horizontal:1),
-          child: Text('Etkinlikler'),
-        ),
-        4: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 1),
-          child: Text('Raporlar'),
-        ),
+      final segments = {
+        0: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Bilgiler')),
+        1: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Üyeler')),
+        2: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Projeler')),
+        3: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Etkinlikler')),
+        4: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Raporlar')),
       };
       
       return Padding(
         padding: const EdgeInsets.all(16.0),
         child: CupertinoSlidingSegmentedControl<int>(
           groupValue: _selectedSegment,
-          onValueChanged: (value) {
-            if (value != null) {
-              setState(() {
-                _selectedSegment = value;
-              });
-              
-              // Raporlar sekmesi seçildiğinde logları yükle
-              if (value == 4 && _groupLogs.isEmpty && !_isLoadingLogs) {
-                // Build bittikten sonra çağır
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _loadGroupLogs();
-                });
-              }
-            }
-          },
+          onValueChanged: _onSegmentChanged,
           children: segments,
         ),
       );
     } else {
-      // Material design için TabBar oluşturulabilir
       return Container(
         height: 50,
         decoration: BoxDecoration(
@@ -442,21 +402,30 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     }
   }
   
+  void _onSegmentChanged(int? value) {
+    if (value == null) return;
+    
+    _safeSetState(() => _selectedSegment = value);
+    
+    // Raporlar sekmesi seçildiğinde logları yükle
+    if (value == 4 && _groupLogs.isEmpty && !_isLoadingLogs) {
+      // Build bittikten sonra çağır
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadGroupLogs());
+    }
+  }
+  
   Widget _buildMaterialTab(BuildContext context, String title, int index) {
+    final bool isSelected = _selectedSegment == index;
+    final Color primaryColor = Theme.of(context).colorScheme.primary;
+    
     return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedSegment = index;
-        });
-      },
+      onTap: () => _onSegmentChanged(index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: _selectedSegment == index 
-                ? Theme.of(context).colorScheme.primary 
-                : Colors.transparent,
+              color: isSelected ? primaryColor : Colors.transparent,
               width: 2,
             ),
           ),
@@ -465,12 +434,8 @@ class _GroupDetailViewState extends State<GroupDetailView> {
           child: Text(
             title,
             style: TextStyle(
-              color: _selectedSegment == index 
-                ? Theme.of(context).colorScheme.primary 
-                : Theme.of(context).textTheme.bodyMedium?.color,
-              fontWeight: _selectedSegment == index 
-                ? FontWeight.bold 
-                : FontWeight.normal,
+              color: isSelected ? primaryColor : Theme.of(context).textTheme.bodyMedium?.color,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
         ),
@@ -495,106 +460,147 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     }
   }
   
+  Widget _buildListItem(
+    BuildContext context, 
+    String title, 
+    String value, {
+    VoidCallback? onTap, 
+    bool isLink = false
+  }) {
+    final isIOS = isCupertino(context);
+    final Color borderColor = isIOS ? CupertinoColors.systemGrey5 : Colors.grey.shade200;
+    final Color backgroundColor = isIOS 
+        ? CupertinoColors.systemBackground 
+        : Theme.of(context).cardColor.withOpacity(0.7);
+    final Color linkColor = isIOS ? CupertinoColors.activeBlue : Colors.blue;
+    final Color valueColor = isLink 
+        ? linkColor
+        : isIOS 
+            ? CupertinoColors.secondaryLabel 
+            : Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey;
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        margin: const EdgeInsets.only(bottom: 8, right: 16, left: 16),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Text(
+                title,
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.titleSmall,
+                  cupertino: (data) => data.textTheme.textStyle.copyWith(fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                value,
+                style: TextStyle(
+                  fontWeight: isLink ? FontWeight.w500 : FontWeight.normal,
+                  color: valueColor,
+                  decoration: isLink ? TextDecoration.underline : null,
+                ),
+                textAlign: TextAlign.right,
+              ),
+            ),
+            if (onTap != null && !isLink)
+              Icon(
+                context.platformIcons.rightChevron,
+                size: 16,
+                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildInfoTab(BuildContext context) {
+    if (_groupDetail == null) return const SizedBox();
+    
     final group = _groupDetail!;
+    final isIOS = isCupertino(context);
+    final isAdmin = group.users.any((user) => user.isAdmin);
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Grup Bilgileri',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              cupertino: (data) => data.textTheme.navTitleTextStyle,
-            ),
-          ),
+          _buildSectionHeader(context, 'Grup Bilgileri'),
           const SizedBox(height: 12),
-          ListTile(
-            leading: Icon(
-              isCupertino(context) ? CupertinoIcons.person_2 : Icons.people,
-              color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
-            ),
-            title: const Text('Üye Sayısı'),
-            trailing: Text(
-              '${group.totalUsers}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+          
+          // Bilgi kartları
+          _buildInfoCard(
+            context, 
+            'Üye Sayısı', 
+            '${group.totalUsers}', 
+            isIOS ? CupertinoIcons.person_2_fill : Icons.people,
+            isIOS ? CupertinoColors.activeBlue : Colors.blue
           ),
           const Divider(),
-          ListTile(
-            leading: Icon(
-              isCupertino(context) ? CupertinoIcons.folder : Icons.folder,
-              color: isCupertino(context) ? CupertinoColors.systemIndigo : Colors.indigo,
-            ),
-            title: const Text('Proje Sayısı'),
-            trailing: Text(
-              '${group.projects.length}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+          _buildInfoCard(
+            context, 
+            'Proje Sayısı', 
+            '${group.projects.length}', 
+            isIOS ? CupertinoIcons.folder_fill : Icons.folder,
+            isIOS ? CupertinoColors.systemIndigo : Colors.indigo
           ),
           const Divider(),
-          ListTile(
-            leading: Icon(
-              isCupertino(context) ? CupertinoIcons.calendar : Icons.event,
-              color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
-            ),
-            title: const Text('Etkinlik Sayısı'),
-            trailing: Text(
-              '${group.events.length}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+          _buildInfoCard(
+            context, 
+            'Etkinlik Sayısı', 
+            '${group.events.length}', 
+            isIOS ? CupertinoIcons.calendar : Icons.event_note,
+            isIOS ? CupertinoColors.systemOrange : Colors.orange
           ),
           const Divider(),
-          ListTile(
-            leading: Icon(
-              isCupertino(context) ? CupertinoIcons.tag : Icons.label,
-              color: isCupertino(context) ? CupertinoColors.systemGreen : Colors.green,
-            ),
-            title: const Text('Paket Türü'),
-            trailing: Text(
-              group.packageName,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: group.isFree 
-                  ? isCupertino(context) ? CupertinoColors.activeGreen : Colors.green
-                  : isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
-              ),
-            ),
+          _buildInfoCard(
+            context, 
+            'Paket Türü', 
+            group.packageName, 
+            isIOS ? CupertinoIcons.tag_fill : Icons.local_offer,
+            isIOS ? CupertinoColors.systemGreen : Colors.green,
+            valueColor: group.isFree 
+                ? (isIOS ? CupertinoColors.activeGreen : Colors.green)
+                : (isIOS ? CupertinoColors.systemOrange : Colors.orange)
           ),
+          
           const SizedBox(height: 20),
-          Text(
-            'Hızlı İşlemler',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              cupertino: (data) => data.textTheme.navTitleTextStyle,
-            ),
-          ),
+          _buildSectionHeader(context, 'Hızlı İşlemler'),
           const SizedBox(height: 12),
+          
+          // Hızlı işlemler
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildQuickActionButton(
-                icon: isCupertino(context) ? CupertinoIcons.calendar_badge_plus : Icons.event_available,
-                color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
+                icon: isIOS ? CupertinoIcons.calendar_badge_plus : Icons.event_available,
+                color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
                 label: 'Etkinlik Ekle',
-                onTap: _createEvent,
+                onTap: _navigateToCreateEventView,
               ),
-              if (group.users.any((user) => user.isAdmin))
+              if (isAdmin)
                 _buildQuickActionButton(
-                  icon: isCupertino(context) ? CupertinoIcons.person_badge_plus : Icons.person_add,
-                  color: isCupertino(context) ? CupertinoColors.systemGreen : Colors.green,
+                  icon: isIOS ? CupertinoIcons.person_badge_plus : Icons.person_add_alt,
+                  color: isIOS ? CupertinoColors.systemGreen : Colors.green,
                   label: 'Üye Ekle',
-                  onTap: () {
-                    // Üye ekleme işlevi eklenecek
-                  },
+                  onTap: _inviteUser,
                 ),
               _buildQuickActionButton(
-                icon: isCupertino(context) ? CupertinoIcons.chat_bubble_2 : Icons.chat,
-                color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
+                icon: isIOS ? CupertinoIcons.chat_bubble_2_fill : Icons.chat,
+                color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
                 label: 'Grup Sohbeti',
                 onTap: () {
                   // Grup sohbeti açma işlevi eklenecek
@@ -607,39 +613,36 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     );
   }
   
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+  // Info kartı widget'ı
+  Widget _buildInfoCard(
+    BuildContext context, 
+    String title, 
+    String value, 
+    IconData iconData, 
+    Color iconColor,
+    {Color? valueColor}
+  ) {
+    final double iconSize = 24.0;
+    
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: iconColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Icon(iconData, color: iconColor, size: iconSize),
+        ),
+      ),
+      title: Text(title),
+      trailing: Text(
+        value,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: valueColor,
+        ),
       ),
     );
   }
@@ -667,9 +670,11 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               ),
               if (group.isAddUser && hasAdminRights)
                 PlatformIconButton(
+                  padding: EdgeInsets.zero,
                   icon: Icon(
-                    isIOS ? CupertinoIcons.person_add : Icons.person_add,
+                    isIOS ? CupertinoIcons.person_badge_plus : Icons.person_add_alt,
                     color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                    size: 22,
                   ),
                   onPressed: _inviteUser,
                 ),
@@ -694,22 +699,27 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               ),
               title: Text(user.userName),
               subtitle: Text(user.isAdmin ? 'Yönetici' : 'Üye'),
-              trailing: hasAdminRights && !user.isAdmin 
-                ? PlatformIconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(
-                      isIOS ? CupertinoIcons.trash : Icons.delete_outline,
-                      color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
-                      size: 20,
-                    ),
-                    onPressed: () => _confirmRemoveUser(user),
-                  )
-                : (user.isAdmin 
-                  ? Icon(
-                      isIOS ? CupertinoIcons.shield : Icons.shield,
-                      color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+              trailing: Container(
+                width: 40,
+                alignment: Alignment.center,
+                child: hasAdminRights && !user.isAdmin 
+                  ? PlatformIconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        isIOS ? CupertinoIcons.delete : Icons.delete_outline,
+                        color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
+                        size: 20,
+                      ),
+                      onPressed: () => _confirmRemoveUser(user),
                     )
-                  : null),
+                  : (user.isAdmin 
+                    ? Icon(
+                        isIOS ? CupertinoIcons.shield_fill : Icons.shield,
+                        color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                        size: 20,
+                      )
+                    : SizedBox(width: 20)),
+              ),
             ),
           )).toList(),
         ],
@@ -717,62 +727,58 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     );
   }
   
+  // Kullanıcı çıkarma onayı
   void _confirmRemoveUser(GroupUser user) {
     final isIOS = isCupertino(context);
+    final String title = 'Kullanıcıyı Çıkar';
+    final String content = '${user.userName} kullanıcısını gruptan çıkarmak istediğinize emin misiniz?';
     
-    if (isIOS) {
-      showCupertinoDialog(
-        context: context,
-        builder: (dialogContext) => CupertinoAlertDialog(
-          title: const Text('Kullanıcıyı Çıkar'),
-          content: Text('${user.userName} kullanıcısını gruptan çıkarmak istediğinize emin misiniz?'),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('İptal'),
-            ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _removeUser(user.userID);
-              },
-              child: const Text('Çıkar'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Kullanıcıyı Çıkar'),
-          content: Text('${user.userName} kullanıcısını gruptan çıkarmak istediğinize emin misiniz?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('İptal'),
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
+    showPlatformDialog(
+      context: context,
+      builder: (dialogContext) => isIOS
+        ? CupertinoAlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
               ),
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                await _removeUser(user.userID);
-              },
-              child: const Text('Çıkar'),
-            ),
-          ],
-        ),
-      );
-    }
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _removeUser(user.userID);
+                },
+                child: const Text('Çıkar'),
+              ),
+            ],
+          )
+        : AlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red,
+                ),
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _removeUser(user.userID);
+                },
+                child: const Text('Çıkar'),
+              ),
+            ],
+          ),
+    );
   }
   
   Future<void> _removeUser(int userID) async {
-    setState(() {
-      _isLoading = true;
-    });
+    _safeSetState(() => _isLoading = true);
     
     try {
       final success = await Provider.of<GroupViewModel>(context, listen: false)
@@ -781,30 +787,21 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       if (mounted) {
         if (success) {
           await _loadGroupDetail();
-          try {
-            final messenger = ScaffoldMessenger.of(context);
-            messenger.showSnackBar(
-              const SnackBar(content: Text('Kullanıcı başarıyla çıkarıldı')),
-            );
-          } catch (e) {
-            _logger.e('ScaffoldMessenger hatası: $e');
-          }
+          _showSnackBar('Kullanıcı başarıyla çıkarıldı');
         } else {
-          setState(() {
+          _safeSetState(() {
             _isLoading = false;
             _errorMessage = 'Kullanıcı çıkarılamadı.';
           });
-          
           _showErrorSnackbar('Kullanıcı çıkarma işlemi başarısız oldu. Lütfen daha sonra tekrar deneyin.');
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
+        _safeSetState(() {
           _isLoading = false;
           _errorMessage = e.toString();
         });
-        
         _showErrorSnackbar(_formatErrorMessage(e.toString()));
       }
     }
@@ -848,7 +845,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                     groupValue: selectedRole,
                     children: const {
                       1: Text('Üye'),
-                      2: Text('Admin'),
+                      2: Text('Yönetici'),
                     },
                     onValueChanged: (value) {
                       if (value != null) {
@@ -937,7 +934,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   SegmentedButton<int>(
                     segments: const [
                       ButtonSegment<int>(value: 1, label: Text('Üye')),
-                      ButtonSegment<int>(value: 2, label: Text('Admin')),
+                      ButtonSegment<int>(value: 2, label: Text('Yönetici')),
                     ],
                     selected: {selectedRole},
                     onSelectionChanged: (newSelection) {
@@ -1050,7 +1047,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     if (!mounted || _isDisposed) return;
     
     final isIOS = isCupertino(context);
-    final roleText = role == 2 ? 'Üye' : 'Yönetici';
+    final roleText = role == 2 ? 'Yönetici' : 'Üye';
     
     if (isIOS) {
       showCupertinoModalPopup(
@@ -1374,33 +1371,6 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     }
   }
   
-  // Hata mesajı snackbar göster
-  void _showErrorSnackbar(String message) {
-    if (!mounted || _isDisposed) return;
-    
-    final isIOS = isCupertino(context);
-    final errorColor = isIOS ? CupertinoColors.systemRed : Colors.red;
-    
-    try {
-      // ScaffoldMessenger.of çağrılmadan önce geçerli bir Scaffold olduğundan emin olalım
-      final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
-      if (scaffoldMessengerState == null) {
-        _logger.w('ScaffoldMessenger bulunamadı, SnackBar gösterilemiyor');
-        return;
-      }
-      
-      scaffoldMessengerState.showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: errorColor,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } catch (e) {
-      _logger.e('SnackBar gösterirken hata: $e');
-    }
-  }
-  
   // Davet URL'ini dialog ile göster
   void _showInviteUrlDialog(String inviteUrl) {
     if (!mounted || _isDisposed) return;
@@ -1510,6 +1480,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   Widget _buildProjectsTab(BuildContext context) {
     final group = _groupDetail!;
     final hasAdminRights = group.users.any((user) => user.isAdmin);
+    final isIOS = isCupertino(context);
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -1531,8 +1502,9 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 PlatformIconButton(
                   padding: EdgeInsets.zero,
                   icon: Icon(
-                    isCupertino(context) ? CupertinoIcons.add : Icons.add,
-                    color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
+                    isIOS ? CupertinoIcons.add_circled : Icons.add_circle_outline,
+                    color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                    size: 22,
                   ),
                   onPressed: _createProject,
                 ),
@@ -1546,15 +1518,15 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 child: Column(
                   children: [
                     Icon(
-                      isCupertino(context) ? CupertinoIcons.folder : Icons.folder_outlined,
+                      isIOS ? CupertinoIcons.folder : Icons.folder_outlined,
                       size: 48,
-                      color: isCupertino(context) ? CupertinoColors.systemGrey : Colors.grey,
+                      color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'Henüz proje bulunmuyor',
                       style: TextStyle(
-                        color: isCupertino(context) ? CupertinoColors.systemGrey : Colors.grey,
+                        color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
                       ),
                     ),
                   ],
@@ -1564,32 +1536,49 @@ class _GroupDetailViewState extends State<GroupDetailView> {
           ...group.projects.map((project) => Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
             child: ListTile(
-              leading: Icon(
-                isCupertino(context) ? CupertinoIcons.folder_fill : Icons.folder,
-                color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Icon(
+                    isIOS ? CupertinoIcons.folder_fill : Icons.folder,
+                    color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                    size: 20,
+                  ),
+                ),
               ),
               title: Text(project.projectName),
-              trailing: hasAdminRights 
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      PlatformIconButton(
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          isCupertino(context) ? CupertinoIcons.delete : Icons.delete_outline,
-                          color: isCupertino(context) ? CupertinoColors.systemRed : Colors.red,
-                          size: 20,
+              trailing: Container(
+                width: 60,
+                alignment: Alignment.centerRight,
+                child: hasAdminRights 
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PlatformIconButton(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            isIOS ? CupertinoIcons.delete : Icons.delete_outline,
+                            color: isIOS ? CupertinoColors.systemRed : Colors.red,
+                            size: 20,
+                          ),
+                          onPressed: () => _confirmDeleteProject(project.projectID),
                         ),
-                        onPressed: () => _confirmDeleteProject(project.projectID),
-                      ),
-                      Icon(
-                        isCupertino(context) ? CupertinoIcons.chevron_right : Icons.chevron_right,
-                      ),
-                    ],
-                  )
-                : Icon(
-                    isCupertino(context) ? CupertinoIcons.chevron_right : Icons.chevron_right,
-                  ),
+                        Icon(
+                          isIOS ? CupertinoIcons.chevron_right : Icons.chevron_right,
+                          size: 16,
+                        ),
+                      ],
+                    )
+                  : Icon(
+                      isIOS ? CupertinoIcons.chevron_right : Icons.chevron_right,
+                      size: 16,
+                    ),
+              ),
               onTap: () {
                 // Proje detayına gitme işlevi
                 Navigator.of(context).push(
@@ -1625,14 +1614,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     
     if (result == true && mounted) {
       await _loadGroupDetail();
-      try {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Proje başarıyla oluşturuldu')),
-        );
-      } catch (e) {
-        _logger.e('ScaffoldMessenger hatası: $e');
-      }
+      _showSnackBar('Proje başarıyla oluşturuldu');
     }
   }
   
@@ -1659,10 +1641,11 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               PlatformIconButton(
                 padding: EdgeInsets.zero,
                 icon: Icon(
-                  isIOS ? CupertinoIcons.add : Icons.add,
+                  isIOS ? CupertinoIcons.add_circled : Icons.add_circle_outline,
                   color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                  size: 22,
                 ),
-                onPressed: () => _navigateToCreateEventView(),
+                onPressed: _navigateToCreateEventView,
               ),
             ],
           ),
@@ -1687,7 +1670,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                     ),
                     const SizedBox(height: 16),
                     PlatformElevatedButton(
-                      onPressed: () => _navigateToCreateEventView(),
+                      onPressed: _navigateToCreateEventView,
                       child: const Text('Etkinlik Ekle'),
                     ),
                   ],
@@ -1713,10 +1696,17 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                     children: [
                       Row(
                         children: [
-                          Icon(
-                            isIOS ? CupertinoIcons.calendar : Icons.event,
-                            color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
-                            size: 18,
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: (isIOS ? CupertinoColors.systemOrange : Colors.orange).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isIOS ? CupertinoIcons.calendar : Icons.event_note,
+                              color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
+                              size: 16,
+                            ),
                           ),
                           const SizedBox(width: 8),
                           Text(
@@ -2100,16 +2090,16 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     Color logColor;
     
     if (log.logName.contains('Tamamlandı')) {
-      logIcon = isIOS ? CupertinoIcons.checkmark_circle : Icons.check_circle;
+      logIcon = isIOS ? CupertinoIcons.checkmark_circle_fill : Icons.check_circle;
       logColor = isIOS ? CupertinoColors.activeGreen : Colors.green;
     } else if (log.logName.contains('Tamamlanmadı')) {
-      logIcon = isIOS ? CupertinoIcons.xmark_circle : Icons.cancel;
+      logIcon = isIOS ? CupertinoIcons.xmark_circle_fill : Icons.cancel;
       logColor = isIOS ? CupertinoColors.systemRed : Colors.red;
     } else if (log.logName.contains('Açıldı')) {
-      logIcon = isIOS ? CupertinoIcons.add_circled : Icons.add_circle;
+      logIcon = isIOS ? CupertinoIcons.add_circled_solid : Icons.add_circle;
       logColor = isIOS ? CupertinoColors.activeBlue : Colors.blue;
     } else {
-      logIcon = isIOS ? CupertinoIcons.doc_text : Icons.article;
+      logIcon = isIOS ? CupertinoIcons.doc_text_fill : Icons.article;
       logColor = isIOS ? CupertinoColors.systemGrey : Colors.grey;
     }
     
@@ -2129,10 +2119,17 @@ class _GroupDetailViewState extends State<GroupDetailView> {
           children: [
             Row(
               children: [
-                Icon(
-                  logIcon,
-                  color: logColor,
-                  size: 16,
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: logColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    logIcon,
+                    color: logColor,
+                    size: 16,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -2162,7 +2159,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 color: isIOS ? CupertinoColors.label : Colors.black87,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Icon(
@@ -2178,7 +2175,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                     color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Icon(
                   isIOS ? CupertinoIcons.doc_text : Icons.assignment,
                   size: 12,
@@ -2229,5 +2226,80 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         });
       }
     }
+  }
+
+  // Hata mesajı snackbar göster
+  void _showErrorSnackbar(String message) {
+    _showSnackBar(message, isError: true);
+  }
+
+  // SnackBar gösterim yardımcı metodu
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted || _isDisposed) return;
+    
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError 
+              ? (isCupertino(context) ? CupertinoColors.systemRed : Colors.red)
+              : null,
+        ),
+      );
+    } catch (e) {
+      _logger.e('ScaffoldMessenger hatası: $e');
+    }
+  }
+
+  // Bölüm başlığı widget'ı
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Text(
+      title,
+      style: platformThemeData(
+        context,
+        material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        cupertino: (data) => data.textTheme.navTitleTextStyle,
+      ),
+    );
+  }
+
+  // Hızlı işlem butonu widget'ı
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    final double iconSize = 24.0;
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: iconSize,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 } 

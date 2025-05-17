@@ -810,13 +810,6 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    user.assignedDate,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                    ),
-                  ),
                   const SizedBox(width: 8),
                   PlatformIconButton(
                     padding: EdgeInsets.zero,

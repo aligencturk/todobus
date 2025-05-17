@@ -7,6 +7,7 @@ import 'dart:io' show Platform;
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import '../services/snackbar_service.dart';
+import '../services/user_service.dart';
 import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import '../models/group_models.dart';
@@ -29,6 +30,7 @@ class _DashboardViewState extends State<DashboardView> {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
   final SnackBarService _snackBarService = SnackBarService();
+  final UserService _userService = UserService();
   
   List<GroupLog> _recentLogs = [];
   bool _isLoadingLogs = false;
@@ -44,6 +46,21 @@ class _DashboardViewState extends State<DashboardView> {
       if (mounted) {
         final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
         final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+        final profileViewModel = Provider.of<ProfileViewModel>(context, listen: false);
+        
+        // Önce kullanıcı bilgilerini yükle
+        try {
+          _logger.i('Kullanıcı bilgileri yükleniyor...');
+          final userResponse = await _userService.getUser();
+          if (userResponse.success && userResponse.data != null) {
+            profileViewModel.setUser(userResponse.data!.user);
+            _logger.i('Kullanıcı bilgileri başarıyla yüklendi');
+          } else {
+            _logger.e('Kullanıcı bilgileri yüklenemedi: ${userResponse.errorMessage}');
+          }
+        } catch (e) {
+          _logger.e('Kullanıcı bilgileri alınırken hata: $e');
+        }
         
         // Proje durumlarını önce yükle (diğer verilere bağlı olarak doğru gösterilmesi için)
         await groupViewModel.getProjectStatuses();
