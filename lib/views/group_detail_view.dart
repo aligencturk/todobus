@@ -459,72 +459,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         return _buildInfoTab(context);
     }
   }
-  
-  Widget _buildListItem(
-    BuildContext context, 
-    String title, 
-    String value, {
-    VoidCallback? onTap, 
-    bool isLink = false
-  }) {
-    final isIOS = isCupertino(context);
-    final Color borderColor = isIOS ? CupertinoColors.systemGrey5 : Colors.grey.shade200;
-    final Color backgroundColor = isIOS 
-        ? CupertinoColors.systemBackground 
-        : Theme.of(context).cardColor.withOpacity(0.7);
-    final Color linkColor = isIOS ? CupertinoColors.activeBlue : Colors.blue;
-    final Color valueColor = isLink 
-        ? linkColor
-        : isIOS 
-            ? CupertinoColors.secondaryLabel 
-            : Theme.of(context).textTheme.bodyMedium?.color ?? Colors.grey;
-    
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        margin: const EdgeInsets.only(bottom: 8, right: 16, left: 16),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: borderColor),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Text(
-                title,
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.titleSmall,
-                  cupertino: (data) => data.textTheme.textStyle.copyWith(fontWeight: FontWeight.w500),
-                ),
-              ),
-            ),
-            Expanded(
-              flex: 3,
-              child: Text(
-                value,
-                style: TextStyle(
-                  fontWeight: isLink ? FontWeight.w500 : FontWeight.normal,
-                  color: valueColor,
-                ),
-                textAlign: TextAlign.right,
-              ),
-            ),
-            if (onTap != null && !isLink)
-              Icon(
-                context.platformIcons.rightChevron,
-                size: 16,
-                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
+ 
   Widget _buildInfoTab(BuildContext context) {
     if (_groupDetail == null) return const SizedBox();
     
@@ -576,37 +511,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 : (isIOS ? CupertinoColors.systemOrange : Colors.orange)
           ),
           
-          const SizedBox(height: 20),
-          _buildSectionHeader(context, 'Hızlı İşlemler'),
-          const SizedBox(height: 12),
-          
-          // Hızlı işlemler
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildQuickActionButton(
-                icon: isIOS ? CupertinoIcons.calendar_badge_plus : Icons.event_available,
-                color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
-                label: 'Etkinlik Ekle',
-                onTap: _navigateToCreateEventView,
-              ),
-              if (isAdmin)
-                _buildQuickActionButton(
-                  icon: isIOS ? CupertinoIcons.person_badge_plus : Icons.person_add_alt,
-                  color: isIOS ? CupertinoColors.systemGreen : Colors.green,
-                  label: 'Üye Ekle',
-                  onTap: _inviteUser,
-                ),
-              _buildQuickActionButton(
-                icon: isIOS ? CupertinoIcons.chat_bubble_2_fill : Icons.chat,
-                color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
-                label: 'Grup Sohbeti',
-                onTap: () {
-                  // Grup sohbeti açma işlevi eklenecek
-                },
-              ),
-            ],
-          ),
+         
         ],
       ),
     );
@@ -2260,46 +2165,6 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         context,
         material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         cupertino: (data) => data.textTheme.navTitleTextStyle,
-      ),
-    );
-  }
-
-  // Hızlı işlem butonu widget'ı
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    final double iconSize = 24.0;
-    
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: iconSize,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
       ),
     );
   }

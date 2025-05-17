@@ -654,43 +654,6 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Hızlı İşlemler',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              cupertino: (data) => data.textTheme.navTitleTextStyle,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildQuickActionButton(
-                icon: isIOS ? CupertinoIcons.square_list : Icons.playlist_add_check,
-                color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
-                label: 'Görev Ekle',
-                onTap: _showAddWorkDialog,
-              ),
-              _buildQuickActionButton(
-                icon: isIOS ? CupertinoIcons.person_badge_plus : Icons.person_add,
-                color: isIOS ? CupertinoColors.systemGreen : Colors.green,
-                label: 'Üye Ekle',
-                onTap: () {
-                  // Üye ekleme işlevi eklenecek
-                },
-              ),
-              _buildQuickActionButton(
-                icon: isIOS ? CupertinoIcons.chart_bar : Icons.bar_chart,
-                color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
-                label: 'Rapor',
-                onTap: () {
-                  // Rapor işlevi eklenecek
-                },
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -733,44 +696,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       ),
     );
   }
-  
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
+
   Widget _buildMembersTab(BuildContext context) {
     final project = _projectDetail!;
     final isIOS = isCupertino(context);

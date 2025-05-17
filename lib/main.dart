@@ -71,32 +71,37 @@ class _MyAppState extends State<MyApp> {
         settings: PlatformSettingsData(
           iosUsesMaterialWidgets: true,
         ),
-        builder: (context) => MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'TodoBus',
-          localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: const [
-            Locale('tr', 'TR'),
-            Locale('en', 'US'),
-          ],
-          theme: ThemeData(
-            colorSchemeSeed: Colors.blue,
-            useMaterial3: true,
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            boldText: false,
           ),
-          scaffoldMessengerKey: SnackBarService.scaffoldMessengerKey,
-          home: _isLoading
-              ? PlatformScaffold(
-                  body: Center(
-                    child: PlatformCircularProgressIndicator(),
-                  ),
-                )
-              : _isLoggedIn
-                  ? const MainApp()
-                  : const LoginView(),
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'TodoBus',
+            localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('tr', 'TR'),
+              Locale('en', 'US'),
+            ],
+            theme: ThemeData(
+              colorSchemeSeed: Colors.blue,
+              useMaterial3: true,
+            ),
+            scaffoldMessengerKey: SnackBarService.scaffoldMessengerKey,
+            home: _isLoading
+                ? PlatformScaffold(
+                    body: Center(
+                      child: PlatformCircularProgressIndicator(),
+                    ),
+                  )
+                : _isLoggedIn
+                    ? const MainApp()
+                    : const LoginView(),
+          ),
         ),
       ),
     );
