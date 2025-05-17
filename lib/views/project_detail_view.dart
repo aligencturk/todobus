@@ -97,17 +97,31 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       final works = await Provider.of<GroupViewModel>(context, listen: false)
           .getProjectWorks(widget.projectId);
       
-      setState(() {
-        _projectWorks = works;
-        _isLoadingWorks = false;
-      });
-      _logger.i('Proje görevleri yüklendi: ${works.length} görev');
+      if (mounted) {
+        setState(() {
+          _projectWorks = works;
+          _isLoadingWorks = false;
+        });
+        _logger.i('Proje görevleri yüklendi: ${works.length} görev');
+      }
     } catch (e) {
-      setState(() {
-        _worksErrorMessage = 'Görevler yüklenemedi: $e';
-        _isLoadingWorks = false;
-      });
-      _logger.e('Proje görevleri yüklenirken hata: $e');
+      if (mounted) {
+        // 417 hata kodu veya "Bu projeye ait henüz görev bulunmamaktadır" hatası normal durum
+        if (e.toString().contains('417') || e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
+          setState(() {
+            _projectWorks = []; // Boş liste olarak ayarla
+            _isLoadingWorks = false;
+            // Hata mesajı gösterme, normal bir durum
+          });
+          _logger.i('Proje için henüz görev bulunmuyor (417)');
+        } else {
+          setState(() {
+            _worksErrorMessage = 'Görevler yüklenemedi: $e';
+            _isLoadingWorks = false;
+          });
+          _logger.e('Proje görevleri yüklenirken hata: $e');
+        }
+      }
     }
   }
   

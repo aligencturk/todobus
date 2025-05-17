@@ -239,14 +239,7 @@ class DashboardViewModel with ChangeNotifier {
   // Yaklaşan etkinlikleri yükle
   Future<void> _loadUpcomingEvents() async {
     try {
-      // Önbellekteki etkinlikleri kontrol et
-      final cachedEvents = _storageService.getCachedUpcomingEvents();
-      if (cachedEvents != null && !_storageService.isCacheStale()) {
-        _upcomingEvents = cachedEvents;
-        _logger.i('${_upcomingEvents.length} etkinlik önbellekten alındı');
-        return;
-      }
-      
+      // Önbellekten kontrol etmeden doğrudan grupları yükle
       await _loadUserGroups(); // Önce tüm grupları yükle
       
       // Tüm gruplardan etkinlikleri al
@@ -277,10 +270,9 @@ class DashboardViewModel with ChangeNotifier {
         _upcomingEvents = _upcomingEvents.sublist(0, 5);
       }
       
-      // Etkinlikleri önbelleğe kaydet
-      await _storageService.cacheUpcomingEvents(_upcomingEvents);
+      // Önbelleğe kaydetmeyi kaldırdık
       
-      _logger.i('${_upcomingEvents.length} yaklaşan etkinlik yüklendi ve önbelleğe kaydedildi');
+      _logger.i('${_upcomingEvents.length} yaklaşan etkinlik yüklendi');
     } catch (e) {
       _logger.e('Etkinlikler yüklenirken hata: $e');
       // Ana process'i durdurmamak için hata fırlatma

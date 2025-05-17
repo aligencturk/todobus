@@ -255,7 +255,7 @@ class BaseApiService {
       case 404:
         return 'İstenen kaynak bulunamadı.';
       case 417:
-        return 'İşlem tamamlanamadı, lütfen tekrar deneyin.';
+        return 'Bu projeye ait henüz görev bulunmamaktadır.';
       case 429:
         return 'Çok fazla istek gönderdiniz, lütfen biraz bekleyin.';
       case 500:

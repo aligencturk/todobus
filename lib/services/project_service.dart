@@ -217,27 +217,36 @@ class ProjectService {
         throw Exception('Kullanıcı token bilgisi bulunamadı');
       }
       
-      final response = await _apiService.post(
-        'service/user/project/workList',
-        body: {
-          'userToken': token,
-          'projectID': projectID,
-        },
-        requiresToken: true,
-      );
-      
-      if (response['success'] == true && response['data'] != null) {
-        final workListResponse = ProjectWorkListResponse.fromJson(response);
+      try {
+        final response = await _apiService.post(
+          'service/user/project/workList',
+          body: {
+            'userToken': token,
+            'projectID': projectID,
+          },
+          requiresToken: true,
+        );
         
-        if (workListResponse.data != null) {
-          final works = workListResponse.data!.works;
-          _logger.i('${works.length} görev alındı.');
-          return works;
+        if (response['success'] == true && response['data'] != null) {
+          final workListResponse = ProjectWorkListResponse.fromJson(response);
+          
+          if (workListResponse.data != null) {
+            final works = workListResponse.data!.works;
+            _logger.i('${works.length} görev alındı.');
+            return works;
+          }
         }
+        
+        _logger.i('Proje için henüz görev bulunmuyor.');
+        return [];
+      } catch (e) {
+        if (e.toString().contains('417')) {
+          // 417 kodu "Bu projeye ait henüz görev bulunmamaktadır" anlamına gelir
+          _logger.i('Proje için henüz görev bulunmuyor. (417)');
+          return [];
+        }
+        rethrow;
       }
-      
-      _logger.w('Proje görevleri alınamadı veya boş.');
-      return [];
     } catch (e) {
       _logger.e('Proje görevleri yüklenirken hata: $e');
       throw Exception('Proje görevleri yüklenemedi: $e');

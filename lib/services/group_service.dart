@@ -261,7 +261,8 @@ class GroupService {
     try {
       final userToken = await _storageService.getToken();
       if (userToken == null) {
-        throw Exception('Oturum bilgisi bulunamadı');
+        _logger.e('Oturum bilgisi bulunamadı');
+        return []; // Exception atmak yerine boş liste dön
       }
 
       final response = await _apiService.post(
@@ -285,7 +286,7 @@ class GroupService {
       return [];
     } catch (e) {
       _logger.e('Grup raporları alınırken hata: $e');
-      throw Exception('Grup raporları alınamadı: $e');
+      return []; // Exception atmak yerine boş liste dön
     }
   }
 } 

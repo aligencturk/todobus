@@ -50,31 +50,12 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      // Önbellekten grupları kontrol et ve göster
-      final cachedGroups = _storageService.getCachedGroups();
-      if (cachedGroups != null) {
-        _groups = cachedGroups;
-        _status = GroupLoadStatus.loaded;
-        _safeNotifyListeners();
-        
-        // Önbellek güncelliğini kontrol et
-        if (_storageService.isCacheStale()) {
-          // Arka planda güncel verileri yükle
-          _loadGroupsFromApi();
-        }
-      } else {
-        // Önbellekte grup yoksa API'den yükle
-        await _loadGroupsFromApi();
-      }
+      // Her zaman API'den yükle, önbellekten alma
+      await _loadGroupsFromApi();
     } catch (e) {
-      // Hata durumunda önbellekte veri varsa onları göster, yoksa hata göster
-      if (_groups.isNotEmpty) {
-        _status = GroupLoadStatus.loaded;
-      } else {
-        _status = GroupLoadStatus.error;
-        _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
-        _logger.e('Gruplar yüklenirken hata: $e');
-      }
+      _status = GroupLoadStatus.error;
+      _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
+      _logger.e('Gruplar yüklenirken hata: $e');
       _safeNotifyListeners();
     }
   }
@@ -91,19 +72,16 @@ class GroupViewModel with ChangeNotifier {
       _groups = groups;
       _status = GroupLoadStatus.loaded;
       
-      // Grupları önbelleğe kaydet
-      await _storageService.cacheGroups(_groups);
+      // Önbelleğe kaydetmeyi kaldırdık
       
-      _logger.i('${_groups.length} grup yüklendi ve önbelleğe kaydedildi');
+      _logger.i('${_groups.length} grup yüklendi');
       _safeNotifyListeners();
     } catch (e) {
-      // API'den yükleme sırasında hata oluşursa ve önbellekte veri yoksa hata göster
-      if (_groups.isEmpty) {
-        _status = GroupLoadStatus.error;
-        _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
-        _logger.e('Gruplar API\'den yüklenirken hata: $e');
-        _safeNotifyListeners();
-      }
+      // API'den yükleme sırasında hata
+      _status = GroupLoadStatus.error;
+      _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
+      _logger.e('Gruplar API\'den yüklenirken hata: $e');
+      _safeNotifyListeners();
     } finally {
       _isLoadingFromApi = false;
     }
@@ -288,16 +266,24 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final reports = await _apiService.group.getGroupReports(groupID, isAdmin);
-      
-      _status = GroupLoadStatus.loaded;
-      _safeNotifyListeners();
-      
-      return reports;
+      try {
+        final reports = await _apiService.group.getGroupReports(groupID, isAdmin);
+        
+        _status = GroupLoadStatus.loaded;
+        _safeNotifyListeners();
+        
+        return reports;
+      } catch (e) {
+        // Hata durumunda sessizce boş liste dön, hata durumunu gösterme
+        _logger.e('Grup raporları yüklenirken hata: $e'); // Sadece log'a yaz
+        _status = GroupLoadStatus.loaded; // Loaded olarak işaretle, error değil
+        _safeNotifyListeners();
+        return []; // Boş liste dön
+      }
     } catch (e) {
-      _status = GroupLoadStatus.error;
-      _errorMessage = e.toString();
-      _logger.e('Grup raporları yüklenirken hata: $e');
+      // En dıştaki try-catch bloğu da boş liste dönsün
+      _logger.e('Grup raporları işlenirken beklenmeyen hata: $e');
+      _status = GroupLoadStatus.loaded; // Loaded olarak işaretle
       _safeNotifyListeners();
       return [];
     }
@@ -431,12 +417,22 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final works = await _apiService.project.getProjectWorks(projectID);
-      
-      _status = GroupLoadStatus.loaded;
-      _safeNotifyListeners();
-      
-      return works;
+      try {
+        final works = await _apiService.project.getProjectWorks(projectID);
+        
+        _status = GroupLoadStatus.loaded;
+        _safeNotifyListeners();
+        
+        return works;
+      } catch (e) {
+        // 417 kodunu içeren hatalar, görev olmadığını belirtiyor, bu normal bir durum
+        if (e.toString().contains('417') || e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
+          _status = GroupLoadStatus.loaded; // Hata değil, sadece veri yok
+          _safeNotifyListeners();
+          return []; // Boş liste dön
+        }
+        rethrow; // Diğer hataları yeniden fırlat
+      }
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();

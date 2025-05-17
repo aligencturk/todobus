@@ -39,7 +39,21 @@ class _EventsViewState extends State<EventsView> {
     });
   }
   
+  @override
+  void dispose() {
+    // Sayfadan çıkarken ViewModel'i temizle
+    try {
+      final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
+      eventViewModel.reset();
+    } catch (e) {
+      _logger.e('EventsView dispose sırasında hata: $e');
+    }
+    super.dispose();
+  }
+  
   Future<void> _loadEvents() async {
+    if (!mounted) return;
+    
     setState(() => _isLoading = true);
     try {
       final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
@@ -50,6 +64,9 @@ class _EventsViewState extends State<EventsView> {
       } else if (_selectedEventType == 2) {
         await eventViewModel.loadEvents(groupID: 1);
       }
+      
+      if (!mounted) return;
+      
       _logger.i('Etkinlikler başarıyla yüklendi');
       _organizeEventsByDay();
     } catch (e) {
@@ -60,6 +77,8 @@ class _EventsViewState extends State<EventsView> {
   }
   
   void _organizeEventsByDay() {
+    if (!mounted) return;
+    
     _eventsByDay = {};
     final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
     List<Event> events;
@@ -214,10 +233,15 @@ class _EventsViewState extends State<EventsView> {
   }
   
   Future<void> _deleteEvent(Event event) async {
+    if (!mounted) return;
+    
     setState(() => _isLoading = true);
     try {
       final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
       final success = await eventViewModel.deleteEvent(event.eventID, groupID: widget.groupID);
+      
+      if (!mounted) return;
+      
       if (success) {
         _loadEvents();
         _showSnackBar('Etkinlik başarıyla silindi.');
@@ -226,13 +250,15 @@ class _EventsViewState extends State<EventsView> {
       }
     } catch (e) {
       _logger.e('Etkinlik silinirken hata: $e');
-      _showSnackBar('Etkinlik silinirken bir hata oluştu.');
+      if (mounted) _showSnackBar('Etkinlik silinirken bir hata oluştu.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
   
   void _showSnackBar(String message) {
+    if (!mounted) return;
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

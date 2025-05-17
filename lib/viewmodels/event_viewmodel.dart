@@ -225,4 +225,14 @@ class EventViewModel with ChangeNotifier {
       return eventDate;
     }
   }
+  
+  // ViewModel'i sıfırla
+  void reset() {
+    _status = EventLoadStatus.initial;
+    _errorMessage = '';
+    _events = [];
+    _companyEvents = [];
+    _selectedEvent = null;
+    _safeNotifyListeners();
+  }
 } 
