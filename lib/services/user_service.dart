@@ -123,20 +123,44 @@ class UserService {
         'userToken': token,
         'fcmToken': fcmToken,
         'platform': platform,
+        'deviceId': await _apiService.getDeviceId(), // Cihaz kimliği eklendi
       };
 
-      final response = await _apiService.put('service/user/update/fcmtoken', body: body);
-      
-      final success = response['success'] == true;
-      if (success) {
-        _logger.i('FCM token başarıyla kaydedildi');
-        _logger.i('Sunucu Yanıtı: $response');
-      } else {
-        _logger.w('FCM token kaydedilemedi: ${response['errorMessage']}');
-        _logger.w('Sunucu Yanıtı: $response');
+      try {
+        final response = await _apiService.put('service/user/update/fcmtoken', body: body);
+        
+        final success = response['success'] == true || response[410] == true; 
+        if (success) {
+          _logger.i('FCM token başarıyla kaydedildi');
+          _logger.i('Sunucu Yanıtı: $response');
+        } else {
+          _logger.w('FCM token kaydedilemedi: ${response['errorMessage'] ?? 'Bilinmeyen hata'}');
+          _logger.w('Sunucu Yanıtı: $response');
+        }
+        
+        return success;
+      } catch (apiError) {
+        _logger.e('FCM token API isteği başarısız: $apiError');
+        
+        // 3 saniye bekleyip tekrar dene
+        await Future.delayed(const Duration(seconds: 3));
+        try {
+          _logger.i('FCM token kaydı tekrar deneniyor...');
+          final response = await _apiService.put('service/user/update/fcmtoken', body: body);
+          final success = response['success'] == true;
+          
+          if (success) {
+            _logger.i('FCM token başarıyla kaydedildi (tekrar deneme)');
+          } else {
+            _logger.w('FCM token tekrar deneme başarısız: ${response['errorMessage'] ?? 'Bilinmeyen hata'}');
+          }
+          
+          return success;
+        } catch (retryError) {
+          _logger.e('FCM token tekrar deneme başarısız: $retryError');
+          return false;
+        }
       }
-      
-      return success;
     } catch (e) {
       _logger.e('FCM token kaydedilirken hata: $e');
       return false;
@@ -205,33 +229,4 @@ class UserService {
     }
   }
 
-  // Bildirimi okundu olarak işaretle
-  Future<bool> markNotificationAsRead(int notificationId) async {
-    try {
-      final token = await _storageService.getToken();
-      if (token == null) {
-        throw Exception('Oturum bilgisi bulunamadı');
-      }
-
-      final body = {
-        'userToken': token,
-        'notificationId': notificationId,
-      };
-
-      _logger.i('Bildirim okundu olarak işaretleniyor: $notificationId');
-      final response = await _apiService.put('service/user/account/notification/read', body: body);
-      
-      final success = response['success'] == true;
-      if (success) {
-        _logger.i('Bildirim başarıyla okundu olarak işaretlendi');
-      } else {
-        _logger.w('Bildirim okundu olarak işaretlenemedi: ${response['errorMessage']}');
-      }
-      
-      return success;
-    } catch (e) {
-      _logger.e('Bildirim okundu olarak işaretlenirken hata: $e');
-      return false;
-    }
-  }
 } 

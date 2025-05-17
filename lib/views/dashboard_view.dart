@@ -8,6 +8,7 @@ import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import '../services/snackbar_service.dart';
 import '../services/user_service.dart';
+import '../services/notification_service.dart';
 import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import '../viewmodels/event_viewmodel.dart';
@@ -19,6 +20,7 @@ import 'group_detail_view.dart';
 import 'project_detail_view.dart';
 import 'work_detail_view.dart';
 import 'event_detail_view.dart';
+import 'notifications_view.dart';
 
 class DashboardView extends StatefulWidget {
   const DashboardView({Key? key}) : super(key: key);
@@ -32,10 +34,11 @@ class _DashboardViewState extends State<DashboardView> {
   final LoggerService _logger = LoggerService();
   final SnackBarService _snackBarService = SnackBarService();
   final UserService _userService = UserService();
+  final NotificationService _notificationService = NotificationService.instance;
   
   List<GroupLog> _recentLogs = [];
   bool _isLoadingLogs = false;
-  
+  int _unreadNotifications = 0;
   
   List<ProjectPreviewItem> _userProjects = [];
 
@@ -50,6 +53,9 @@ class _DashboardViewState extends State<DashboardView> {
         final profileViewModel = Provider.of<ProfileViewModel>(context, listen: false);
         final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
         
+        // Bildirimleri kontrol et
+        await _checkNotifications();
+        
         // Önce kullanıcı bilgilerini yükle
         try {
           _logger.i('Kullanıcı bilgileri yükleniyor...');
@@ -57,6 +63,12 @@ class _DashboardViewState extends State<DashboardView> {
           if (userResponse.success && userResponse.data != null) {
             profileViewModel.setUser(userResponse.data!.user);
             _logger.i('Kullanıcı bilgileri başarıyla yüklendi');
+            
+            // Kullanıcıyı kendi ID'sine göre FCM topic'ine abone et
+            final user = userResponse.data!.user;
+            await _notificationService.subscribeToUserTopic(user.userID);
+            _logger.i('Kullanıcı FCM topic\'ine abone edildi: ${user.userID}');
+            
           } else {
             _logger.e('Kullanıcı bilgileri yüklenemedi: ${userResponse.errorMessage}');
           }
@@ -79,9 +91,22 @@ class _DashboardViewState extends State<DashboardView> {
         await groupViewModel.loadGroups();
         
         if (mounted) {
-          _loadRecentLogs(groupViewModel);
           _loadUserProjects(groupViewModel);
           _logger.i('Gruplar yüklendi, loglar ve projeler istendi');
+          
+          // Kullanıcının gruplarına FCM topic olarak abone olmasını sağla
+          if (profileViewModel.user != null) {
+            final groups = groupViewModel.groups;
+            final groupIds = groups.map((group) => group.groupID).toList();
+            
+            // Kullanıcıyı hem kendi ID'sine hem de grup ID'lerine abone et
+            await _notificationService.subscribeUserToRequiredTopics(
+              profileViewModel.user!.userID, 
+              groupIds
+            );
+            
+            _logger.i('Kullanıcı FCM topics\'lerine abone edildi: ${groupIds.join(", ")}');
+          }
           
           // Yüklenen verilerle UI'ı güncelle
           setState(() {});
@@ -90,6 +115,16 @@ class _DashboardViewState extends State<DashboardView> {
         _logger.i('Dashboard açıldı: Veriler yükleniyor...');
       }
     });
+  }
+  
+  // Bildirimleri kontrol et
+  Future<void> _checkNotifications() async {
+    await _notificationService.fetchNotifications();
+    if (mounted) {
+      setState(() {
+        _unreadNotifications = _notificationService.unreadCount;
+      });
+    }
   }
   
   // Verileri yenileme 
@@ -112,7 +147,6 @@ class _DashboardViewState extends State<DashboardView> {
     
     // Son olarak projeleri ve logları yükle
     if (mounted) {
-      await _loadRecentLogs(groupViewModel);
       _loadUserProjects(groupViewModel);
       setState(() {}); // UI'ı güncelle
     }
@@ -156,9 +190,41 @@ class _DashboardViewState extends State<DashboardView> {
         material: (_, __) => MaterialAppBarData(
           actions: <Widget>[
             IconButton(
-              icon: const Icon(Icons.search),
+              icon: Stack(
+                children: [
+                  const Icon(Icons.notifications),
+                  if (_unreadNotifications > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 12,
+                          minHeight: 12,
+                        ),
+                        child: Text(
+                          _unreadNotifications > 9 ? '9+' : _unreadNotifications.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               onPressed: () {
-                // Arama işlevi
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const NotificationsView(),
+                  ),
+                ).then((_) => _checkNotifications());
               },
             ),
             IconButton(
@@ -175,9 +241,41 @@ class _DashboardViewState extends State<DashboardView> {
             children: [
               CupertinoButton(
                 padding: EdgeInsets.zero,
-                child: const Icon(CupertinoIcons.search, size: 24),
+                child: Stack(
+                  children: [
+                    const Icon(CupertinoIcons.bell, size: 24),
+                    if (_unreadNotifications > 0)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(1),
+                          decoration: BoxDecoration(
+                            color: CupertinoColors.destructiveRed,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 12,
+                            minHeight: 12,
+                          ),
+                          child: Text(
+                            _unreadNotifications > 9 ? '9+' : _unreadNotifications.toString(),
+                            style: const TextStyle(
+                              color: CupertinoColors.white,
+                              fontSize: 8,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 onPressed: () {
-                  // Arama işlevi
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (context) => const NotificationsView(),
+                    ),
+                  ).then((_) => _checkNotifications());
                 },
               ),
               const SizedBox(width: 8),
@@ -316,8 +414,6 @@ class _DashboardViewState extends State<DashboardView> {
             _buildSectionHeader('Görevlerim'),
             _buildMyTasksSection(),
             
-            _buildSectionHeader('Son Aktiviteler', onRefresh: () => _loadRecentLogs(groupViewModel)),
-            _buildRecentActivities(),
             
             const SliverToBoxAdapter(
               child: SizedBox(height: 40),
@@ -684,80 +780,7 @@ class _DashboardViewState extends State<DashboardView> {
       ),
     );
   }
-
-  Future<void> _loadRecentLogs(GroupViewModel groupViewModel) async {
-    if (_isLoadingLogs && _recentLogs.isNotEmpty) return;
-    
-    setState(() {
-      _isLoadingLogs = true;
-    });
-    
-    try {
-      _logger.i('Son aktiviteler yükleniyor...');
-      
-      try {
-        if (groupViewModel.groups.isEmpty) {
-          await groupViewModel.loadGroups();
-          if (groupViewModel.groups.isEmpty) {
-            if (mounted) setState(() => _isLoadingLogs = false);
-            return;
-          }
-        }
-        
-        int? targetGroupId;
-        final adminGroups = groupViewModel.groups.where((group) => group.isAdmin).toList();
-        if (adminGroups.isNotEmpty) {
-          targetGroupId = adminGroups.first.groupID;
-        } else {
-          final premiumGroups = groupViewModel.groups.where((group) => !group.isFree).toList();
-          if (premiumGroups.isNotEmpty) {
-            targetGroupId = premiumGroups.first.groupID;
-          } else if (groupViewModel.groups.isNotEmpty) {
-            targetGroupId = groupViewModel.groups.first.groupID;
-          }
-        }
-        
-        if (targetGroupId != null) {
-          final isAdmin = adminGroups.any((group) => group.groupID == targetGroupId);
-          final logs = await groupViewModel.getGroupReports(targetGroupId, isAdmin);
-          if (mounted) {
-            setState(() {
-              _recentLogs = logs;
-              _isLoadingLogs = false;
-            });
-            _logger.i('${logs.length} adet log başarıyla yüklendi');
-          }
-        } else {
-          if (mounted) {
-            _logger.i('Hiçbir grup bulunamadı (log için), boş liste gösteriliyor');
-            setState(() {
-               _recentLogs = [];
-              _isLoadingLogs = false;
-            });
-          }
-        }
-      } catch (e) {
-        // İç catch bloğu - hataları yakala ama kullanıcıya gösterme
-        _logger.e('Son aktiviteler yüklenirken hata: $e');
-        if (mounted) {
-          setState(() {
-            _recentLogs = [];
-            _isLoadingLogs = false;
-          });
-        }
-      }
-    } catch (e) {
-      // Ana catch bloğu - her türlü hatayı sessizce işle
-      _logger.e('Son aktiviteler işlenirken beklenmeyen hata: $e');
-      if (mounted) {
-        setState(() {
-          _recentLogs = [];
-          _isLoadingLogs = false;
-        });
-      }
-    }
-  }
-  
+ 
   Widget _buildLogItem(BuildContext context, GroupLog log) {
     final bool isIOS = Platform.isIOS;
     
@@ -945,38 +968,6 @@ class _DashboardViewState extends State<DashboardView> {
     );
   }
 
-  Widget _buildRecentActivities() {
-    final groupViewModel = Provider.of<GroupViewModel>(context);
-    
-    if (_isLoadingLogs && _recentLogs.isEmpty) {
-      return SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(30.0),
-          child: Center(child: CupertinoActivityIndicator()),
-        ),
-      );
-    }
-    
-    if (!_isLoadingLogs && _recentLogs.isEmpty) {
-      return SliverToBoxAdapter(
-        child: _buildEmptyState(
-          icon: CupertinoIcons.doc_text_search,
-          message: 'Henüz aktivite kaydı bulunmuyor.',
-          onRetry: () => _loadRecentLogs(groupViewModel),
-        ),
-      );
-    }
-    
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) => _buildLogItem(context, _recentLogs[index]),
-          childCount: _recentLogs.length > 5 ? 5 : _recentLogs.length,
-        ),
-      ),
-    );
-  }
 
   Widget _buildProjectsList(bool isLoadingOverall) {
         

@@ -50,17 +50,7 @@ class _NotificationsViewState extends State<NotificationsView> {
     }
   }
 
-  Future<void> _markAsRead(int notificationId) async {
-    try {
-      final success = await _notificationService.markAsRead(notificationId);
-      if (success) {
-        // Bildirimi okundu olarak işaretle ve bildirimleri yenile
-        await _loadNotifications();
-      }
-    } catch (e) {
-      _logger.e('Bildirim okundu olarak işaretlenirken hata: $e');
-    }
-  }
+
 
   String _formatDate(String dateStr) {
     try {
@@ -161,12 +151,7 @@ class _NotificationsViewState extends State<NotificationsView> {
               onTap: () {
                 // Bildirime tıklandığında yapılacak işlemler
                 _logger.i('Bildirime tıklandı: ${notification.id}');
-                
-                // Bildirimi okundu olarak işaretle
-                if (!notification.isRead) {
-                  _markAsRead(notification.id);
-                }
-                
+               
                 // Bildirim verilerine göre yönlendirme yapılabilir
                 if (notification.data != null && notification.data!.containsKey('screen')) {
                   _logger.i('Bildirim yönlendirmesi: ${notification.data!['screen']}');

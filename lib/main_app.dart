@@ -19,7 +19,6 @@ class MainApp extends StatefulWidget {
 
 class MainAppState extends State<MainApp> {
   int _currentIndex = 0;
-  int _unreadNotifications = 0;
   
   // Bu metodu dışarıdan çağrılabilir hale getiriyoruz
   void setCurrentIndex(int index) {
@@ -36,113 +35,9 @@ class MainAppState extends State<MainApp> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _checkNotifications();
-  }
-  
-  // Bildirimleri kontrol et
-  Future<void> _checkNotifications() async {
-    await NotificationService.instance.fetchNotifications();
-    setState(() {
-      _unreadNotifications = NotificationService.instance.unreadCount;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     return PlatformScaffold(
       body: _pages[_currentIndex],
-      material: (_, __) => MaterialScaffoldData(
-        // Material platform için ayarlar
-        appBar: _currentIndex == 0 ? AppBar(
-          title: const Text('TodoBus'),
-          actions: [
-            IconButton(
-              icon: Stack(
-                children: [
-                  const Icon(Icons.notifications),
-                  if (_unreadNotifications > 0)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(1),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 12,
-                          minHeight: 12,
-                        ),
-                        child: Text(
-                          _unreadNotifications > 9 ? '9+' : _unreadNotifications.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const NotificationsView(),
-                  ),
-                ).then((_) => _checkNotifications());
-              },
-            ),
-          ],
-        ) : null,
-      ),
-      cupertino: (_, __) => CupertinoPageScaffoldData(
-        // iOS platform için ayarlar
-        navigationBar: _currentIndex == 0 ? CupertinoNavigationBar(
-          middle: const Text('TodoBus'),
-          trailing: GestureDetector(
-            onTap: () {
-              Navigator.of(context).push(
-                CupertinoPageRoute(
-                  builder: (context) => const NotificationsView(),
-                ),
-              ).then((_) => _checkNotifications());
-            },
-            child: Stack(
-              children: [
-                const Icon(CupertinoIcons.bell),
-                if (_unreadNotifications > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(1),
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.destructiveRed,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      constraints: const BoxConstraints(
-                        minWidth: 12,
-                        minHeight: 12,
-                      ),
-                      child: Text(
-                        _unreadNotifications > 9 ? '9+' : _unreadNotifications.toString(),
-                        style: const TextStyle(
-                          color: CupertinoColors.white,
-                          fontSize: 8,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ) : null,
-      ),
       bottomNavBar: PlatformNavBar(
         currentIndex: _currentIndex,
         itemChanged: (int index) {

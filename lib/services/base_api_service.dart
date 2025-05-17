@@ -40,6 +40,11 @@ class BaseApiService {
     return _deviceInfoService.getAppVersion();
   }
 
+  // Cihaz kimliğini al
+  Future<String> getDeviceId() async {
+    return await _deviceInfoService.getDeviceId();
+  }
+
   // HTTP başlıklarını oluştur
   Map<String, String> getHeaders({bool withToken = false}) {
     final headers = <String, String>{

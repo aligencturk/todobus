@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:http/http.dart' as http;
 import '../firebase_options.dart';
 import 'user_service.dart';
 import 'logger_service.dart';
@@ -16,6 +18,11 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   final UserService _userService = UserService();
   final LoggerService _logger = LoggerService();
+  
+  // FCM API için gerekli bilgiler
+  static const String _fcmApiUrl = 'https://fcm.googleapis.com/v1/projects/todobus-3fc9b/messages:send';
+  static const String _fcmLegacyApiUrl = 'https://fcm.googleapis.com/fcm/send';
+  String? _fcmServerKey; // FCM server key
   
   String? _fcmToken;
   String? get fcmToken => _fcmToken;
@@ -83,13 +90,27 @@ class NotificationService {
     
     // Token'ı sunucuya gönder
     if (_fcmToken != null) {
-      await _userService.updateFcmToken(_fcmToken!).then((success) {
-        if (success) {
+      try {
+        bool tokenSent = await _userService.updateFcmToken(_fcmToken!);
+        if (tokenSent) {
           _logger.i('FCM Token sunucuya başarıyla gönderildi: $_fcmToken');
         } else {
-          _logger.w('FCM Token sunucuya gönderilemedi!');
+          _logger.w('FCM Token sunucuya gönderilemedi! 5 saniye sonra tekrar denenecek.');
+          // Bir süre bekledikten sonra tekrar deneyelim
+          await Future.delayed(const Duration(seconds: 5));
+          tokenSent = await _userService.updateFcmToken(_fcmToken!);
+          
+          if (tokenSent) {
+            _logger.i('FCM Token sunucuya başarıyla gönderildi (ikinci deneme): $_fcmToken');
+          } else {
+            _logger.w('FCM Token sunucuya ikinci denemede de gönderilemedi!');
+          }
         }
-      });
+      } catch (e) {
+        _logger.e('FCM Token gönderilirken beklenmeyen hata: $e');
+      }
+    } else {
+      _logger.w('FCM Token alınamadı, sunucuya gönderilemiyor!');
     }
     
     // Token yenilendiğinde olayı dinle
@@ -101,13 +122,27 @@ class NotificationService {
       
       // Yeni token'ı sunucuya gönder
       if (_fcmToken != null) {
-        await _userService.updateFcmToken(_fcmToken!).then((success) {
-          if (success) {
+        try {
+          bool tokenSent = await _userService.updateFcmToken(_fcmToken!);
+          if (tokenSent) {
             _logger.i('Yenilenen FCM Token sunucuya gönderildi.');
           } else {
-            _logger.w('Yenilenen FCM Token sunucuya gönderilemedi!');
+            _logger.w('Yenilenen FCM Token sunucuya gönderilemedi! 5 saniye sonra tekrar denenecek.');
+            // Bir süre bekledikten sonra tekrar deneyelim
+            await Future.delayed(const Duration(seconds: 5));
+            tokenSent = await _userService.updateFcmToken(_fcmToken!);
+            
+            if (tokenSent) {
+              _logger.i('Yenilenen FCM Token sunucuya başarıyla gönderildi (ikinci deneme).');
+            } else {
+              _logger.w('Yenilenen FCM Token sunucuya ikinci denemede de gönderilemedi!');
+            }
           }
-        });
+        } catch (e) {
+          _logger.e('Yenilenen FCM Token gönderilirken beklenmeyen hata: $e');
+        }
+      } else {
+        _logger.w('Yenilenen FCM Token alınamadı, sunucuya gönderilemiyor!');
       }
     });
     
@@ -289,28 +324,41 @@ class NotificationService {
         return _notifications;
       } else {
         _logger.w('Bildirimler alınamadı: ${response.errorMessage}');
-        return null;
+        
+        // 3 saniye bekleyip tekrar deneyelim
+        await Future.delayed(const Duration(seconds: 3));
+        try {
+          _logger.i('Bildirimler tekrar yükleniyor...');
+          final retryResponse = await _userService.getNotifications();
+          
+          if (retryResponse.success && retryResponse.notifications != null) {
+            _notifications = retryResponse.notifications;
+            _unreadCount = retryResponse.unreadCount ?? 0;
+            _logger.i('Bildirimler ikinci denemede başarıyla alındı: ${_notifications?.length} bildirim');
+            return _notifications;
+          } else {
+            _logger.w('Bildirimler ikinci denemede de alınamadı: ${retryResponse.errorMessage}');
+            return null;
+          }
+        } catch (retryError) {
+          _logger.e('Bildirimleri tekrar yüklerken hata: $retryError');
+          return null;
+        }
       }
     } catch (e) {
       _logger.e('Bildirimler yüklenirken hata: $e');
+      
+      // Önceki bildirimleri kullan (varsa) - çevrimdışı erişimi desteklemek için
+      if (_notifications != null && _notifications!.isNotEmpty) {
+        _logger.i('Önbellekteki bildirimler kullanılıyor (${_notifications!.length} bildirim)');
+        return _notifications;
+      }
+      
       return null;
     }
   }
   
-  // Bildirimi okundu olarak işaretle
-  Future<bool> markAsRead(int notificationId) async {
-    try {
-      final success = await _userService.markNotificationAsRead(notificationId);
-      if (success) {
-        // Başarıyla işaretlendiyse, bildirimleri güncelle
-        await fetchNotifications();
-      }
-      return success;
-    } catch (e) {
-      _logger.e('Bildirim okundu olarak işaretlenirken hata: $e');
-      return false;
-    }
-  }
+
   
   // FCM Token bilgilerini yazdır (debug ve test için)
   void printFcmTokenInfo() {
@@ -325,5 +373,206 @@ class NotificationService {
   String? getFcmToken() {
     printFcmTokenInfo();
     return _fcmToken;
+  }
+  
+  // FCM kullanarak konuya bildirim gönder
+  Future<bool> sendPushNotification({
+    required String topic, 
+    required String title, 
+    required String body,
+    Map<String, dynamic>? data
+  }) async {
+    try {
+      _logger.i('FCM Bildirimi gönderiliyor - Topic: $topic, Başlık: $title');
+      
+      // FCM HTTP v1 API için server key gerekli (Firebase Console'dan alınabilir)
+      if (_fcmServerKey == null || _fcmServerKey!.isEmpty) {
+        _logger.e('FCM Server key bulunamadı');
+        return false;
+      }
+      
+      // API için payload oluştur - kullanıcı örneğindeki JSON formatına benzer
+      final Map<String, dynamic> payload = {
+        'message': {
+          'topic': topic,
+          'notification': {
+            'title': title,
+            'body': body
+          }
+        }
+      };
+      
+      // Eğer data kısmı varsa ekle
+      if (data != null && data.isNotEmpty) {
+        // String formatında JSON olarak gönderilmesi gerekiyor
+        payload['message']['data'] = {
+          'keysandvalues': jsonEncode(data)
+        };
+      }
+      
+      // FCM API'ye POST isteği gönder
+      final response = await http.post(
+        Uri.parse(_fcmApiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_fcmServerKey',
+        },
+        body: jsonEncode(payload),
+      );
+      
+      if (response.statusCode == 200) {
+        _logger.i('Bildirim başarıyla gönderildi: ${response.body}');
+        return true;
+      } else {
+        _logger.e('Bildirim gönderilemedi: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Bildirim gönderilirken hata: $e');
+      return false;
+    }
+  }
+  
+  // Kullanıcıları bir konuya abone et
+  Future<bool> subscribeUserToTopic(String topic) async {
+    try {
+      await _firebaseMessaging.subscribeToTopic(topic);
+      _logger.i('Kullanıcı "$topic" konusuna abone edildi');
+      return true;
+    } catch (e) {
+      _logger.e('Konuya abone olunurken hata: $e');
+      return false;
+    }
+  }
+  
+  // Legacy FCM API kullanarak bildirim gönderme (daha basit)
+  Future<bool> sendPushNotificationLegacy({
+    required String topic, 
+    required String title, 
+    required String body,
+    Map<String, dynamic>? data
+  }) async {
+    try {
+      _logger.i('FCM Bildirimi gönderiliyor (Legacy API) - Topic: $topic, Başlık: $title');
+      
+      if (_fcmServerKey == null || _fcmServerKey!.isEmpty) {
+        _logger.e('FCM Server key bulunamadı');
+        return false;
+      }
+      
+      // Legacy API için daha basit payload
+      final Map<String, dynamic> payload = {
+        'to': '/topics/$topic',
+        'notification': {
+          'title': title,
+          'body': body,
+          'sound': 'default'
+        },
+      };
+      
+      // Eğer data varsa ekle
+      if (data != null && data.isNotEmpty) {
+        payload['data'] = data;
+      }
+      
+      // FCM Legacy API'ye POST isteği
+      final response = await http.post(
+        Uri.parse(_fcmLegacyApiUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'key=$_fcmServerKey',
+        },
+        body: jsonEncode(payload),
+      );
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData['success'] == 1) {
+          _logger.i('Bildirim başarıyla gönderildi: ${response.body}');
+          return true;
+        } else {
+          _logger.w('Bildirim gönderildi ama başarısız olabilir: ${response.body}');
+          return false;
+        }
+      } else {
+        _logger.e('Bildirim gönderilemedi: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Bildirim gönderilirken hata: $e');
+      return false;
+    }
+  }
+  
+  // Yardımcı metodları Legacy API'ye güncelle
+  
+  // Proje atama bildirimi
+  Future<bool> sendProjectAssignedNotification({
+    required String topic, 
+    required String userName,
+    required String projectName,
+    required int projectId
+  }) async {
+    return sendPushNotificationLegacy(
+      topic: topic,
+      title: 'Yeni Proje!',
+      body: '$userName sizi $projectName isimli projeye ekledi.',
+      data: {
+        'type': 'project_assigned',
+        'id': projectId.toString() // FCM data sadece string değerlerini destekler
+      }
+    );
+  }
+  
+  // Görev atama bildirimi
+  Future<bool> sendTaskAssignedNotification({
+    required String topic, 
+    required String userName,
+    required String taskName,
+    required int taskId,
+    required int projectId
+  }) async {
+    return sendPushNotificationLegacy(
+      topic: topic,
+      title: 'Yeni Görev!',
+      body: '$userName size "$taskName" görevini atadı.',
+      data: {
+        'type': 'task_assigned',
+        'task_id': taskId.toString(),
+        'project_id': projectId.toString()
+      }
+    );
+  }
+  
+  // FCM server key ayarla
+  void setFcmServerKey(String key) {
+    _fcmServerKey = key;
+    _logger.i('FCM Server key ayarlandı');
+  }
+  
+  // Kullanıcıyı kendi ID'sine göre FCM topic'ine abone et
+  Future<bool> subscribeToUserTopic(int userId) async {
+    try {
+      final userIdStr = userId.toString();
+      await _firebaseMessaging.subscribeToTopic(userIdStr);
+      _logger.i('Kullanıcı kendi ID\'sine ($userIdStr) abone edildi');
+      return true;
+    } catch (e) {
+      _logger.e('Kullanıcı topic aboneliği başarısız: $e');
+      return false;
+    }
+  }
+  
+  // Kullanıcıyı hızlıca gerekli tüm topic'lere abone et
+  Future<void> subscribeUserToRequiredTopics(int userId, List<int> groupIds) async {
+    // Kullanıcı ID'sine abone et
+    await subscribeToUserTopic(userId);
+    _logger.i('Kullanıcı kendi ID\'sine abone edildi: $userId');
+    
+    // Kullanıcının gruplarına abone et
+    for (final groupId in groupIds) {
+      await subscribeUserToTopic(groupId.toString());
+      _logger.i('Kullanıcı grup ID\'sine abone edildi: $groupId');
+    }
   }
 } 

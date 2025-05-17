@@ -54,6 +54,10 @@ void main() async {
     await NotificationService.instance.init();
     logger.i('Bildirim servisi başarıyla başlatıldı');
     
+    // FCM server key ayarla (Firebase Console'dan alınmalı)
+    // NOT: Gerçek projelerde bu değer güvenli bir şekilde saklanmalıdır
+    NotificationService.instance.setFcmServerKey('YOUR_FCM_SERVER_KEY');
+    
     // FCM token bilgilerini debug konsoluna yazdır
     NotificationService.instance.printFcmTokenInfo();
   } catch (e) {

@@ -1,7 +1,10 @@
 import '../models/group_models.dart';
 import '../services/logger_service.dart';
 import '../services/storage_service.dart';
+import '../services/notification_service.dart';
 import 'base_api_service.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class GroupService {
   static final GroupService _instance = GroupService._internal();
@@ -288,5 +291,79 @@ class GroupService {
       _logger.e('Grup raporları alınırken hata: $e');
       return []; // Exception atmak yerine boş liste dön
     }
+  }
+
+  // Kullanıcıyı projeye ekle
+  Future<bool> addUserToProject({
+    required int groupId,
+    required int projectId,
+    required String userEmail,
+  }) async {
+    try {
+      _logger.i('Kullanıcı projeye ekleniyor: GroupID: $groupId, ProjectID: $projectId, Email: $userEmail');
+      
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Kullanıcı token bilgisi bulunamadı');
+      }
+      
+      final response = await _apiService.put(
+        'service/user/project/addmember',
+        body: {
+          'userToken': token,
+          'groupID': groupId,
+          'projectID': projectId,
+          'userEmail': userEmail,
+        },
+        requiresToken: true,
+      );
+      
+      if (response['success'] == true) {
+        _logger.i('Kullanıcı projeye başarıyla eklendi');
+        return true;
+      } else {
+        final errorMsg = response['errorMessage'] ?? 'Bilinmeyen hata';
+        _logger.e('Kullanıcı projeye eklenemedi: $errorMsg');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Kullanıcı projeye eklenirken hata: $e');
+      return false;
+    }
+  }
+
+  // Kullanıcıyı projeye ekle ve bildirim gönder
+  Future<bool> addUserToProjectWithNotification({
+    required int groupId,
+    required int projectId,
+    required String projectName,
+    required String userEmail,
+    required String currentUserName,
+  }) async {
+    final result = await addUserToProject(
+      groupId: groupId,
+      projectId: projectId,
+      userEmail: userEmail
+    );
+    
+    if (result) {
+      // Bildirim gönder
+      final notificationService = NotificationService.instance;
+      
+      // Konu olarak grup ID'sini kullan (grup ID'ye abone olanlar bildirim alacak)
+      final topic = groupId.toString();
+      
+      // Bildirimi gönder
+      await notificationService.sendProjectAssignedNotification(
+        topic: topic,
+        userName: currentUserName,
+        projectName: projectName,
+        projectId: projectId
+      );
+      
+      return true;
+    }
+    
+    return false;
   }
 } 
