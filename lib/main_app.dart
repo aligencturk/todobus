@@ -59,15 +59,7 @@ class MainAppState extends State<MainApp> {
             label: 'Gruplar',
           ),
           BottomNavigationBarItem(
-            icon: PlatformIconButton(
-              padding: EdgeInsets.zero,
-              material: (_, __) => MaterialIconButtonData(
-                icon: Icon(Icons.calendar_today),
-              ),
-              cupertino: (_, __) => CupertinoIconButtonData(
-                icon: Icon(CupertinoIcons.calendar),
-              ),
-            ),
+            icon: Icon(context.platformIcon(material: Icons.calendar_month, cupertino: CupertinoIcons.calendar)),
             label: 'Etkinlikler',
           ),
           BottomNavigationBarItem(

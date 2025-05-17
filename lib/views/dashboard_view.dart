@@ -786,48 +786,60 @@ class _DashboardViewState extends State<DashboardView> {
     try {
       _logger.i('Son aktiviteler yükleniyor...');
       
-      if (groupViewModel.groups.isEmpty) {
-        await groupViewModel.loadGroups();
+      try {
         if (groupViewModel.groups.isEmpty) {
-          if (mounted) setState(() => _isLoadingLogs = false);
-          return;
+          await groupViewModel.loadGroups();
+          if (groupViewModel.groups.isEmpty) {
+            if (mounted) setState(() => _isLoadingLogs = false);
+            return;
+          }
         }
-      }
-      
-      int? targetGroupId;
-      final adminGroups = groupViewModel.groups.where((group) => group.isAdmin).toList();
-      if (adminGroups.isNotEmpty) {
-        targetGroupId = adminGroups.first.groupID;
-      } else {
-        final premiumGroups = groupViewModel.groups.where((group) => !group.isFree).toList();
-        if (premiumGroups.isNotEmpty) {
-          targetGroupId = premiumGroups.first.groupID;
-        } else if (groupViewModel.groups.isNotEmpty) {
-          targetGroupId = groupViewModel.groups.first.groupID;
+        
+        int? targetGroupId;
+        final adminGroups = groupViewModel.groups.where((group) => group.isAdmin).toList();
+        if (adminGroups.isNotEmpty) {
+          targetGroupId = adminGroups.first.groupID;
+        } else {
+          final premiumGroups = groupViewModel.groups.where((group) => !group.isFree).toList();
+          if (premiumGroups.isNotEmpty) {
+            targetGroupId = premiumGroups.first.groupID;
+          } else if (groupViewModel.groups.isNotEmpty) {
+            targetGroupId = groupViewModel.groups.first.groupID;
+          }
         }
-      }
-      
-      if (targetGroupId != null) {
-        final isAdmin = adminGroups.any((group) => group.groupID == targetGroupId);
-        final logs = await groupViewModel.getGroupReports(targetGroupId, isAdmin);
+        
+        if (targetGroupId != null) {
+          final isAdmin = adminGroups.any((group) => group.groupID == targetGroupId);
+          final logs = await groupViewModel.getGroupReports(targetGroupId, isAdmin);
+          if (mounted) {
+            setState(() {
+              _recentLogs = logs;
+              _isLoadingLogs = false;
+            });
+            _logger.i('${logs.length} adet log başarıyla yüklendi');
+          }
+        } else {
+          if (mounted) {
+            _logger.i('Hiçbir grup bulunamadı (log için), boş liste gösteriliyor');
+            setState(() {
+               _recentLogs = [];
+              _isLoadingLogs = false;
+            });
+          }
+        }
+      } catch (e) {
+        // İç catch bloğu - hataları yakala ama kullanıcıya gösterme
+        _logger.e('Son aktiviteler yüklenirken hata: $e');
         if (mounted) {
           setState(() {
-            _recentLogs = logs;
-            _isLoadingLogs = false;
-          });
-          _logger.i('${logs.length} adet log başarıyla yüklendi');
-        }
-      } else {
-        if (mounted) {
-          _logger.e('Hiçbir grup bulunamadı (log için)');
-          setState(() {
-             _recentLogs = [];
+            _recentLogs = [];
             _isLoadingLogs = false;
           });
         }
       }
     } catch (e) {
-      _logger.e('Son aktiviteler yüklenirken hata: $e');
+      // Ana catch bloğu - her türlü hatayı sessizce işle
+      _logger.e('Son aktiviteler işlenirken beklenmeyen hata: $e');
       if (mounted) {
         setState(() {
           _recentLogs = [];

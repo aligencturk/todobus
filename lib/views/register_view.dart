@@ -155,12 +155,20 @@ class _RegisterViewState extends State<RegisterView> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 // Ad alanı
-                                Text(
-                                  'Ad',
-                                  style: TextStyle(
-                                    color: const Color(0xFF34495E),
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide.none,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Ad',
+                                    style: TextStyle(
+                                      color: const Color(0xFF34495E),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.none,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -190,12 +198,20 @@ class _RegisterViewState extends State<RegisterView> {
                                 const SizedBox(height: 16),
                                 
                                 // Soyad alanı
-                                Text(
-                                  'Soyad',
-                                  style: TextStyle(
-                                    color: const Color(0xFF34495E),
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide.none,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Soyad',
+                                    style: TextStyle(
+                                      color: const Color(0xFF34495E),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.none,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -225,12 +241,20 @@ class _RegisterViewState extends State<RegisterView> {
                                 const SizedBox(height: 16),
                                 
                                 // E-posta alanı
-                                Text(
-                                  'E-posta',
-                                  style: TextStyle(
-                                    color: const Color(0xFF34495E),
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide.none,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'E-posta',
+                                    style: TextStyle(
+                                      color: const Color(0xFF34495E),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.none,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -260,12 +284,20 @@ class _RegisterViewState extends State<RegisterView> {
                                 const SizedBox(height: 16),
                                 
                                 // Telefon alanı
-                                Text(
-                                  'Telefon',
-                                  style: TextStyle(
-                                    color: const Color(0xFF34495E),
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide.none,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Telefon',
+                                    style: TextStyle(
+                                      color: const Color(0xFF34495E),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.none,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -299,12 +331,20 @@ class _RegisterViewState extends State<RegisterView> {
                                 const SizedBox(height: 16),
                                 
                                 // Şifre alanı
-                                Text(
-                                  'Şifre',
-                                  style: TextStyle(
-                                    color: const Color(0xFF34495E),
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                Container(
+                                  decoration: BoxDecoration(
+                                    border: Border(
+                                      bottom: BorderSide.none,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Şifre',
+                                    style: TextStyle(
+                                      color: const Color(0xFF34495E),
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.none,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -366,6 +406,7 @@ class _RegisterViewState extends State<RegisterView> {
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: const Color(0xFF7F8C8D),
+                                          decoration: TextDecoration.none,
                                         ),
                                       ),
                                     ),
@@ -393,6 +434,7 @@ class _RegisterViewState extends State<RegisterView> {
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: const Color(0xFF7F8C8D),
+                                          decoration: TextDecoration.none,
                                         ),
                                       ),
                                     ),
@@ -515,6 +557,7 @@ class _RegisterViewState extends State<RegisterView> {
                                             color: CupertinoColors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w600,
+                                            decoration: TextDecoration.none,
                                           ),
                                         ),
                                 ),
@@ -533,6 +576,7 @@ class _RegisterViewState extends State<RegisterView> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: const Color(0xFF7F8C8D),
+                                    decoration: TextDecoration.none,
                                   ),
                                 ),
                                 CupertinoButton(
@@ -546,6 +590,7 @@ class _RegisterViewState extends State<RegisterView> {
                                       fontSize: 14,
                                       color: const Color(0xFF3498DB),
                                       fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.none,
                                     ),
                                   ),
                                 ),

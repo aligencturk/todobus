@@ -509,7 +509,6 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 style: TextStyle(
                   fontWeight: isLink ? FontWeight.w500 : FontWeight.normal,
                   color: valueColor,
-                  decoration: isLink ? TextDecoration.underline : null,
                 ),
                 textAlign: TextAlign.right,
               ),
@@ -2219,9 +2218,11 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         });
       }
     } catch (e) {
+      // Hata durumunda sessizce boş liste göster, hata mesajı gösterme
+      _logger.e('Grup logları yüklenirken hata: $e'); // Sadece loga kaydet
       if (!_isDisposed && mounted) {
         _safeSetState(() {
-          _errorMessage = 'Grup etkinlikleri yüklenemedi: $e';
+          _groupLogs = []; // Boş liste olarak ayarla
           _isLoadingLogs = false;
         });
       }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'dart:ui';
 import 'package:provider/provider.dart';
 import '../viewmodels/login_viewmodel.dart';
 import '../main_app.dart';
@@ -63,12 +62,20 @@ class _LoginViewState extends State<LoginView> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   // E-posta alanı
-                                  Text(
-                                    'E-posta',
-                                    style: TextStyle(
-                                      color: const Color(0xFF34495E),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide.none,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'E-posta',
+                                      style: TextStyle(
+                                        color: const Color(0xFF34495E),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        decoration: TextDecoration.none,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -98,12 +105,20 @@ class _LoginViewState extends State<LoginView> {
                                   const SizedBox(height: 20),
                                   
                                   // Şifre alanı
-                                  Text(
-                                    'Şifre',
-                                    style: TextStyle(
-                                      color: const Color(0xFF34495E),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide.none,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Şifre',
+                                      style: TextStyle(
+                                        color: const Color(0xFF34495E),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        decoration: TextDecoration.none,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -154,7 +169,6 @@ class _LoginViewState extends State<LoginView> {
                                             value: true,
                                             activeColor: const Color(0xFF3498DB),
                                             onChanged: (bool value) {
-                                              // İşlem burada yapılacak
                                             },
                                           ),
                                         ),
@@ -165,6 +179,7 @@ class _LoginViewState extends State<LoginView> {
                                             fontSize: 14,
                                             color: const Color(0xFF7F8C8D),
                                             fontWeight: FontWeight.w500,
+                                            decoration: TextDecoration.none,
                                           ),
                                         ),
                                         const Spacer(),
@@ -184,6 +199,7 @@ class _LoginViewState extends State<LoginView> {
                                               fontSize: 14,
                                               color: const Color(0xFF3498DB),
                                               fontWeight: FontWeight.w500,
+                                              decoration: TextDecoration.none,
                                             ),
                                           ),
                                         ),
@@ -268,6 +284,7 @@ class _LoginViewState extends State<LoginView> {
                                             color: CupertinoColors.white,
                                             fontSize: 16,
                                             fontWeight: FontWeight.w600,
+                                            decoration: TextDecoration.none,
                                           ),
                                         ),
                                 ),
@@ -301,6 +318,7 @@ class _LoginViewState extends State<LoginView> {
                                       color: Color(0xFF3498DB),
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.none,
                                     ),
                                   ),
                                 ),
