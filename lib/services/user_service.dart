@@ -191,55 +191,114 @@ class UserService {
       throw Exception('Kullanıcı görevleri yüklenemedi: $e');
     }
   }
-Future<NotificationResponse> getNotifications() async {
-  try {
-    final token = await _storageService.getToken();
-    if (token == null) {
-      throw Exception('Oturum bilgisi bulunamadı');
-    }
 
-    // Kullanıcı ID'sini al
-    final userResponse = await getUser();
+  Future<NotificationResponse> getNotifications() async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
 
-    // Backend 410 dönerse veya kullanıcı yoksa logout et
-    if (!userResponse.success || userResponse.data == null) {
-      _logger.w('Kullanıcı bilgileri alınamadı, oturum sonlandırılıyor...');
+      // Kullanıcı ID'sini al
+      final userResponse = await getUser();
+
+      // Backend 410 dönerse veya kullanıcı yoksa logout et
+      if (!userResponse.success || userResponse.data == null) {
+        _logger.w('Kullanıcı bilgileri alınamadı, oturum sonlandırılıyor...');
+        return NotificationResponse(
+          success: false,
+          errorMessage: 'Kullanıcı oturumu sonlandı (410)',
+          notifications: [],
+        );
+      }
+
+      final userId = userResponse.data!.user.userID;
+
+      final body = {
+        'userToken': token,
+      };
+
+      _logger.i('Kullanıcı bildirimleri getiriliyor...');
+      final response = await _apiService.put(
+        'service/user/account/$userId/notifications',
+        body: body,
+      );
+
+      final notificationResponse = NotificationResponse.fromJson(response);
+
+      if (notificationResponse.success) {
+        _logger.i('Kullanıcı bildirimleri başarıyla getirildi: ${notificationResponse.notifications?.length ?? 0} bildirim');
+      } else {
+        _logger.w('Kullanıcı bildirimleri getirilemedi: ${notificationResponse.errorMessage}');
+      }
+
+      return notificationResponse;
+    } catch (e) {
+      _logger.e('Bildirimler yüklenirken hata: $e');
       return NotificationResponse(
         success: false,
-        errorMessage: 'Kullanıcı oturumu sonlandı (410)',
+        errorMessage: 'Bildirimler yüklenemedi: ${e.toString()}',
         notifications: [],
       );
     }
-
-    final userId = userResponse.data!.user.userID;
-
-    final body = {
-      'userToken': token,
-    };
-
-    _logger.i('Kullanıcı bildirimleri getiriliyor...');
-    final response = await _apiService.put(
-      'service/user/account/$userId/notifications',
-      body: body,
-    );
-
-    final notificationResponse = NotificationResponse.fromJson(response);
-
-    if (notificationResponse.success) {
-      _logger.i('Kullanıcı bildirimleri başarıyla getirildi: ${notificationResponse.notifications?.length ?? 0} bildirim');
-    } else {
-      _logger.w('Kullanıcı bildirimleri getirilemedi: ${notificationResponse.errorMessage}');
-    }
-
-    return notificationResponse;
-  } catch (e) {
-    _logger.e('Bildirimler yüklenirken hata: $e');
-    return NotificationResponse(
-      success: false,
-      errorMessage: 'Bildirimler yüklenemedi: ${e.toString()}',
-      notifications: [],
-    );
   }
-}
 
+  // Kullanıcı şifresini güncelle
+  Future<UserResponse> updatePassword({
+    required String currentPassword,
+    required String password,
+    required String passwordAgain,
+  }) async {
+    try {
+      final token = await _storageService.getToken();
+      if (token == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+
+      final body = {
+        'userToken': token,
+        'currentPassword': currentPassword,
+        'password': password,
+        'passwordAgain': passwordAgain,
+      };
+
+      _logger.i('Kullanıcı şifresi güncelleniyor...');
+      
+      try {
+        final response = await _apiService.put('service/user/update/password', body: body);
+        
+        final userResponse = UserResponse.fromJson(response);
+        if (userResponse.success) {
+          _logger.i('Kullanıcı şifresi başarıyla güncellendi');
+        } else {
+          // API tarafından döndürülen hata mesajlarını kontrol et
+          if (response.containsKey('errorMessage')) {
+            final errorMsg = response['errorMessage'];
+            _logger.w('Şifre güncellenirken API hatası: $errorMsg');
+          } else {
+            _logger.w('Şifre güncellenirken bilinmeyen bir hata oldu');
+          }
+        }
+        
+        return userResponse;
+      } catch (apiError) {
+        _logger.e('Şifre güncellenirken API hatası: $apiError');
+        
+        // Error mapping
+        String errorMessage = 'Şifre güncellenirken bir hata oluştu';
+        if (apiError.toString().contains('417')) {
+          errorMessage = 'Şifreniz en az 8 karakter, en az 1 sayı ve harf içermelidir.';
+        }
+        
+        return UserResponse(
+          error: true,
+          success: false, 
+          errorMessage: errorMessage
+        );
+      }
+    } catch (e) {
+      _logger.e('Kullanıcı şifresi güncellenirken hata: $e');
+      throw Exception('Kullanıcı şifresi güncellenemedi: $e');
+    }
+  }
 }

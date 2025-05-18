@@ -108,6 +108,17 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
+  // Şifre değiştirme ekranını aç
+  void _navigateToChangePasswordView() {
+    Navigator.push(
+      context,
+      platformPageRoute(
+        context: context,
+        builder: (context) => const ChangePasswordView(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ProfileViewModel>(
@@ -213,6 +224,13 @@ class _ProfileViewState extends State<ProfileView> {
               _buildListItem(context, 'Doğum Tarihi', user?.userBirthday ?? ""),
               _buildListItem(context, 'Telefon', user?.userPhone ?? ""),
               _buildListItem(context, 'Cinsiyet', _getGenderText(user?.userGender ?? "")),
+              _buildListItem(
+                context, 
+                'Şifre', 
+                '********', 
+                onTap: () => _navigateToChangePasswordView(),
+                isLink: false
+              ),
             ],
           ),
           
@@ -922,5 +940,361 @@ class _EditProfileViewState extends State<EditProfileView> {
         ),
       ),
     );
+  }
+}
+
+// Şifre Değiştirme Ekranı
+class ChangePasswordView extends StatefulWidget {
+  const ChangePasswordView({Key? key}) : super(key: key);
+
+  @override
+  _ChangePasswordViewState createState() => _ChangePasswordViewState();
+}
+
+class _ChangePasswordViewState extends State<ChangePasswordView> {
+  final LoggerService _logger = LoggerService();
+  final _formKey = GlobalKey<FormState>();
+  
+  final TextEditingController _currentPasswordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  
+  bool _isLoading = false;
+  String _errorMessage = '';
+  bool _obscureCurrentPassword = true;
+  bool _obscureNewPassword = true;
+  bool _obscureConfirmPassword = true;
+  
+  @override
+  void dispose() {
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+  
+  // Şifre değiştirme işlemi
+  Future<void> _updatePassword() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+    
+    try {
+      await context.read<ProfileViewModel>().updatePassword(
+        currentPassword: _currentPasswordController.text,
+        password: _newPasswordController.text,
+        passwordAgain: _confirmPasswordController.text,
+      );
+      
+      if (mounted) {
+        final viewModel = context.read<ProfileViewModel>();
+        if (viewModel.status == ProfileStatus.passwordChanged) {
+          // Başarı mesajını göster
+          _showSuccessDialog('Şifreniz başarıyla güncellendi');
+        } else {
+          setState(() {
+            _errorMessage = _formatErrorMessage(viewModel.errorMessage);
+          });
+        }
+      }
+    } catch (e) {
+      _logger.e('Şifre güncellenirken hata: $e');
+      setState(() {
+        _errorMessage = _formatErrorMessage(e.toString());
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  // Başarı mesajı diyalog olarak göster
+  void _showSuccessDialog(String message) {
+    showPlatformDialog(
+      context: context,
+      builder: (dialogContext) => PlatformAlertDialog(
+        title: const Text('Başarılı'),
+        content: Text(message),
+        actions: <Widget>[
+          PlatformDialogAction(
+            child: const Text('Tamam'),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              Navigator.of(context).pop(); // Ana sayfaya dön
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // API hata mesajını formatla ve kullanıcı dostu hale getir
+  String _formatErrorMessage(String error) {
+    // API'nin döndürdüğü özel hata mesajlarını kontrol et
+    if (error.contains('en az 8 karakter') || 
+        error.contains('en az 1 sayı') || 
+        error.contains('en az 1 harf')) {
+      return error;
+    }
+    
+    // Mevcut şifre hatası
+    if (error.contains('Mevcut şifreniz hatalı') || 
+        error.contains('current password') || 
+        error.contains('incorrect password')) {
+      return 'Mevcut şifreniz hatalı. Lütfen kontrol ediniz.';
+    }
+    
+    // Şifre eşleşmeme hatası
+    if (error.contains('Şifreler eşleşmiyor') || 
+        error.contains('passwordAgain') || 
+        error.contains('passwords do not match')) {
+      return 'Girdiğiniz yeni şifreler birbiriyle eşleşmiyor.';
+    }
+    
+    // Genel hata
+    return 'Şifre değiştirme işlemi sırasında bir hata oluştu. Lütfen tekrar deneyiniz.';
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return PlatformScaffold(
+      appBar: PlatformAppBar(
+        title: const Text('Şifre Değiştir'),
+        material: (_, __) => MaterialAppBarData(
+          actions: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.check),
+              onPressed: _isLoading ? null : _updatePassword,
+              tooltip: 'Kaydet',
+            ),
+          ],
+        ),
+        cupertino: (_, __) => CupertinoNavigationBarData(
+          transitionBetweenRoutes: false,
+          trailing: _isLoading 
+          ? const CupertinoActivityIndicator()
+          : CupertinoButton(
+              padding: EdgeInsets.zero,
+              child: const Text('Kaydet'),
+              onPressed: _updatePassword,
+            ),
+        ),
+      ),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              if (_errorMessage.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: platformThemeData(
+                      context,
+                      material: (data) => Colors.red.shade100,
+                      cupertino: (data) => CupertinoColors.systemRed.withOpacity(0.2),
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _errorMessage,
+                    style: TextStyle(
+                      color: platformThemeData(
+                        context,
+                        material: (data) => Colors.red,
+                        cupertino: (data) => CupertinoColors.systemRed,
+                      ),
+                    ),
+                  ),
+                ),
+              
+              _buildPasswordField(
+                context: context,
+                controller: _currentPasswordController,
+                label: 'Mevcut Şifre',
+                obscureText: _obscureCurrentPassword,
+                onToggleVisibility: () {
+                  setState(() {
+                    _obscureCurrentPassword = !_obscureCurrentPassword;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Mevcut şifrenizi girmelisiniz';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              _buildPasswordField(
+                context: context,
+                controller: _newPasswordController,
+                label: 'Yeni Şifre',
+                obscureText: _obscureNewPassword,
+                onToggleVisibility: () {
+                  setState(() {
+                    _obscureNewPassword = !_obscureNewPassword;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Yeni şifrenizi girmelisiniz';
+                  }
+                  if (value.length < 8) {
+                    return 'Şifre en az 8 karakter olmalıdır';
+                  }
+                  if (!RegExp(r'[0-9]').hasMatch(value)) {
+                    return 'Şifre en az 1 rakam içermelidir';
+                  }
+                  if (!RegExp(r'[a-zA-Z]').hasMatch(value)) {
+                    return 'Şifre en az 1 harf içermelidir';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              _buildPasswordField(
+                context: context,
+                controller: _confirmPasswordController,
+                label: 'Yeni Şifre (Tekrar)',
+                obscureText: _obscureConfirmPassword,
+                onToggleVisibility: () {
+                  setState(() {
+                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Şifrenizi tekrar girmelisiniz';
+                  }
+                  if (value != _newPasswordController.text) {
+                    return 'Şifreler eşleşmiyor';
+                  }
+                  return null;
+                },
+              ),
+              
+              const SizedBox(height: 32),
+              
+              if (_isLoading)
+                Center(child: PlatformCircularProgressIndicator())
+              else
+                PlatformElevatedButton(
+                  onPressed: _updatePassword,
+                  child: const Text('Şifreyi Güncelle'),
+                  material: (_, __) => MaterialElevatedButtonData(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                  cupertino: (_, __) => CupertinoElevatedButtonData(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Şifre alanı widget'ı
+  Widget _buildPasswordField({
+    required BuildContext context,
+    required TextEditingController controller,
+    required String label,
+    required bool obscureText,
+    required VoidCallback onToggleVisibility,
+    String? Function(String?)? validator,
+  }) {
+    return isCupertino(context)
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 8),
+                child: Text(
+                  label,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: CupertinoColors.systemGrey4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CupertinoTextField(
+                        controller: controller,
+                        obscureText: obscureText,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: const BoxDecoration(
+                          border: null,
+                        ),
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: onToggleVisibility,
+                      child: Icon(
+                        obscureText ? CupertinoIcons.eye : CupertinoIcons.eye_slash,
+                        color: CupertinoColors.systemGrey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (validator != null)
+                Builder(
+                  builder: (context) {
+                    final error = validator(controller.text);
+                    return error != null
+                        ? Padding(
+                            padding: const EdgeInsets.only(left: 4, top: 4),
+                            child: Text(
+                              error,
+                              style: const TextStyle(
+                                color: CupertinoColors.systemRed,
+                                fontSize: 12,
+                              ),
+                            ),
+                          )
+                        : const SizedBox.shrink();
+                  },
+                ),
+            ],
+          )
+        : TextFormField(
+            controller: controller,
+            obscureText: obscureText,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscureText ? Icons.visibility_off : Icons.visibility,
+                ),
+                onPressed: onToggleVisibility,
+              ),
+            ),
+            validator: validator,
+          );
   }
 } 

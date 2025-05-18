@@ -4,11 +4,9 @@ import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../services/logger_service.dart';
 import '../services/user_service.dart';
-import '../firebase_options.dart';
 import '../firebase_messaging_background.dart';
 
 /// Firebase bildirimlerini yönetecek servis sınıfı

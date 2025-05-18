@@ -6,7 +6,7 @@ import '../services/logger_service.dart';
 import '../services/device_info_service.dart';
 import '../services/refresh_service.dart';
 
-enum ProfileStatus { initial, loading, loaded, error, updating, updateSuccess, updateError }
+enum ProfileStatus { initial, loading, loaded, error, updating, updateSuccess, updateError, changingPassword, passwordChanged, passwordError }
 
 class ProfileViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -181,5 +181,72 @@ class ProfileViewModel with ChangeNotifier {
     _status = ProfileStatus.initial;
     _errorMessage = '';
     _safeNotifyListeners();
+  }
+
+  // Şifre değiştirme
+  Future<void> updatePassword({
+    required String currentPassword,
+    required String password,
+    required String passwordAgain,
+  }) async {
+    if (_status == ProfileStatus.changingPassword) return;
+
+    try {
+      _status = ProfileStatus.changingPassword;
+      _errorMessage = '';
+      _safeNotifyListeners();
+
+      _logger.i('Kullanıcı şifresi değiştiriliyor');
+      final response = await _apiService.user.updatePassword(
+        currentPassword: currentPassword,
+        password: password,
+        passwordAgain: passwordAgain,
+      );
+
+      if (response.success) {
+        _status = ProfileStatus.passwordChanged;
+        _logger.i('Kullanıcı şifresi başarıyla değiştirildi');
+      } else {
+        // API'den gelen hata mesajlarını daha anlaşılır hale getir
+        String errorMsg = response.errorMessage ?? 'Şifre değiştirirken bir hata oluştu';
+        
+        // API'den gelen hataları kullanıcı dostu mesajlara çevir
+        if (errorMsg.contains('417')) {
+          errorMsg = errorMsg.replaceFirst('417 - ', '');
+        } else if (errorMsg.contains('current password') || 
+                  errorMsg.contains('incorrect password')) {
+          errorMsg = 'Mevcut şifreniz hatalı. Lütfen kontrol ediniz.';
+        } else if (errorMsg.contains('passwordAgain') || 
+                  errorMsg.contains('password match')) {
+          errorMsg = 'Girdiğiniz yeni şifreler birbiriyle eşleşmiyor.';
+        }
+        
+        _errorMessage = errorMsg;
+        _status = ProfileStatus.passwordError;
+        _logger.w('Şifre değiştirme başarısız: $_errorMessage');
+      }
+    } catch (e) {
+      // Genel hata durumunu işle
+      _errorMessage = _formatErrorMessage(e.toString());
+      _status = ProfileStatus.passwordError;
+      _logger.e('Şifre değiştirme hatası:', e);
+    } finally {
+      _safeNotifyListeners();
+    }
+  }
+  
+  // Hata mesajını formatla
+  String _formatErrorMessage(String error) {
+    if (error.contains('SocketException') || 
+        error.contains('Connection refused') || 
+        error.contains('Network is unreachable')) {
+      return 'İnternet bağlantınızı kontrol ediniz ve tekrar deneyiniz.';
+    }
+    
+    if (error.contains('timed out')) {
+      return 'Sunucu yanıt vermedi. Lütfen daha sonra tekrar deneyiniz.';
+    }
+    
+    return 'Şifre değiştirme işlemi sırasında bir hata oluştu. Lütfen tekrar deneyiniz.';
   }
 } 
