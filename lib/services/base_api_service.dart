@@ -2,16 +2,21 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import '../services/logger_service.dart';
 import '../services/storage_service.dart';
 import '../services/device_info_service.dart';
+import '../views/login_view.dart';
 
 class BaseApiService {
   static final BaseApiService _instance = BaseApiService._internal();
   final LoggerService _logger = LoggerService();
   final StorageService _storageService = StorageService();
   final DeviceInfoService _deviceInfoService = DeviceInfoService();
+  
+  // Global navigasyon için key
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   // API ayarları
   static const String baseUrl = 'https://api.todobus.tr/';  // Gerçek URL eklenecek
@@ -63,6 +68,39 @@ class BaseApiService {
 
     return headers;
   }
+  
+  // 401 Hatasını Yönet ve Login sayfasına yönlendir
+  void _handle401Error() {
+    _logger.w('401 Yetkisiz erişim hatası - Oturum zaman aşımı');
+    
+    // Token temizle
+    
+    // Login sayfasına yönlendir
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.pushAndRemoveUntil(
+          CupertinoPageRoute(builder: (context) => const LoginView()),
+          (route) => false, // Tüm sayfaları temizle
+        );
+      }
+    });
+  }
+  
+  // Yanıt durumunu kontrol et
+  bool _checkResponseStatus(http.Response response) {
+    // 401 hatası varsa login sayfasına yönlendir
+    if (response.statusCode == 401) {
+      _handle401Error();
+      return false;
+    }
+    
+    // 410 Gone, bu API'de başarı yanıtı temsil ediyor
+    if (response.statusCode == 410 || response.statusCode == 200) {
+      return true;
+    }
+    
+    return false;
+  }
 
   // POST isteği yap
   Future<Map<String, dynamic>> post(
@@ -83,6 +121,11 @@ class BaseApiService {
         body: body != null ? jsonEncode(body) : null,
       );
 
+      if (response.statusCode == 401) {
+        _handle401Error();
+        throw Exception('Oturum süreniz dolmuş, giriş sayfasına yönlendiriliyorsunuz.');
+      }
+      
       // 410 Gone, bu API'de başarı yanıtı temsil ediyor
       if (response.statusCode == 410) {
         _logger.i('Başarılı yanıt alındı (410 Gone)');
@@ -127,6 +170,11 @@ class BaseApiService {
         headers: headers,
         body: body != null ? jsonEncode(body) : null,
       );
+      
+      if (response.statusCode == 401) {
+        _handle401Error();
+        throw Exception('Oturum süreniz dolmuş, giriş sayfasına yönlendiriliyorsunuz.');
+      }
 
       _logger.d('DELETE yanıt: ${response.statusCode} ${response.reasonPhrase}');
       _logger.d('DELETE yanıt body: ${response.body}');
@@ -191,6 +239,11 @@ class BaseApiService {
         url,
         headers: headers,
       );
+      
+      if (response.statusCode == 401) {
+        _handle401Error();
+        throw Exception('Oturum süreniz dolmuş, giriş sayfasına yönlendiriliyorsunuz.');
+      }
 
       // GET istekleri için 200 başarı durum kodudur
       if (response.statusCode == 200 || response.statusCode == 410) {
@@ -223,7 +276,7 @@ class BaseApiService {
     String endpoint, {
     Map<String, dynamic>? body,
     bool requiresToken = false,
-  }) async {
+  }) async {  
     final url = Uri.parse('$baseUrl$endpoint');
     final headers = getHeaders(withToken: requiresToken);
     
@@ -236,6 +289,11 @@ class BaseApiService {
         headers: headers,
         body: body != null ? jsonEncode(body) : null,
       );
+      
+      if (response.statusCode == 401) {
+        _handle401Error();
+        throw Exception('Oturum süreniz dolmuş, giriş sayfasına yönlendiriliyorsunuz.');
+      }
 
       // 410 Gone ve 200 OK, bu API'de başarı yanıtı temsil ediyor
       if (response.statusCode == 410 || response.statusCode == 200) {

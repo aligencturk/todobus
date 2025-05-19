@@ -15,6 +15,7 @@ import 'services/storage_service.dart';
 import 'services/device_info_service.dart';
 import 'services/firebase_messaging_service.dart';
 import 'services/notification_viewmodel.dart';
+import 'services/base_api_service.dart';
 import 'views/login_view.dart';
 import 'main_app.dart';
 import 'services/snackbar_service.dart';
@@ -122,6 +123,7 @@ class _MyAppState extends State<MyApp> {
               useMaterial3: true,
             ),
             scaffoldMessengerKey: SnackBarService.scaffoldMessengerKey,
+            navigatorKey: BaseApiService.navigatorKey,
             home: _isLoading
                 ? PlatformScaffold(
                     body: Center(
