@@ -444,8 +444,8 @@ class _ProfileViewState extends State<ProfileView> {
   // Cinsiyet değerini metne çevir
   String _getGenderText(String genderValue) {
     switch(genderValue) {
-      case "1": return "Erkek";
-      case "2": return "Kadın";
+      case "Erkek": return "Erkek";
+      case "Kadın": return "Kadın";
       default: return "Belirtilmemiş";
     }
   }
