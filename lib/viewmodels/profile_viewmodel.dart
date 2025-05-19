@@ -183,6 +183,60 @@ class ProfileViewModel with ChangeNotifier {
     _safeNotifyListeners();
   }
 
+  // Kullanıcı aktivasyon durumunu kontrol et
+  bool get isUserActivated => _user?.userStatus != 'not_activated';
+  
+  // Profil fotoğrafı güncelleme
+  Future<void> updateProfilePhoto(String base64Image) async {
+    if (_status == ProfileStatus.updating) return;
+    
+    try {
+      _status = ProfileStatus.updating;
+      _errorMessage = '';
+      _safeNotifyListeners();
+      
+      _logger.i('Profil fotoğrafı güncelleniyor');
+      
+      // Eğer kullanıcı bilgileri yoksa, önce yükle
+      if (_user == null) {
+        await loadUserProfile();
+        if (_user == null) {
+          throw Exception('Kullanıcı bilgileri yüklenemedi');
+        }
+      }
+      
+      // Mevcut kullanıcı bilgilerini kullan ve profil fotoğrafını güncelle
+      final response = await _apiService.user.updateUserProfile(
+        userFullname: _user!.userFullname,
+        userEmail: _user!.userEmail,
+        userBirthday: _user!.userBirthday,
+        userPhone: _user!.userPhone,
+        userGender: int.tryParse(_user!.userGender) ?? 0,
+        profilePhoto: base64Image,
+      );
+      
+      if (response.success) {
+        // Kullanıcı bilgilerini tekrar yükle
+        await loadUserProfile();
+        _status = ProfileStatus.updateSuccess;
+        // Tüm uygulamaya profil güncelleme bildirimi gönder
+        _refreshService.refreshProfile();
+        _refreshService.refreshAll();
+        _logger.i('Profil fotoğrafı başarıyla güncellendi');
+      } else {
+        _errorMessage = response.errorMessage ?? 'Profil fotoğrafı güncellenirken bir hata oluştu';
+        _status = ProfileStatus.updateError;
+        _logger.w('Profil fotoğrafı güncelleme başarısız: $_errorMessage');
+      }
+    } catch (e) {
+      _errorMessage = 'Güncelleme hatası: ${e.toString()}';
+      _status = ProfileStatus.updateError;
+      _logger.e('Profil fotoğrafı güncelleme hatası:', e);
+    } finally {
+      _safeNotifyListeners();
+    }
+  }
+
   // Şifre değiştirme
   Future<void> updatePassword({
     required String currentPassword,

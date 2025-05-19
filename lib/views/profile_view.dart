@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import '../viewmodels/profile_viewmodel.dart';
 import '../models/user_model.dart';
 import '../services/storage_service.dart';
@@ -19,11 +23,13 @@ class ProfileView extends StatefulWidget {
 class _ProfileViewState extends State<ProfileView> {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
+  final ImagePicker _imagePicker = ImagePicker();
   
   // Genişletilebilir panellerin durumlarını takip etmek için
   bool _isAccountSectionExpanded = false;
   bool _isHelpSectionExpanded = false;
   bool _isAppInfoSectionExpanded = false;
+  bool _isLoadingImage = false;
   
   @override
   void initState() {
@@ -115,6 +121,99 @@ class _ProfileViewState extends State<ProfileView> {
       platformPageRoute(
         context: context,
         builder: (context) => const ChangePasswordView(),
+      ),
+    );
+  }
+
+  // Profil fotoğrafı seçme
+  Future<void> _pickProfileImage() async {
+    try {
+      final XFile? pickedImage = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
+      
+      if (pickedImage == null) return;
+      
+      setState(() {
+        _isLoadingImage = true;
+      });
+      
+      // Resmi kırp
+      final croppedFile = await _cropImage(File(pickedImage.path));
+      if (croppedFile == null) {
+        setState(() {
+          _isLoadingImage = false;
+        });
+        return;
+      }
+      
+      // Dosyayı base64'e dönüştür
+      final bytes = await croppedFile.readAsBytes();
+      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      
+      // Profil fotoğrafını güncelle
+      final viewModel = context.read<ProfileViewModel>();
+      await viewModel.updateProfilePhoto(base64Image);
+      
+      setState(() {
+        _isLoadingImage = false;
+      });
+      
+      if (viewModel.status == ProfileStatus.updateError) {
+        _showErrorMessage(viewModel.errorMessage);
+      }
+    } catch (e) {
+      _logger.e('Profil fotoğrafı seçilirken hata: $e');
+      setState(() {
+        _isLoadingImage = false;
+      });
+      _showErrorMessage('Görsel seçilirken bir hata oluştu: ${e.toString()}');
+    }
+  }
+  
+  // Resmi kırpma
+  Future<File?> _cropImage(File imageFile) async {
+    try {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: imageFile.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 70,
+        compressFormat: ImageCompressFormat.jpg,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Profil Fotoğrafını Düzenle',
+            toolbarColor: Colors.blue,
+            toolbarWidgetColor: Colors.white,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: 'Profil Fotoğrafını Düzenle',
+            aspectRatioLockEnabled: true,
+          ),
+        ],
+      );
+      
+      return croppedFile != null ? File(croppedFile.path) : null;
+    } catch (e) {
+      _logger.e('Resim kırpılırken hata: $e');
+      return null;
+    }
+  }
+  
+  // Hata mesajı göster
+  void _showErrorMessage(String message) {
+    showPlatformDialog(
+      context: context,
+      builder: (context) => PlatformAlertDialog(
+        title: const Text('Hata'),
+        content: Text(message),
+        actions: <Widget>[
+          PlatformDialogAction(
+            child: const Text('Tamam'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
       ),
     );
   }
@@ -355,54 +454,92 @@ class _ProfileViewState extends State<ProfileView> {
     String profileImageUrl = user?.profilePhoto ?? '';
     bool hasProfileImage = profileImageUrl.isNotEmpty && profileImageUrl != 'null';
     
-    return Center(
-      child: Column(
-        children: [
+    return Column(
+      children: [
+        // Aktivasyon durumu uyarısı
+        if (user != null && user.userStatus == 'not_activated')
           Container(
-            width: 100,
-            height: 100,
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: hasProfileImage 
-                  ? null 
-                  : platformThemeData(
-                      context,
-                      material: (data) => Colors.blue.shade100,
-                      cupertino: (data) => CupertinoColors.activeBlue.withOpacity(0.2),
-                    ),
-              shape: BoxShape.circle,
-              image: hasProfileImage
-                  ? DecorationImage(
-                      image: NetworkImage(profileImageUrl),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
+              color: platformThemeData(
+                context,
+                material: (data) => Colors.orange.shade100,
+                cupertino: (data) => CupertinoColors.systemOrange.withOpacity(0.2),
+              ),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: !hasProfileImage 
-                ? Center(
-                    child: Icon(
-                      context.platformIcons.person,
-                      size: 50,
-                      color: platformThemeData(
-                        context,
-                        material: (data) => Colors.blue,
-                        cupertino: (data) => CupertinoColors.activeBlue,
-                      ),
+            child: Row(
+              children: [
+                Icon(
+                  isCupertino(context) ? CupertinoIcons.exclamationmark_triangle : Icons.warning_amber_outlined,
+                  color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Hesabınız henüz aktifleştirilmemiş. Lütfen e-posta adresinize gönderilen aktivasyon bağlantısını kullanın veya destek ekibiyle iletişime geçin.',
+                    style: TextStyle(
+                      color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange.shade800,
                     ),
-                  )
-                : null,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            user?.userFullname ?? 'Yükleniyor...',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.headlineSmall,
-              cupertino: (data) => data.textTheme.navLargeTitleTextStyle.copyWith(fontSize: 24),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
+        
+        Center(
+          child: Column(
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: hasProfileImage 
+                      ? null 
+                      : platformThemeData(
+                          context,
+                          material: (data) => Colors.blue.shade100,
+                          cupertino: (data) => CupertinoColors.activeBlue.withOpacity(0.2),
+                        ),
+                  shape: BoxShape.circle,
+                  image: hasProfileImage
+                      ? DecorationImage(
+                          image: NetworkImage(profileImageUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: !hasProfileImage 
+                    ? Center(
+                        child: Icon(
+                          context.platformIcons.person,
+                          size: 50,
+                          color: platformThemeData(
+                            context,
+                            material: (data) => Colors.blue,
+                            cupertino: (data) => CupertinoColors.activeBlue,
+                          ),
+                        ),
+                      )
+                    : null),
+         Text(
+                user?.userFullname ?? 'Yükleniyor...',
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.headlineSmall,
+                  cupertino: (data) => data.textTheme.navLargeTitleTextStyle.copyWith(fontSize: 24),
+                ),
+              ),
+       ] ),
+      
+      
+            
+      )  ],
+          );
+        
+      
+    
   }
   
   Widget _buildSectionHeader(BuildContext context, String title) {
@@ -578,6 +715,7 @@ class EditProfileView extends StatefulWidget {
 class _EditProfileViewState extends State<EditProfileView> {
   final LoggerService _logger = LoggerService();
   final _formKey = GlobalKey<FormState>();
+  final ImagePicker _imagePicker = ImagePicker();
   
   late TextEditingController _fullNameController;
   late TextEditingController _emailController;
@@ -586,7 +724,9 @@ class _EditProfileViewState extends State<EditProfileView> {
   
   int _selectedGender = 0;
   bool _isLoading = false;
+  bool _isLoadingImage = false;
   String _errorMessage = '';
+  String? _profileImageBase64;
   
   @override
   void initState() {
@@ -612,6 +752,93 @@ class _EditProfileViewState extends State<EditProfileView> {
     super.dispose();
   }
   
+  // Profil fotoğrafı seçme
+  Future<void> _pickProfileImage() async {
+    try {
+      final XFile? pickedImage = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 70,
+      );
+      
+      if (pickedImage == null) return;
+      
+      setState(() {
+        _isLoadingImage = true;
+      });
+      
+      // Resmi kırp
+      final croppedFile = await _cropImage(File(pickedImage.path));
+      if (croppedFile == null) {
+        setState(() {
+          _isLoadingImage = false;
+        });
+        return;
+      }
+      
+      // Dosyayı base64'e dönüştür
+      final bytes = await croppedFile.readAsBytes();
+      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      
+      setState(() {
+        _profileImageBase64 = base64Image;
+        _isLoadingImage = false;
+      });
+      
+    } catch (e) {
+      _logger.e('Profil fotoğrafı seçilirken hata: $e');
+      setState(() {
+        _isLoadingImage = false;
+      });
+      _showErrorMessage('Görsel seçilirken bir hata oluştu: ${e.toString()}');
+    }
+  }
+  
+  // Resmi kırpma
+  Future<File?> _cropImage(File imageFile) async {
+    try {
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: imageFile.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 70,
+        compressFormat: ImageCompressFormat.jpg,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Profil Fotoğrafını Düzenle',
+            toolbarColor: Colors.blue,
+            toolbarWidgetColor: Colors.white,
+            lockAspectRatio: true,
+          ),
+          IOSUiSettings(
+            title: 'Profil Fotoğrafını Düzenle',
+            aspectRatioLockEnabled: true,
+          ),
+        ],
+      );
+      
+      return croppedFile != null ? File(croppedFile.path) : null;
+    } catch (e) {
+      _logger.e('Resim kırpılırken hata: $e');
+      return null;
+    }
+  }
+  
+  // Hata mesajı göster
+  void _showErrorMessage(String message) {
+    showPlatformDialog(
+      context: context,
+      builder: (context) => PlatformAlertDialog(
+        title: const Text('Hata'),
+        content: Text(message),
+        actions: <Widget>[
+          PlatformDialogAction(
+            child: const Text('Tamam'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+  
   // Profil güncelleme işlemi
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) {
@@ -630,7 +857,7 @@ class _EditProfileViewState extends State<EditProfileView> {
         userBirthday: _birthdayController.text,
         userPhone: _phoneController.text,
         userGender: _selectedGender,
-        profilePhoto: widget.user.profilePhoto,
+        profilePhoto: _profileImageBase64 ?? widget.user.profilePhoto,
       );
       
       if (mounted) {
@@ -708,6 +935,11 @@ class _EditProfileViewState extends State<EditProfileView> {
           child: ListView(
             padding: const EdgeInsets.all(16.0),
             children: [
+              // Profil fotoğrafı seçme alanı
+              _buildProfilePhotoSelector(),
+              
+              const SizedBox(height: 24),
+              
               if (_errorMessage.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -820,6 +1052,93 @@ class _EditProfileViewState extends State<EditProfileView> {
                 ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+  
+  // Profil fotoğrafı seçme alanı
+  Widget _buildProfilePhotoSelector() {
+    String profileImageUrl = widget.user.profilePhoto;
+    bool hasImage = (profileImageUrl.isNotEmpty && profileImageUrl != 'null') || _profileImageBase64 != null;
+    
+    return Center(
+      child: GestureDetector(
+        onTap: _isLoadingImage ? null : _pickProfileImage,
+        child: Stack(
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: !hasImage
+                  ? platformThemeData(
+                      context,
+                      material: (data) => Colors.blue.shade100,
+                      cupertino: (data) => CupertinoColors.activeBlue.withOpacity(0.2),
+                    )
+                  : null,
+                shape: BoxShape.circle,
+                image: hasImage
+                  ? _profileImageBase64 != null
+                    ? DecorationImage(
+                        image: MemoryImage(
+                          base64Decode(_profileImageBase64!.replaceFirst('data:image/jpeg;base64,', '')),
+                        ),
+                        fit: BoxFit.cover,
+                      )
+                    : DecorationImage(
+                        image: NetworkImage(profileImageUrl),
+                        fit: BoxFit.cover,
+                      )
+                  : null,
+              ),
+              child: _isLoadingImage
+                ? Center(child: PlatformCircularProgressIndicator())
+                : (!hasImage
+                  ? Center(
+                      child: Icon(
+                        context.platformIcons.person,
+                        size: 60,
+                        color: platformThemeData(
+                          context,
+                          material: (data) => Colors.blue,
+                          cupertino: (data) => CupertinoColors.activeBlue,
+                        ),
+                      ),
+                    )
+                  : null),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: platformThemeData(
+                    context,
+                    material: (data) => Colors.blue,
+                    cupertino: (data) => CupertinoColors.activeBlue,
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: platformThemeData(
+                      context,
+                      material: (data) => Colors.white,
+                      cupertino: (data) => CupertinoColors.white,
+                    ),
+                    width: 2,
+                  ),
+                ),
+                child: Icon(
+                  isCupertino(context) ? CupertinoIcons.camera : Icons.camera_alt,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

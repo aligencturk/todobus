@@ -4,6 +4,7 @@ import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:todobus/viewmodels/profile_viewmodel.dart';
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import '../services/snackbar_service.dart';
@@ -29,7 +30,7 @@ class DashboardView extends StatefulWidget {
   _DashboardViewState createState() => _DashboardViewState();
 }
 
-class _DashboardViewState extends State<DashboardView> {
+class _DashboardViewState extends State<DashboardView> with TickerProviderStateMixin {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
   final SnackBarService _snackBarService = SnackBarService();
@@ -41,6 +42,22 @@ class _DashboardViewState extends State<DashboardView> {
   int _unreadNotifications = 0;
   
   List<ProjectPreviewItem> _userProjects = [];
+  
+  // Tamamlanan görevlerin animasyonlu çıkış için geçici listesi ve animasyon kontrolleri
+  Map<int, _TaskCompletionAnimationState> _completingTasksMap = {};
+  final Duration _taskCompletionAnimationDuration = const Duration(milliseconds: 800);
+  
+  // Konfeti parçacıkları için rastgele renkler
+  final List<Color> _confettiColors = [
+    Colors.red, 
+    Colors.blue, 
+    Colors.green, 
+    Colors.yellow, 
+    Colors.purple, 
+    Colors.orange,
+    Colors.teal,
+    Colors.pink
+  ];
 
   @override
   void initState() {
@@ -322,15 +339,15 @@ class _DashboardViewState extends State<DashboardView> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12.0,
                   mainAxisSpacing: 12.0,
-                  childAspectRatio: 1.3,
+                  childAspectRatio: 2.0,
                 ),
                 delegate: SliverChildListDelegate([
                   _buildInfoCard(
                     context,
-                    title: 'Görevler',
-                    value: '${dashboardViewModel.taskCount}',
-                    icon: CupertinoIcons.checkmark_shield,
-                    color: CupertinoColors.activeBlue,
+                    title: 'Bekleyen Görevler',
+                    value: '${dashboardViewModel.incompletedTaskCount}',
+                    icon: CupertinoIcons.tray_arrow_up_fill,
+                    color: CupertinoColors.systemIndigo,
                   ),
                   _buildInfoCard(
                     context,
@@ -416,7 +433,7 @@ class _DashboardViewState extends State<DashboardView> {
             
             
             const SliverToBoxAdapter(
-              child: SizedBox(height: 40),
+              child: SizedBox(height: 90),
             ),
           ]
         )
@@ -508,50 +525,63 @@ class _DashboardViewState extends State<DashboardView> {
     return Container(
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.3), width: 0.5) : null,
+        borderRadius: BorderRadius.circular(16),
+        border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.2), width: 0.5) : null,
         boxShadow: isIOS 
           ? [
               BoxShadow(
-                color: CupertinoColors.systemGrey4.withOpacity(0.2),
-                blurRadius: 10,
+                color: color.withOpacity(0.1),
+                blurRadius: 12,
                 spreadRadius: -2,
-                offset: const Offset(0, 3),
+                offset: const Offset(0, 4),
               )
             ]
           : [
               BoxShadow(
-                color: Colors.grey.withOpacity(0.15),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: color.withOpacity(0.08),
+                blurRadius: 10,
+                spreadRadius: -2,
+                offset: const Offset(0, 3),
               )
             ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 12.0),
+        child: Row(
           children: [
-            Icon(
-              icon,
-              size: 26,
-              color: color,
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 22,
+                color: color,
+              ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: (isIOS 
-                ? CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(fontWeight: FontWeight.w600, color: CupertinoTheme.of(context).textTheme.textStyle.color) 
-                : Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)
-              )?.copyWith(fontSize: 20),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              title,
-              style: isIOS
-                ? CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(color: CupertinoColors.secondaryLabel, fontSize: 13)
-                : Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    value,
+                    style: (isIOS 
+                      ? CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(fontWeight: FontWeight.w600, color: CupertinoTheme.of(context).textTheme.textStyle.color) 
+                      : Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)
+                    )?.copyWith(fontSize: 18),
+                  ),
+                  Text(
+                    title,
+                    style: isIOS
+                      ? CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(color: CupertinoColors.secondaryLabel, fontSize: 12)
+                      : Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1143,7 +1173,12 @@ class _DashboardViewState extends State<DashboardView> {
   Widget _buildMyTasksSection() {
     final dashboardViewModel = Provider.of<DashboardViewModel>(context);
     
-    if (dashboardViewModel.isLoadingTasks && dashboardViewModel.userTasks.isEmpty) {
+    // Sadece tamamlanmamış görevleri filtrele
+    final incompleteTasks = dashboardViewModel.userTasks
+        .where((task) => !task.workCompleted)
+        .toList();
+    
+    if (dashboardViewModel.isLoadingTasks && incompleteTasks.isEmpty) {
       return SliverToBoxAdapter(
         child: Padding(
           padding: const EdgeInsets.all(30.0),
@@ -1152,17 +1187,11 @@ class _DashboardViewState extends State<DashboardView> {
       );
     }
     
-    if (!dashboardViewModel.isLoadingTasks && dashboardViewModel.userTasks.isEmpty) {
+    if (!dashboardViewModel.isLoadingTasks && incompleteTasks.isEmpty) {
       return SliverToBoxAdapter(
         child: _buildEmptyState(
           icon: CupertinoIcons.square_list,
-          message: dashboardViewModel.tasksErrorMessage.isNotEmpty 
-              ? dashboardViewModel.tasksErrorMessage
-              : 'Henüz atanmış göreviniz bulunmuyor.',
-          onRetry: dashboardViewModel.tasksErrorMessage.isNotEmpty 
-              ? () => dashboardViewModel.loadUserTasks()
-              : null,
-          retryText: 'Tekrar Dene',
+          message: 'Tamamlanmamış göreviniz bulunmuyor.',
         ),
       );
     }
@@ -1172,10 +1201,10 @@ class _DashboardViewState extends State<DashboardView> {
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate(
           (context, index) {
-            final task = dashboardViewModel.userTasks[index];
+            final task = incompleteTasks[index];
             return _buildWorkItem(task);
           },
-          childCount: dashboardViewModel.userTasks.length > 5 ? 5 : dashboardViewModel.userTasks.length,
+          childCount: incompleteTasks.length > 5 ? 5 : incompleteTasks.length,
         ),
       ),
     );
@@ -1189,10 +1218,97 @@ class _DashboardViewState extends State<DashboardView> {
       : Theme.of(context).cardColor;
 
     final bool isCompleted = task.workCompleted;
+    final bool isCompleting = _completingTasksMap.containsKey(task.workID);
+    final _TaskCompletionAnimationState? animationState = isCompleting ? _completingTasksMap[task.workID] : null;
+    
     final Color statusColor = isCompleted 
         ? (isIOS ? CupertinoColors.systemGreen : Colors.green)
         : (isIOS ? CupertinoColors.systemGrey2 : Colors.grey);
 
+    if (isCompleting && animationState != null) {
+      // Konfeti efekti ile ileri seviye animasyon
+      return Stack(
+        children: [
+          // Ana görev kartı
+          SlideTransition(
+            position: animationState.slideAnimation,
+            child: ScaleTransition(
+              scale: animationState.scaleAnimation,
+              child: RotationTransition(
+                turns: animationState.rotateAnimation,
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (context) => WorkDetailView(
+                          projectId: task.projectID,
+                          groupId: 0,
+                          workId: task.workID,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                    decoration: BoxDecoration(
+                      color: cardBackgroundColor,
+                      borderRadius: BorderRadius.circular(10.0),
+                      border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.3), width: 0.5) : null,
+                    ),
+                    child: _buildTaskContent(task, statusColor, isIOS, isCompleted),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          
+          // Konfeti efekti
+          ...List.generate(animationState.confettiAnimations.length, (index) {
+            // Her bir parçacık için rastgele pozisyon ve renk
+            final randomOffsetX = 40.0 + (index * 20.0);
+            final randomOffsetY = -20.0 - (index * 5.0);
+            final randomColor = _confettiColors[math.Random().nextInt(_confettiColors.length)];
+            final size = 5.0 + (index % 3) * 3.0;
+            
+            return Positioned(
+              right: randomOffsetX,
+              top: 25 + randomOffsetY,
+              child: AnimatedBuilder(
+                animation: animationState.confettiAnimations[index],
+                builder: (context, child) {
+                  final value = animationState.confettiAnimations[index].value;
+                  final opacity = 1.0 - value * 0.5; // Yavaşça kaybolur
+                  
+                  return Transform.translate(
+                    offset: Offset(
+                      -100 * value, // Sola doğru hareket
+                      50 * value + 20 * math.sin(value * math.pi * 2), // Parabol yörünge
+                    ),
+                    child: Transform.rotate(
+                      angle: value * math.pi * 2 * (index % 2 == 0 ? 1 : -1), // Dönme efekti
+                      child: Opacity(
+                        opacity: opacity,
+                        child: Container(
+                          width: size,
+                          height: size,
+                          decoration: BoxDecoration(
+                            color: randomColor,
+                            shape: index % 2 == 0 ? BoxShape.circle : BoxShape.rectangle,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          }),
+        ],
+      );
+    }
+
+    // Normal görünüm
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
@@ -1213,95 +1329,111 @@ class _DashboardViewState extends State<DashboardView> {
           borderRadius: BorderRadius.circular(10.0),
           border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.3), width: 0.5) : null,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () => _toggleTaskCompletion(task),
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: statusColor, width: 1.5),
-                  color: isCompleted ? statusColor.withOpacity(0.2) : Colors.transparent,
-                ),
-                padding: const EdgeInsets.all(2),
-                child: isCompleted 
-                  ? Icon(CupertinoIcons.checkmark, size: 14, color: statusColor)
-                  : SizedBox(width: 14, height: 14),
-              ),
+        child: _buildTaskContent(task, statusColor, isIOS, isCompleted),
+      ),
+    );
+  }
+  
+  // Görev içeriği widget'ı (kod tekrarını önlemek için çıkarıldı)
+  Widget _buildTaskContent(UserProjectWork task, Color statusColor, bool isIOS, bool isCompleted) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        GestureDetector(
+          onTap: () => _toggleTaskCompletion(task),
+          child: Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: statusColor, width: 1.5),
+              color: isCompleted ? statusColor.withOpacity(0.2) : Colors.transparent,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    task.workName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 15,
-                      decoration: isCompleted ? TextDecoration.lineThrough : null,
-                      color: isCompleted 
-                        ? (isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600])
-                        : (isIOS ? CupertinoTheme.of(context).textTheme.textStyle.color : Colors.black87),
-                    ),
-                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            padding: const EdgeInsets.all(2),
+            child: isCompleted 
+              ? Icon(CupertinoIcons.checkmark, size: 14, color: statusColor)
+              : SizedBox(width: 14, height: 14),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                task.workName,
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 15,
+                  decoration: isCompleted ? TextDecoration.lineThrough : null,
+                  color: isCompleted 
+                    ? (isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600])
+                    : (isIOS ? CupertinoTheme.of(context).textTheme.textStyle.color : Colors.black87),
+                ),
+                 maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (task.workDesc.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  task.workDesc,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isIOS ? CupertinoColors.tertiaryLabel : Colors.grey[500],
+                    decoration: isCompleted ? TextDecoration.lineThrough : null,
                   ),
-                  if (task.workDesc.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      task.workDesc,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isIOS ? CupertinoColors.tertiaryLabel : Colors.grey[500],
-                        decoration: isCompleted ? TextDecoration.lineThrough : null,
-                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  Icon(
+                    isIOS ? CupertinoIcons.calendar_today : Icons.calendar_today,
+                    size: 11,
+                    color: CupertinoColors.tertiaryLabel,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    task.workEndDate,
+                    style: TextStyle(fontSize: 11, color: CupertinoColors.tertiaryLabel),
+                  ),
+                  const SizedBox(width: 10),
+                  Icon(
+                    isIOS ? CupertinoIcons.folder_fill : Icons.folder,
+                    size: 11,
+                    color: CupertinoColors.tertiaryLabel,
+                  ),
+                  const SizedBox(width: 3),
+                  Expanded(
+                    child: Text(
+                      task.projectName,
+                      style: TextStyle(fontSize: 11, color: CupertinoColors.tertiaryLabel),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      Icon(
-                        isIOS ? CupertinoIcons.calendar_today : Icons.calendar_today,
-                        size: 11,
-                        color: CupertinoColors.tertiaryLabel,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        task.workEndDate,
-                        style: TextStyle(fontSize: 11, color: CupertinoColors.tertiaryLabel),
-                      ),
-                      const SizedBox(width: 10),
-                      Icon(
-                        isIOS ? CupertinoIcons.folder_fill : Icons.folder,
-                        size: 11,
-                        color: CupertinoColors.tertiaryLabel,
-                      ),
-                      const SizedBox(width: 3),
-                      Expanded(
-                        child: Text(
-                          task.projectName,
-                          style: TextStyle(fontSize: 11, color: CupertinoColors.tertiaryLabel),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Future<void> _toggleTaskCompletion(UserProjectWork task) async {
     _logger.i("Görev tamamlama durumu değiştiriliyor: ${task.workName}");
+    
+    // Eğer görev tamamlanıyorsa ve henüz animasyon listesinde değilse, animasyon listesine ekle
+    if (!task.workCompleted && mounted) {
+      final animState = _TaskCompletionAnimationState(this, task.workID);
+      setState(() {
+        _completingTasksMap[task.workID] = animState;
+      });
+      
+      // Animasyonları başlat
+      animState.startAnimations();
+    }
     
     final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
     final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
@@ -1315,7 +1447,18 @@ class _DashboardViewState extends State<DashboardView> {
       
       if (mounted) {
         if (success) {
-          // İşlem başarılıysa dashboard verilerini yenile
+          // Animasyon tamamlanana kadar bekle
+          await Future.delayed(_taskCompletionAnimationDuration);
+          
+          // Animasyon durumunu temizle ve kaynakları serbest bırak
+          if (_completingTasksMap.containsKey(task.workID)) {
+            _completingTasksMap[task.workID]?.dispose();
+            setState(() {
+              _completingTasksMap.remove(task.workID);
+            });
+          }
+          
+          // Dashboard verilerini yenile
           await dashboardViewModel.loadUserTasks();
           
           _showTaskStatusMessage(
@@ -1323,11 +1466,25 @@ class _DashboardViewState extends State<DashboardView> {
             isError: false
           );
         } else {
+          // Eğer başarısız olursa, animasyon durumunu temizle
+          if (_completingTasksMap.containsKey(task.workID)) {
+            _completingTasksMap[task.workID]?.dispose();
+            setState(() {
+              _completingTasksMap.remove(task.workID);
+            });
+          }
           _showTaskStatusMessage('Görev durumu değiştirilemedi', isError: true);
         }
       }
     } catch (e) {
       _logger.e('Görev durumu değiştirilirken hata: $e');
+      // Hata durumunda animasyon durumunu temizle
+      if (_completingTasksMap.containsKey(task.workID)) {
+        _completingTasksMap[task.workID]?.dispose();
+        setState(() {
+          _completingTasksMap.remove(task.workID);
+        });
+      }
       if (mounted) {
         _showTaskStatusMessage('Hata: ${e.toString()}', isError: true);
       }
@@ -1446,5 +1603,119 @@ class ProjectPreviewItem {
   @override
   String toString() {
     return 'ProjectPreviewItem{projectID: $projectID, projectName: $projectName, projectStatusID: $projectStatusID, groupID: $groupID, groupName: $groupName}';
+  }
+}
+
+// Görev tamamlama animasyonu için durum sınıfı
+class _TaskCompletionAnimationState {
+  late AnimationController slideController;
+  late AnimationController scaleController;
+  late AnimationController rotateController;
+  late Animation<Offset> slideAnimation;
+  late Animation<double> scaleAnimation;
+  late Animation<double> rotateAnimation;
+  
+  final List<AnimationController> confettiControllers = [];
+  final List<Animation<double>> confettiAnimations = [];
+  
+  bool isDisposed = false;
+  
+  _TaskCompletionAnimationState(TickerProvider vsync, int workId) {
+    // Kaydırma animasyonu - sağa doğru kayar
+    slideController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: vsync,
+    );
+    
+    slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(1.5, 0),
+    ).animate(CurvedAnimation(
+      parent: slideController,
+      curve: Curves.easeOutQuint,
+    ));
+    
+    // Ölçek animasyonu - küçülür
+    scaleController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: vsync,
+    );
+    
+    scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: scaleController,
+      curve: Curves.easeInQuint,
+    ));
+    
+    // Döndürme animasyonu
+    rotateController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: vsync,
+    );
+    
+    rotateAnimation = Tween<double>(
+      begin: 0.0,
+      end: 0.1, // 10% dönüş
+    ).animate(CurvedAnimation(
+      parent: rotateController,
+      curve: Curves.easeInOutBack,
+    ));
+    
+    // Her bir konfeti parçası için animasyon kontrolleri oluştur
+    for (int i = 0; i < 6; i++) {
+      final controller = AnimationController(
+        duration: Duration(milliseconds: 400 + (i * 100)), // farklı sürelerde
+        vsync: vsync,
+      );
+      
+      final animation = Tween<double>(
+        begin: 0.0,
+        end: 1.0,
+      ).animate(CurvedAnimation(
+        parent: controller,
+        curve: Curves.easeOutQuad,
+      ));
+      
+      confettiControllers.add(controller);
+      confettiAnimations.add(animation);
+    }
+  }
+  
+  // Tüm animasyonları başlat
+  Future<void> startAnimations() async {
+    rotateController.forward();
+    await Future.delayed(const Duration(milliseconds: 100));
+    slideController.forward();
+    await Future.delayed(const Duration(milliseconds: 200));
+    scaleController.forward();
+    
+    // Konfeti animasyonlarını aralıklı olarak başlat
+    for (var controller in confettiControllers) {
+      await Future.delayed(const Duration(milliseconds: 50));
+      controller.forward();
+    }
+  }
+  
+  // Animasyonlar tamamlandı mı?
+  bool get isCompleted => 
+      slideController.isCompleted && 
+      scaleController.isCompleted &&
+      rotateController.isCompleted;
+  
+  // Tüm kaynakları temizle
+  void dispose() {
+    if (!isDisposed) {
+      slideController.dispose();
+      scaleController.dispose();
+      rotateController.dispose();
+      
+      for (var controller in confettiControllers) {
+        controller.dispose();
+      }
+      
+      isDisposed = true;
+    }
   }
 } 

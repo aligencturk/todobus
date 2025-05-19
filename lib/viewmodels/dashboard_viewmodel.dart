@@ -38,6 +38,7 @@ class DashboardViewModel with ChangeNotifier {
   String get errorMessage => _errorMessage;
   User? get user => _user;
   int get taskCount => _userTasks.length;
+  int get incompletedTaskCount => _userTasks.where((task) => !task.workCompleted).length;
   bool get isLoading => _status == DashboardLoadStatus.loading;
   List<GroupEvent> get upcomingEvents => _upcomingEvents;
   List<UserProjectWork> get userTasks => _userTasks;

@@ -60,5 +60,11 @@
 	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Profil fotoğrafı çekmek için kamera erişimi gerekiyor</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Profil fotoğrafı seçmek için galeri erişimi gerekiyor</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Düzenlenen fotoğrafların kaydedilmesi için galeri erişimi gerekiyor</string>
 </dict>
 </plist>
