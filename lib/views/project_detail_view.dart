@@ -9,6 +9,7 @@ import '../viewmodels/group_viewmodel.dart';
 import '../views/edit_project_view.dart';
 import '../views/work_detail_view.dart';
 import '../views/add_work_view.dart';
+import '../services/storage_service.dart';
 
 class ProjectDetailView extends StatefulWidget {
   final int projectId;
@@ -37,6 +38,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
   List<ProjectWork>? _projectWorks;
   bool _isLoadingWorks = false;
   String _worksErrorMessage = '';
+  bool _isDisposed = false; // Widget dispose edildiğinde true olacak
   
   @override
   void initState() {
@@ -51,6 +53,19 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
         });
       }
     });
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true; // Widget dispose edildiğinde işaret koy
+    super.dispose();
+  }
+  
+  // Güvenli setState için yardımcı metot
+  void _safeSetState(VoidCallback fn) {
+    if (!_isDisposed && mounted) {
+      setState(fn);
+    }
   }
   
   Future<void> _loadProjectDetail() async {
@@ -85,42 +100,70 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
     }
   }
   
-  Future<void> _loadProjectWorks() async {
-    if (_projectWorks != null) return; // Daha önce yüklenmişse tekrar yükleme
+  void _onSegmentChanged(int value) {
+    if (_isDisposed) return; // Eğer sayfa dispose edildiyse hiçbir işlem yapmadan çık
     
     setState(() {
+      _selectedSegment = value;
+    });
+    
+    // Görevler sekmesi seçildiyse görevleri yükle
+    if (value == 2 && !_isDisposed) {
+      _loadProjectWorks();
+    }
+  }
+  
+  Future<void> _loadProjectWorks() async {
+    // 1. Sayfa dispose edildiyse veya görevler zaten yüklendiyse işlemi durdur
+    if (_projectWorks != null || _isDisposed) return;
+    
+    // 2. İşlem sürerken bir daha çağrılmayı engelle
+    if (_isLoadingWorks) return;
+    
+    _safeSetState(() {
       _isLoadingWorks = true;
       _worksErrorMessage = '';
     });
     
     try {
+      // Erken çıkış kontrolü - dispose edildiyse çık
+      if (_isDisposed) {
+        return;
+      }
+      
       final works = await Provider.of<GroupViewModel>(context, listen: false)
           .getProjectWorks(widget.projectId);
       
-      if (mounted) {
-        setState(() {
-          _projectWorks = works;
+      // Erken çıkış kontrolü - dispose edildiyse çık
+      if (_isDisposed || !mounted) {
+        return;
+      }
+      
+      _safeSetState(() {
+        _projectWorks = works;
+        _isLoadingWorks = false;
+      });
+      _logger.i('Proje görevleri yüklendi: ${works.length} görev');
+    } catch (e) {
+      // Erken çıkış kontrolü - dispose edildiyse çık
+      if (_isDisposed || !mounted) {
+        return;
+      }
+      
+      // 417 hata kodu veya "Bu projeye ait henüz görev bulunmamaktadır" hatası normal durum
+      if (e.toString().contains('417') || e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
+        _safeSetState(() {
+          _projectWorks = []; // Boş liste olarak ayarla
+          _isLoadingWorks = false;
+          // Hata mesajı gösterme, normal bir durum
+        });
+        _logger.i('Proje için henüz görev bulunmuyor (417)');
+      } else {
+        _safeSetState(() {
+          _worksErrorMessage = 'Görevler yüklenemedi: $e';
           _isLoadingWorks = false;
         });
-        _logger.i('Proje görevleri yüklendi: ${works.length} görev');
-      }
-    } catch (e) {
-      if (mounted) {
-        // 417 hata kodu veya "Bu projeye ait henüz görev bulunmamaktadır" hatası normal durum
-        if (e.toString().contains('417') || e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
-          setState(() {
-            _projectWorks = []; // Boş liste olarak ayarla
-            _isLoadingWorks = false;
-            // Hata mesajı gösterme, normal bir durum
-          });
-          _logger.i('Proje için henüz görev bulunmuyor (417)');
-        } else {
-          setState(() {
-            _worksErrorMessage = 'Görevler yüklenemedi: $e';
-            _isLoadingWorks = false;
-          });
-          _logger.e('Proje görevleri yüklenirken hata: $e');
-        }
+        _logger.e('Proje görevleri yüklenirken hata: $e');
       }
     }
   }
@@ -551,17 +594,6 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
     );
   }
   
-  void _onSegmentChanged(int value) {
-    setState(() {
-      _selectedSegment = value;
-    });
-    
-    // Görevler sekmesi seçildiyse görevleri yükle
-    if (value == 2) {
-      _loadProjectWorks();
-    }
-  }
-  
   Widget _buildSelectedContent(BuildContext context) {
     switch (_selectedSegment) {
       case 0:
@@ -736,14 +768,19 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                 backgroundColor: user.userRoleID == 1 
                     ? (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.2) 
                     : (isIOS ? CupertinoColors.systemGrey : Colors.grey).withOpacity(0.2),
-                child: Text(
-                  user.userName.substring(0, 1).toUpperCase(),
-                  style: TextStyle(
-                    color: user.userRoleID == 1 
-                        ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
-                        : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
-                  ),
-                ),
+               backgroundImage: user.profilePhoto != null && user.profilePhoto.isNotEmpty
+                    ? NetworkImage(user.profilePhoto)
+                    : null,
+                child: user.profilePhoto == null || user.profilePhoto.isEmpty
+                    ? Text(
+                        user.userName.substring(0, 1).toUpperCase(),
+                        style: TextStyle(
+                          color: user.userRoleID == 1 
+                              ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
+                              : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
+                        ),
+                      )
+                    : null,
               ),
               title: Text(user.userName),
               subtitle: Text(user.userRole),
@@ -764,6 +801,27 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
               ),
             ),
           )).toList(),
+          const SizedBox(height: 20),
+          PlatformElevatedButton(
+            onPressed: _confirmLeaveProject,
+            color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
+            material: (_, __) => MaterialElevatedButtonData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                'Projeden Ayrıl',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isIOS ? CupertinoColors.white : Colors.white,
+                ),
+              ),
+            ),
+          )
         ],
     );
   }
@@ -1910,6 +1968,121 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       _snackBarService.showError(_snackBarService.formatErrorMessage(errorMessage));
     } catch (e) {
       _logger.e('SnackBar gösterilirken hata: $e');
+    }
+  }
+  
+  // Projeden ayrılma onayı
+  void _confirmLeaveProject() {
+    final isIOS = isCupertino(context);
+    
+    if (isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('Projeden Ayrıl'),
+          content: const Text('Bu projeden ayrılmak istediğinize emin misiniz?'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _leaveProject();
+              },
+              child: const Text('Ayrıl'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Projeden Ayrıl'),
+          content: const Text('Bu projeden ayrılmak istediğinize emin misiniz?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _leaveProject();
+              },
+              child: const Text('Ayrıl'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  // Projeden ayrılma işlemi
+  Future<void> _leaveProject() async {
+    // StorageService'den kullanıcı ID'sini al
+    final storageService = StorageService();
+    final userId = storageService.getUserId();
+    
+    if (userId == null) {
+      _showErrorSnackbar('Kullanıcı bilgileriniz alınamadı. Lütfen tekrar giriş yapın.');
+      return;
+    }
+    
+    _safeSetState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // İşlemi başlatmadan önce sayfayı tamamen durdur
+      _isDisposed = true;
+      
+      final success = await Provider.of<GroupViewModel>(context, listen: false)
+          .removeUserFromProject(widget.groupId, widget.projectId, userId);
+      
+      // mounted kontrolü gerekiyor ama işlemi tamamen durdurmak için
+      // _isDisposed kontrolü yapmıyoruz
+      if (mounted) {
+        if (success) {
+          _snackBarService.showSuccess('Projeden başarıyla ayrıldınız');
+          
+          // Tüm proje ile ilgili sayfalardan çık ve direkt ana sayfaya dön
+          // Hiçbir şekilde proje detay sayfasında işlem yapılmamasını sağla
+          Navigator.of(context).popUntil((route) {
+            final routeName = route.settings.name;
+            // Group detay sayfasını veya ana sayfayı bul
+            return route.isFirst || 
+                  (routeName != null && 
+                  (routeName.contains('GroupDetailView') || 
+                   routeName.contains('GroupsView')));
+          });
+        } else {
+          _snackBarService.showError('Projeden ayrılma işlemi başarısız oldu');
+          
+          // Başarısız olursa sayfaya geri dönüş yap, _isDisposed'u sıfırla
+          _safeSetState(() {
+            _isDisposed = false;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      // Hata durumunda eğer hala mounted ise
+      if (mounted) {
+        _snackBarService.showError(_formatErrorMessage(e.toString()));
+        
+        // Başarısız olursa sayfaya geri dönüş yap, _isDisposed'u sıfırla
+        _safeSetState(() {
+          _isDisposed = false;
+          _isLoading = false;
+        });
+      }
     }
   }
   

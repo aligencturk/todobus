@@ -210,46 +210,54 @@ class ProjectService {
   // Proje görevlerini getir
   Future<List<ProjectWork>> getProjectWorks(int projectID) async {
     try {
-      _logger.i('Proje görevleri getiriliyor... (ProjectID: $projectID)');
-      
       final token = await _storageService.getToken();
       if (token == null) {
-        throw Exception('Kullanıcı token bilgisi bulunamadı');
+        throw Exception('Oturum bilgisi bulunamadı');
       }
+      
+      final body = {
+        'userToken': token,
+        'projectID': projectID,
+      };
+      
+      _logger.i('Proje görevleri getiriliyor... ProjectID: $projectID');
       
       try {
         final response = await _apiService.post(
-          'service/user/project/workList',
-          body: {
-            'userToken': token,
-            'projectID': projectID,
-          },
-          requiresToken: true,
+          'service/project/works/all',
+          body: body,
         );
         
-        if (response['success'] == true && response['data'] != null) {
-          final workListResponse = ProjectWorkListResponse.fromJson(response);
-          
-          if (workListResponse.data != null) {
-            final works = workListResponse.data!.works;
-            _logger.i('${works.length} görev alındı.');
-            return works;
-          }
-        }
+        final works = (response['data'] as List)
+            .map((item) => ProjectWork.fromJson(item))
+            .toList();
         
-        _logger.i('Proje için henüz görev bulunmuyor.');
-        return [];
+        _logger.i('${works.length} proje görevi getirildi. ProjectID: $projectID');
+        return works;
       } catch (e) {
-        if (e.toString().contains('417')) {
-          // 417 kodu "Bu projeye ait henüz görev bulunmamaktadır" anlamına gelir
-          _logger.i('Proje için henüz görev bulunmuyor. (417)');
+        // 417 hatası veya görev bulunamadı hatası normal bir durumdur
+        if (e.toString().contains('417') || 
+            e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
+          _logger.i('Proje için henüz görev bulunmuyor (417). ProjectID: $projectID');
+          // Boş liste dön, hata fırlatma
           return [];
         }
-        rethrow;
+        
+        // Genel hataları kontrol et ve sessizce ele al
+        if (e.toString().contains('Bir hata oluştu') || 
+            e.toString().contains('tekrar deneyin')) {
+          _logger.i('Proje görevleri getirilirken genel hata. ProjectID: $projectID, Hata: $e');
+          // Boş liste dön, hata fırlatma
+          return [];
+        }
+        
+        // Diğer hataları sessizce logla ve boş liste dön
+        _logger.d('Proje görevleri getirilirken hata oluştu. ProjectID: $projectID, Hata: $e');
+        return [];
       }
     } catch (e) {
-      _logger.e('Proje görevleri yüklenirken hata: $e');
-      throw Exception('Proje görevleri yüklenemedi: $e');
+      _logger.d('Proje görevleri getirilirken üst seviye hata: $e');
+      return []; // Boş liste dön
     }
   }
   

@@ -33,6 +33,8 @@
 		<string>tel</string>
 		<string>mailto</string>
 		<string>sms</string>
+		<string>calshow</string>
+		<string>webcal</string>
 	</array>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
@@ -66,5 +68,7 @@
 	<string>Profil fotoğrafı seçmek için galeri erişimi gerekiyor</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Düzenlenen fotoğrafların kaydedilmesi için galeri erişimi gerekiyor</string>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Etkinliği takvime eklemek için takvim erişimine ihtiyacımız var.</string>
 </dict>
 </plist>

@@ -285,35 +285,7 @@ class GroupViewModel with ChangeNotifier {
     }
   }
   
-  // Grup raporları (logları) getir
-  Future<List<GroupLog>> getGroupReports(int groupID, bool isAdmin) async {
-    try {
-      _status = GroupLoadStatus.loading;
-      _safeNotifyListeners();
-      
-      try {
-        final reports = await _apiService.group.getGroupReports(groupID, isAdmin);
-        
-        _status = GroupLoadStatus.loaded;
-        _safeNotifyListeners();
-        
-        return reports;
-      } catch (e) {
-        // Hata durumunda sessizce boş liste dön, hata durumunu gösterme
-        _logger.e('Grup raporları yüklenirken hata: $e'); // Sadece log'a yaz
-        _status = GroupLoadStatus.loaded; // Loaded olarak işaretle, error değil
-        _safeNotifyListeners();
-        return []; // Boş liste dön
-      }
-    } catch (e) {
-      // En dıştaki try-catch bloğu da boş liste dönsün
-      _logger.e('Grup raporları işlenirken beklenmeyen hata: $e');
-      _status = GroupLoadStatus.loaded; // Loaded olarak işaretle
-      _safeNotifyListeners();
-      return [];
-    }
-  }
-  
+ 
   // Proje detaylarını getir
   Future<ProjectDetail?> getProjectDetail(int projectID, int groupID) async {
     try {
@@ -466,20 +438,51 @@ class GroupViewModel with ChangeNotifier {
         
         return works;
       } catch (e) {
-        // 417 kodunu içeren hatalar, görev olmadığını belirtiyor, bu normal bir durum
-        if (e.toString().contains('417') || e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
+        // 417 kodunu içeren hatalar veya "Bu projeye ait henüz görev bulunmamaktadır" mesajı
+        // normal bir durum olarak değerlendirilir
+        if (e.toString().contains('417') || 
+            e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
           _status = GroupLoadStatus.loaded; // Hata değil, sadece veri yok
           _safeNotifyListeners();
+          
+          // Sadece bilgi olarak logla, hata olarak değil
+          _logger.i('Proje için henüz görev bulunmuyor: ${e.toString()}');
+          
           return []; // Boş liste dön
         }
-        rethrow; // Diğer hataları yeniden fırlat
+        
+        // Diğer tip hatalar için kontrolcü ayarlama
+        if (_isDisposed) {
+          _logger.i('Proje görevleri yüklenirken iptal edildi: dispose edilmiş');
+          return []; // Sessizce boş liste dön
+        }
+        
+        // 'Bir hata oluştu, lütfen tekrar deneyin.' gibi genel hataları 
+        // da mümkün olduğunca sessizce ele al
+        if (e.toString().contains('Bir hata oluştu') || 
+            e.toString().contains('tekrar deneyin')) {
+          _status = GroupLoadStatus.loaded; // Hata olsa bile loaded olarak işaretle
+          _safeNotifyListeners();
+          
+          // Bilgi olarak logla
+          _logger.i('Proje görevleri yüklenirken genel hata: ${e.toString()}');
+          
+          return []; // Boş liste dön
+        }
+        
+        // Diğer tüm hatalar için rethrow
+        rethrow;
       }
     } catch (e) {
+      // Tüm beklenmeyen hataları kontrol altına al
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
-      _logger.e('Proje görevleri yüklenirken hata: $e');
+      
+      // Önemli: Burada sadece DEBUG modunda log'a yaz, kullanıcıya gösterme
+      _logger.d('Proje görevleri yüklenirken hata: $e');
+      
       _safeNotifyListeners();
-      return [];
+      return []; // Her durumda boş liste dön
     }
   }
   

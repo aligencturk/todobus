@@ -9,12 +9,14 @@ import '../models/group_models.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../viewmodels/group_viewmodel.dart';
-import '../viewmodels/event_viewmodel.dart'; // Eklendi
+import '../viewmodels/report_viewmodel.dart';
 import '../views/edit_group_view.dart';
 import '../views/project_detail_view.dart';
 import '../views/create_project_view.dart';
-import '../views/event_detail_view.dart'; // Eklendi
-import '../views/create_event_view.dart'; // Eklendi
+import '../views/event_detail_view.dart';
+import '../views/create_event_view.dart';
+import '../views/report_detail_view.dart';
+import '../services/storage_service.dart';
 
 class GroupDetailView extends StatefulWidget {
   final int groupId;
@@ -34,7 +36,9 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   String _errorMessage = '';
   int _selectedSegment = 0; // 0: Bilgiler, 1: Kullanıcılar, 2: Projeler, 3: Etkinlikler, 4: Raporlar
   List<GroupLog> _groupLogs = [];
+  List<GroupReport> _groupReports = [];
   bool _isLoadingLogs = false;
+  bool _isLoadingReports = false;
   bool _isDisposed = false;
   
   @override
@@ -355,92 +359,67 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       ],
     );
   }
+ 
+
+
   
   Widget _buildSegmentedControl(BuildContext context) {
     final isIOS = isCupertino(context);
-    
+
     if (isIOS) {
-      final segments = {
-        0: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Bilgiler')),
-        1: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Üyeler')),
-        2: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Projeler')),
-        3: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Etkinlikler')),
-        4: const Padding(padding: EdgeInsets.symmetric(horizontal: 1), child: Text('Raporlar')),
-      };
-      
       return Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
         child: CupertinoSlidingSegmentedControl<int>(
           groupValue: _selectedSegment,
-          onValueChanged: _onSegmentChanged,
-          children: segments,
+          children: const {
+            0: Text('Bilgiler'),
+            1: Text('Üyeler'),
+            2: Text('Projeler'),
+            3: Text('Etkinlikler'),
+            4: Text('Raporlar'),
+          },
+          onValueChanged: (value) {
+            if (value != null) {
+              _safeSetState(() {
+                _selectedSegment = value;
+              });
+              
+              // Raporlar sekmesi seçildiğinde raporları yükle
+              if (value == 4 && _groupReports.isEmpty) {
+                _loadReports();
+              }
+            }
+          },
         ),
       );
     } else {
-      return Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          border: Border(
-            bottom: BorderSide(
-              color: Theme.of(context).dividerColor,
-              width: 1,
-            ),
+      return Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment<int>(value: 0, label: Text('Bilgiler')),
+              ButtonSegment<int>(value: 1, label: Text('Üyeler')),
+              ButtonSegment<int>(value: 2, label: Text('Projeler')),
+              ButtonSegment<int>(value: 3, label: Text('Etkinlikler')),
+              ButtonSegment<int>(value: 4, label: Text('Raporlar')),
+            ],
+            selected: {_selectedSegment},
+            onSelectionChanged: (newSelection) {
+              _safeSetState(() {
+                _selectedSegment = newSelection.first;
+              });
+              
+              // Raporlar sekmesi seçildiğinde raporları yükle
+              if (newSelection.first == 4 && _groupReports.isEmpty) {
+                _loadReports();
+              }
+            },
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildMaterialTab(context, 'Bilgiler', 0),
-            _buildMaterialTab(context, 'Üyeler', 1),
-            _buildMaterialTab(context, 'Projeler', 2),
-            _buildMaterialTab(context, 'Etkinlikler', 3),
-            _buildMaterialTab(context, 'Raporlar', 4),
-          ],
         ),
       );
     }
-  }
-  
-  void _onSegmentChanged(int? value) {
-    if (value == null) return;
-    
-    _safeSetState(() => _selectedSegment = value);
-    
-    // Raporlar sekmesi seçildiğinde logları yükle
-    if (value == 4 && _groupLogs.isEmpty && !_isLoadingLogs) {
-      // Build bittikten sonra çağır
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadGroupLogs());
-    }
-  }
-  
-  Widget _buildMaterialTab(BuildContext context, String title, int index) {
-    final bool isSelected = _selectedSegment == index;
-    final Color primaryColor = Theme.of(context).colorScheme.primary;
-    
-    return InkWell(
-      onTap: () => _onSegmentChanged(index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: isSelected ? primaryColor : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        child: Center(
-          child: Text(
-            title,
-            style: TextStyle(
-              color: isSelected ? primaryColor : Theme.of(context).textTheme.bodyMedium?.color,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ),
-      ),
-    );
   }
   
   Widget _buildSelectedContent(BuildContext context) {
@@ -592,14 +571,19 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 backgroundColor: user.isAdmin 
                     ? (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.2) 
                     : (isIOS ? CupertinoColors.systemGrey : Colors.grey).withOpacity(0.2),
-                child: Text(
-                  user.userName.substring(0, 1).toUpperCase(),
-                  style: TextStyle(
-                    color: user.isAdmin 
-                        ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
-                        : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
-                  ),
-                ),
+                backgroundImage: user.profilePhoto != null && user.profilePhoto.isNotEmpty
+                    ? NetworkImage(user.profilePhoto)
+                    : null,
+                child: user.profilePhoto == null || user.profilePhoto.isEmpty
+                    ? Text(
+                        user.userName.substring(0, 1).toUpperCase(),
+                        style: TextStyle(
+                          color: user.isAdmin 
+                              ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
+                              : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
+                        ),
+                      )
+                    : null,
               ),
               title: Text(user.userName),
               subtitle: Text(user.isAdmin ? 'Yönetici' : 'Üye'),
@@ -626,6 +610,27 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               ),
             ),
           )).toList(),
+          const SizedBox(height: 20),
+          PlatformElevatedButton(
+            onPressed: _confirmLeaveGroup,
+            color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
+            material: (_, __) => MaterialElevatedButtonData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                'Gruptan Ayrıl',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isIOS ? CupertinoColors.white : Colors.white,
+                ),
+              ),
+            ),
+          )
         ],
       ),
     );
@@ -748,8 +753,8 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   CupertinoSlidingSegmentedControl<int>(
                     groupValue: selectedRole,
                     children: const {
-                      1: Text('Üye'),
-                      2: Text('Yönetici'),
+                      1: Text('Yönetici'),
+                      2: Text('Üye'),
                     },
                     onValueChanged: (value) {
                       if (value != null) {
@@ -837,8 +842,8 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   const SizedBox(height: 8),
                   SegmentedButton<int>(
                     segments: const [
-                      ButtonSegment<int>(value: 1, label: Text('Üye')),
-                      ButtonSegment<int>(value: 2, label: Text('Yönetici')),
+                      ButtonSegment<int>(value: 1, label: Text('Yönetici')),
+                      ButtonSegment<int>(value: 2, label: Text('Üye')),
                     ],
                     selected: {selectedRole},
                     onSelectionChanged: (newSelection) {
@@ -1846,7 +1851,6 @@ class _GroupDetailViewState extends State<GroupDetailView> {
             ),
           ],
           cancelButton: CupertinoActionSheetAction(
-            isDefaultAction: true,
             onPressed: () {
               Navigator.pop(context);
             },
@@ -1908,82 +1912,6 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     }
   }
 
-  Widget _buildReportsTab(BuildContext context) {
-    final isIOS = isCupertino(context);
-    
-    if (_isLoadingLogs) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_groupLogs.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 32.0),
-          child: Column(
-            children: [
-              Icon(
-                isIOS ? CupertinoIcons.doc_text_search : Icons.assignment_late,
-                size: 48,
-                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Henüz log kaydı bulunmuyor',
-                style: TextStyle(
-                  color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 24),
-              PlatformElevatedButton(
-                onPressed: _loadGroupLogs,
-                child: const Text('Yenile'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Grup Raporları (${_groupLogs.length})',
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                  cupertino: (data) => data.textTheme.navTitleTextStyle,
-                ),
-              ),
-              PlatformIconButton(
-                padding: EdgeInsets.zero,
-                icon: Icon(
-                  isIOS ? CupertinoIcons.refresh : Icons.refresh,
-                  size: 20,
-                ),
-                onPressed: _loadGroupLogs,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _groupLogs.length,
-            itemBuilder: (context, index) {
-              final log = _groupLogs[index];
-              return _buildLogItem(context, log);
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   // Log öğesi
   Widget _buildLogItem(BuildContext context, GroupLog log) {
@@ -2101,38 +2029,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     );
   }
 
-  // Grup loglarını (raporlarını) yükle
-  Future<void> _loadGroupLogs() async {
-    if (_isLoadingLogs || _groupDetail == null) return;
-    
-    _safeSetState(() {
-      _isLoadingLogs = true;
-    });
-    
-    try {
-      final viewModel = Provider.of<GroupViewModel>(context, listen: false);
-      final logs = await viewModel.getGroupReports(
-        widget.groupId, 
-        _groupDetail!.users.any((user) => user.isAdmin),
-      );
-      
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _groupLogs = logs;
-          _isLoadingLogs = false;
-        });
-      }
-    } catch (e) {
-      // Hata durumunda sessizce boş liste göster, hata mesajı gösterme
-      _logger.e('Grup logları yüklenirken hata: $e'); // Sadece loga kaydet
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _groupLogs = []; // Boş liste olarak ayarla
-          _isLoadingLogs = false;
-        });
-      }
-    }
-  }
+ 
 
   // Hata mesajı snackbar göster
   void _showErrorSnackbar(String message) {
@@ -2167,5 +2064,618 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         cupertino: (data) => data.textTheme.navTitleTextStyle,
       ),
     );
+  }
+
+  // Gruptan ayrılma onayı
+  void _confirmLeaveGroup() {
+    final isIOS = isCupertino(context);
+    final String title = 'Gruptan Ayrıl';
+    final String content = 'Bu gruptan ayrılmak istediğinize emin misiniz?';
+    
+    showPlatformDialog(
+      context: context,
+      builder: (dialogContext) => isIOS
+        ? CupertinoAlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _leaveGroup();
+                },
+                child: const Text('Ayrıl'),
+              ),
+            ],
+          )
+        : AlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red,
+                ),
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _leaveGroup();
+                },
+                child: const Text('Ayrıl'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // Gruptan ayrılma işlemi
+  Future<void> _leaveGroup() async {
+    // StorageService'den kullanıcı ID'sini al
+    final storageService = StorageService();
+    final userId = storageService.getUserId();
+    
+    if (userId == null) {
+      _showErrorSnackbar('Kullanıcı bilgileriniz alınamadı. Lütfen tekrar giriş yapın.');
+      return;
+    }
+    
+    _safeSetState(() => _isLoading = true);
+    
+    try {
+      // İşlemi başlatmadan önce sayfayı tamamen durdur
+      _isDisposed = true;
+      
+      final success = await Provider.of<GroupViewModel>(context, listen: false)
+          .removeUserFromGroup(widget.groupId, userId);
+      
+      // mounted kontrolü gerekiyor ama isDisposed kontrolü yapmıyoruz
+      if (mounted) {
+        if (success) {
+          _showSnackBar('Gruptan başarıyla ayrıldınız');
+          
+          // Doğrudan ana sayfaya veya gruplar listesi sayfasına dön
+          Navigator.of(context).popUntil((route) {
+            final routeName = route.settings.name;
+            // Ana sayfayı veya gruplar listesi sayfasını bul
+            return route.isFirst || (routeName != null && routeName.contains('GroupsView'));
+          });
+        } else {
+          // Başarısız olursa sayfaya geri dönüş yap, _isDisposed'u sıfırla
+          _safeSetState(() {
+            _isDisposed = false;
+            _isLoading = false;
+            _errorMessage = 'Gruptan ayrılma işlemi başarısız oldu.';
+          });
+          
+          _showErrorSnackbar('Gruptan ayrılma işlemi başarısız oldu. Lütfen daha sonra tekrar deneyin.');
+        }
+      }
+    } catch (e) {
+      // Hata durumunda eğer hala mounted ise
+      if (mounted) {
+        // Başarısız olursa sayfaya geri dönüş yap, _isDisposed'u sıfırla
+        _safeSetState(() {
+          _isDisposed = false;
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+        
+        _showErrorSnackbar(_formatErrorMessage(e.toString()));
+      }
+    }
+  }
+
+  // Grup raporlarını yükle
+  Future<void> _loadReports() async {
+    _safeSetState(() {
+      _isLoadingReports = true;
+    });
+    
+    try {
+      final reports = await _apiService.report.getGroupReports(widget.groupId);
+      _safeSetState(() {
+        _groupReports = reports;
+        _isLoadingReports = false;
+      });
+      _logger.i('Grup raporları yüklendi: ${reports.length} adet');
+    } catch (e) {
+      _safeSetState(() {
+        _isLoadingReports = false;
+        _errorMessage = 'Raporlar yüklenemedi: $e';
+      });
+      _logger.e('Raporlar yüklenirken hata: $e');
+    }
+  }
+
+  // Raporlar sekmesi
+  Widget _buildReportsTab(BuildContext context) {
+    final isIOS = isCupertino(context);
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Raporlar (${_groupReports.length})',
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  cupertino: (data) => data.textTheme.navTitleTextStyle,
+                ),
+              ),
+              PlatformIconButton(
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  isIOS ? CupertinoIcons.add_circled : Icons.add_circle_outline,
+                  color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                  size: 22,
+                ),
+                onPressed: _createReport,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          if (_isLoadingReports)
+            Center(
+              child: PlatformCircularProgressIndicator(),
+            )
+          else if (_groupReports.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      isIOS ? CupertinoIcons.doc_text : Icons.description_outlined,
+                      size: 48,
+                      color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Henüz rapor bulunmuyor',
+                      style: TextStyle(
+                        color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    PlatformElevatedButton(
+                      onPressed: _createReport,
+                      child: const Text('Rapor Ekle'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _groupReports.length,
+              itemBuilder: (context, index) {
+                final report = _groupReports[index];
+                return Card(
+                  elevation: isIOS ? 0 : 1,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: isIOS 
+                      ? BorderSide(color: CupertinoColors.systemGrey5) 
+                      : BorderSide.none,
+                  ),
+                  child: InkWell(
+                    onTap: () => _navigateToReportDetail(report),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  image: report.userProfilePhoto.isNotEmpty
+                                    ? DecorationImage(
+                                        image: NetworkImage(report.userProfilePhoto),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
+                                  color: report.userProfilePhoto.isEmpty
+                                    ? (isIOS ? CupertinoColors.systemIndigo : Colors.indigo).withOpacity(0.1)
+                                    : null,
+                                ),
+                                child: report.userProfilePhoto.isEmpty
+                                  ? Center(
+                                      child: Text(
+                                        report.userFullname.substring(0, 1).toUpperCase(),
+                                        style: TextStyle(
+                                          color: isIOS ? CupertinoColors.systemIndigo : Colors.indigo,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      report.reportTitle,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Text(
+                                      report.userFullname,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          if (report.reportDesc.isNotEmpty) ...[
+                            Text(
+                              report.reportDesc,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isIOS ? CupertinoColors.label : Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Rapor Tarihi: ${report.reportDate}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                                ),
+                              ),
+                              Icon(
+                                isIOS ? CupertinoIcons.chevron_right : Icons.arrow_forward_ios,
+                                size: 16,
+                                color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Rapor detayına gitme
+  void _navigateToReportDetail(GroupReport report) {
+    Navigator.of(context).push(
+      platformPageRoute(
+        context: context,
+        builder: (context) => ChangeNotifierProvider(
+          create: (context) => ReportViewModel(),
+          child: ReportDetailView(
+            reportId: report.reportID,
+            groupId: widget.groupId,
+          ),
+        ),
+      ),
+    ).then((result) {
+      if (result == true && mounted) {
+        _loadReports(); // Raporları yenile
+      }
+    });
+  }
+
+  // Rapor oluşturma
+  void _createReport() {
+    if (_groupDetail == null) return;
+    
+    final reportTitleController = TextEditingController();
+    final reportDescController = TextEditingController();
+    final reportDateController = TextEditingController();
+    final currentDate = DateTime.now();
+    final formattedDate = '${currentDate.day}.${currentDate.month}.${currentDate.year}';
+    reportDateController.text = formattedDate;
+    
+    int selectedProjectID = 0; // 0 = Gruba ait genel rapor
+    final projectItems = [
+      {'id': 0, 'name': 'Genel (Gruba ait)'},
+      ..._groupDetail!.projects.map((p) => {'id': p.projectID, 'name': p.projectName}).toList(),
+    ];
+    
+    final isIOS = isCupertino(context);
+    
+    if (isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setState) {
+            return CupertinoAlertDialog(
+              title: const Text('Rapor Oluştur'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
+                  CupertinoTextField(
+                    controller: reportTitleController,
+                    placeholder: 'Rapor Başlığı',
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: CupertinoColors.systemGrey4),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  CupertinoTextField(
+                    controller: reportDateController,
+                    placeholder: 'Rapor Tarihi (GG.AA.YYYY)',
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: CupertinoColors.systemGrey4),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: CupertinoColors.systemGrey4),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: CupertinoButton(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            projectItems.firstWhere((p) => p['id'] == selectedProjectID)['name'] as String,
+                            style: const TextStyle(color: CupertinoColors.label),
+                          ),
+                          const Icon(CupertinoIcons.chevron_down),
+                        ],
+                      ),
+                      onPressed: () {
+                        showCupertinoModalPopup(
+                          context: context,
+                          builder: (context) => CupertinoActionSheet(
+                            title: const Text('Proje Seç'),
+                            actions: projectItems.map((project) => 
+                              CupertinoActionSheetAction(
+                                onPressed: () {
+                                  setState(() {
+                                    selectedProjectID = project['id'] as int;
+                                  });
+                                  Navigator.pop(context);
+                                },
+                                child: Text(project['name'] as String),
+                              )
+                            ).toList(),
+                            cancelButton: CupertinoActionSheetAction(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('İptal'),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  CupertinoTextField(
+                    controller: reportDescController,
+                    placeholder: 'Rapor İçeriği...',
+                    padding: const EdgeInsets.all(12),
+                    minLines: 5,
+                    maxLines: 10,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: CupertinoColors.systemGrey4),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                CupertinoDialogAction(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('İptal'),
+                ),
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  onPressed: () async {
+                    final title = reportTitleController.text.trim();
+                    final desc = reportDescController.text.trim();
+                    final date = reportDateController.text.trim();
+                    
+                    if (title.isEmpty) {
+                      _showErrorSnackbar('Rapor başlığı boş bırakılamaz');
+                      return;
+                    }
+                    
+                    if (desc.isEmpty) {
+                      _showErrorSnackbar('Rapor içeriği boş bırakılamaz');
+                      return;
+                    }
+                    
+                    Navigator.pop(context);
+                    
+                    await _submitReport(
+                      title: title,
+                      desc: desc,
+                      date: date,
+                      projectID: selectedProjectID,
+                    );
+                  },
+                  child: const Text('Oluştur'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Rapor Oluştur'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: reportTitleController,
+                      decoration: const InputDecoration(
+                        labelText: 'Rapor Başlığı',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: reportDateController,
+                      decoration: const InputDecoration(
+                        labelText: 'Rapor Tarihi (GG.AA.YYYY)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    DropdownButtonFormField<int>(
+                      decoration: const InputDecoration(
+                        labelText: 'Proje',
+                        border: OutlineInputBorder(),
+                      ),
+                      value: selectedProjectID,
+                      items: projectItems.map((project) => 
+                        DropdownMenuItem(
+                          value: project['id'] as int,
+                          child: Text(project['name'] as String),
+                        )
+                      ).toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            selectedProjectID = value;
+                          });
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: reportDescController,
+                      decoration: const InputDecoration(
+                        labelText: 'Rapor İçeriği',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                      minLines: 5,
+                      maxLines: 10,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('İptal'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final title = reportTitleController.text.trim();
+                    final desc = reportDescController.text.trim();
+                    final date = reportDateController.text.trim();
+                    
+                    if (title.isEmpty) {
+                      _showErrorSnackbar('Rapor başlığı boş bırakılamaz');
+                      return;
+                    }
+                    
+                    if (desc.isEmpty) {
+                      _showErrorSnackbar('Rapor içeriği boş bırakılamaz');
+                      return;
+                    }
+                    
+                    Navigator.pop(context);
+                    
+                    await _submitReport(
+                      title: title,
+                      desc: desc,
+                      date: date,
+                      projectID: selectedProjectID,
+                    );
+                  },
+                  child: const Text('Oluştur'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
+  }
+
+  // Rapor gönderme işlemi
+  Future<void> _submitReport({
+    required String title, 
+    required String desc, 
+    required String date,
+    required int projectID,
+  }) async {
+    _safeSetState(() => _isLoading = true);
+    
+    try {
+      final success = await _apiService.report.createReport(
+        groupID: widget.groupId,
+        projectID: projectID,
+        reportTitle: title, 
+        reportDesc: desc,
+        reportDate: date,
+      );
+      
+      if (success) {
+        // Raporları yenile
+        await _loadReports();
+        _showSnackBar('Rapor başarıyla oluşturuldu');
+      } else {
+        _showErrorSnackbar('Rapor oluşturulamadı');
+      }
+      
+      _safeSetState(() => _isLoading = false);
+    } catch (e) {
+      _safeSetState(() {
+        _isLoading = false;
+        _errorMessage = 'Rapor oluşturulurken hata: $e';
+      });
+      _showErrorSnackbar(_formatErrorMessage(e.toString()));
+    }
   }
 } 

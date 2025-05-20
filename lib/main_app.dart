@@ -6,9 +6,13 @@ import 'views/dashboard_view.dart';
 import 'views/profile_view.dart';
 import 'views/groups_view.dart';
 import 'views/events_view.dart';
-import 'views/notifications_view.dart';
+import 'viewmodels/group_viewmodel.dart';
+import 'viewmodels/dashboard_viewmodel.dart';
 import 'viewmodels/event_viewmodel.dart';
-import 'services/notification_service.dart';
+import 'services/firebase_messaging_service.dart';
+import 'services/notification_viewmodel.dart';
+import 'viewmodels/profile_viewmodel.dart';
+import 'viewmodels/report_viewmodel.dart';
 
 class MainApp extends StatefulWidget {
   const MainApp({super.key});
@@ -36,40 +40,56 @@ class MainAppState extends State<MainApp> {
 
   @override
   Widget build(BuildContext context) {
-    return PlatformScaffold(
-      body: _pages[_currentIndex],
-      bottomNavBar: PlatformNavBar(
-        currentIndex: _currentIndex,
-        itemChanged: (int index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        items: [
-          BottomNavigationBarItem(
-            icon: Icon(context.platformIcons.home),
-            label: 'Anasayfa',
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => GroupViewModel()),
+        ChangeNotifierProvider(create: (_) => DashboardViewModel()),
+        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
+        ChangeNotifierProvider(create: (_) => EventViewModel()),
+        ChangeNotifierProvider(create: (_) => ReportViewModel()),
+        ChangeNotifierProxyProvider<FirebaseMessagingService, NotificationViewModel>(
+          create: (context) => NotificationViewModel(
+            Provider.of<FirebaseMessagingService>(context, listen: false),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(context.platformIcons.collections),
-            label: 'Gruplar',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(context.platformIcon(material: Icons.calendar_month, cupertino: CupertinoIcons.calendar)),
-            label: 'Etkinlikler',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(context.platformIcons.person),
-            label: 'Profil',
-          ),
-        ],
-        material: (_, __) => MaterialNavBarData(
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: Theme.of(context).colorScheme.primary,
+          update: (context, messaging, previous) => 
+            previous ?? NotificationViewModel(messaging),
         ),
-        cupertino: (_, __) => CupertinoTabBarData(
-          activeColor: CupertinoColors.activeBlue,
-          iconSize: 24,
+      ],
+      child: PlatformScaffold(
+        body: _pages[_currentIndex],
+        bottomNavBar: PlatformNavBar(
+          currentIndex: _currentIndex,
+          itemChanged: (int index) {
+            setState(() {
+              _currentIndex = index;
+            });
+          },
+          items: [
+            BottomNavigationBarItem(
+              icon: Icon(context.platformIcons.home),
+              label: 'Anasayfa',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(context.platformIcons.collections),
+              label: 'Gruplar',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(context.platformIcon(material: Icons.calendar_month, cupertino: CupertinoIcons.calendar)),
+              label: 'Etkinlikler',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(context.platformIcons.person),
+              label: 'Profil',
+            ),
+          ],
+          material: (_, __) => MaterialNavBarData(
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: Theme.of(context).colorScheme.primary,
+          ),
+          cupertino: (_, __) => CupertinoTabBarData(
+            activeColor: CupertinoColors.activeBlue,
+            iconSize: 24,
+          ),
         ),
       ),
     );

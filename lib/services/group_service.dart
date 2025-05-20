@@ -258,40 +258,6 @@ class GroupService {
       throw Exception('Grup silinirken hata: $e');
     }
   }
-  
-  // Grup raporlarını getir
-  Future<List<GroupLog>> getGroupReports(int groupID, bool isAdmin) async {
-    try {
-      final userToken = await _storageService.getToken();
-      if (userToken == null) {
-        _logger.e('Oturum bilgisi bulunamadı');
-        return []; // Exception atmak yerine boş liste dön
-      }
-
-      final response = await _apiService.post(
-        'service/user/group/reports',
-        body: {
-          'userToken': userToken,
-          'groupID': groupID,
-          'isAdmin': isAdmin,
-        },
-        requiresToken: true,
-      );
-
-      if (response['success'] == true && response['data'] != null) {
-        final List<dynamic> logsJson = response['data']['logs'] ?? [];
-        final List<GroupLog> logs = logsJson
-            .map((log) => GroupLog.fromJson(log))
-            .toList();
-        return logs;
-      }
-
-      return [];
-    } catch (e) {
-      _logger.e('Grup raporları alınırken hata: $e');
-      return []; // Exception atmak yerine boş liste dön
-    }
-  }
 
   // Kullanıcıyı projeye ekle
   Future<bool> addUserToProject({

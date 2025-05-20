@@ -147,6 +147,7 @@ class GroupDetail {
   final List<GroupUser> users;
   final List<Project> projects;
   final List<GroupEvent> events;
+  final List<GroupReport> reports;
 
   GroupDetail({
     required this.groupID,
@@ -166,6 +167,7 @@ class GroupDetail {
     required this.users,
     required this.projects,
     required this.events,
+    this.reports = const [],
   });
 
   factory GroupDetail.fromJson(Map<String, dynamic> json) {
@@ -196,6 +198,10 @@ class GroupDetail {
               ?.map((event) => GroupEvent.fromJson(event))
               .toList() ??
           [],
+      reports: (json['reports'] as List<dynamic>?)
+              ?.map((report) => GroupReport.fromJson(report))
+              .toList() ??
+          [],
     );
   }
 }
@@ -208,6 +214,7 @@ class GroupUser {
   final String userRole;
   final String joinedDate;
   final bool isAdmin;
+  final String profilePhoto;
 
   GroupUser({
     required this.groupUID,
@@ -217,6 +224,7 @@ class GroupUser {
     required this.userRole,
     required this.joinedDate,
     required this.isAdmin,
+    required this.profilePhoto,
   });
 
   factory GroupUser.fromJson(Map<String, dynamic> json) {
@@ -228,6 +236,7 @@ class GroupUser {
       userRole: json['userRole'] ?? '',
       joinedDate: json['joinedDate'] ?? '',
       isAdmin: json['isAdmin'] ?? false,
+      profilePhoto: json['profilePhoto'] ?? '',
     );
   }
 }
@@ -465,6 +474,7 @@ class ProjectUser {
   final int userRoleID;
   final String userRole;
   final String assignedDate;
+  final String profilePhoto;
 
   ProjectUser({
     required this.projectUID,
@@ -473,6 +483,7 @@ class ProjectUser {
     required this.userRoleID,
     required this.userRole,
     required this.assignedDate,
+    required this.profilePhoto,
   });
 
   factory ProjectUser.fromJson(Map<String, dynamic> json) {
@@ -483,6 +494,7 @@ class ProjectUser {
       userRoleID: json['userRoleID'] ?? 0,
       userRole: json['userRole'] ?? '',
       assignedDate: json['assignedDate'] ?? '',
+      profilePhoto: json['profilePhoto'] ?? '',
     );
   }
 }
@@ -811,5 +823,110 @@ class UserProjectWork {
       'workCreateDate': workCreateDate,
       'workUsers': workUsers.map((user) => user.toJson()).toList(),
     };
+  }
+}
+
+class GroupReport {
+  final int reportID;
+  final int groupID;
+  final int projectID;
+  final int userID;
+  final String userFullname;
+  final String userProfilePhoto;
+  final String reportTitle;
+  final String reportDesc;
+  final String reportDate;
+  final String createDate;
+  final String updatedDate;
+
+  GroupReport({
+    required this.reportID,
+    required this.groupID,
+    required this.projectID,
+    required this.userID,
+    required this.userFullname,
+    required this.userProfilePhoto,
+    required this.reportTitle,
+    required this.reportDesc,
+    required this.reportDate,
+    required this.createDate,
+    required this.updatedDate,
+  });
+
+  factory GroupReport.fromJson(Map<String, dynamic> json) {
+    return GroupReport(
+      reportID: json['reportID'] ?? 0,
+      groupID: json['groupID'] ?? 0,
+      projectID: json['projectID'] ?? 0,
+      userID: json['userID'] ?? 0,
+      userFullname: json['userFullname'] ?? '',
+      userProfilePhoto: json['userProfilePhoto'] ?? '',
+      reportTitle: json['reportTitle'] ?? '',
+      reportDesc: json['reportDesc'] ?? '',
+      reportDate: json['reportDate'] ?? '',
+      createDate: json['createDate'] ?? '',
+      updatedDate: json['updatedDate'] ?? '',
+    );
+  }
+}
+
+class ReportDetailResponse {
+  final bool error;
+  final bool success;
+  final GroupReport? data;
+  final String? errorMessage;
+
+  ReportDetailResponse({
+    required this.error,
+    required this.success,
+    this.data,
+    this.errorMessage,
+  });
+
+  factory ReportDetailResponse.fromJson(Map<String, dynamic> json) {
+    return ReportDetailResponse(
+      error: json['error'] ?? false,
+      success: json['success'] ?? false,
+      data: json['data'] != null ? GroupReport.fromJson(json['data']) : null,
+      errorMessage: json['errorMessage'],
+    );
+  }
+}
+
+class ReportListResponse {
+  final bool error;
+  final bool success;
+  final ReportListData? data;
+  final String? errorMessage;
+
+  ReportListResponse({
+    required this.error,
+    required this.success,
+    this.data,
+    this.errorMessage,
+  });
+
+  factory ReportListResponse.fromJson(Map<String, dynamic> json) {
+    return ReportListResponse(
+      error: json['error'] ?? false,
+      success: json['success'] ?? false,
+      data: json['data'] != null ? ReportListData.fromJson(json['data']) : null,
+      errorMessage: json['errorMessage'],
+    );
+  }
+}
+
+class ReportListData {
+  final List<GroupReport> reports;
+
+  ReportListData({required this.reports});
+
+  factory ReportListData.fromJson(Map<String, dynamic> json) {
+    List<GroupReport> reportsList = [];
+    if (json['reports'] != null) {
+      reportsList = List<GroupReport>.from(
+          json['reports'].map((report) => GroupReport.fromJson(report)));
+    }
+    return ReportListData(reports: reportsList);
   }
 } 

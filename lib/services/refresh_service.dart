@@ -37,6 +37,10 @@ class RefreshService {
     refreshData('profile');
   }
   
+  void refreshReports() {
+    refreshData('reports');
+  }
+  
   void refreshAll() {
     refreshData('all');
   }
