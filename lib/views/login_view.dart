@@ -14,8 +14,8 @@ class LoginView extends StatefulWidget {
 }
 
 class _LoginViewState extends State<LoginView> {
-  final TextEditingController _emailController = TextEditingController(text: 'gorkemoa35@gmail.com');
-  final TextEditingController _passwordController = TextEditingController(text: '123');
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -31,6 +31,9 @@ class _LoginViewState extends State<LoginView> {
       create: (_) => LoginViewModel(),
       child: Consumer<LoginViewModel>(
         builder: (context, viewModel, _) {
+          // Kaydedilmiş e-posta varsa yükle
+          _loadSavedEmail(viewModel);
+          
           return CupertinoPageScaffold(
             backgroundColor: CupertinoColors.systemBackground,
             child: SafeArea(
@@ -166,9 +169,10 @@ class _LoginViewState extends State<LoginView> {
                                         Transform.scale(
                                           scale: 0.8,
                                           child: CupertinoSwitch(
-                                            value: true,
+                                            value: viewModel.rememberMe,
                                             activeColor: const Color(0xFF3498DB),
                                             onChanged: (bool value) {
+                                              viewModel.toggleRememberMe(value);
                                             },
                                           ),
                                         ),
@@ -180,6 +184,7 @@ class _LoginViewState extends State<LoginView> {
                                             color: const Color(0xFF7F8C8D),
                                             fontWeight: FontWeight.w500,
                                             decoration: TextDecoration.none,
+                                            
                                           ),
                                         ),
                                         const Spacer(),
@@ -336,5 +341,14 @@ class _LoginViewState extends State<LoginView> {
         },
       ),
     );
+  }
+  
+  // Kaydedilmiş e-posta adresini yükle
+  void _loadSavedEmail(LoginViewModel viewModel) async {
+    final savedEmail = await viewModel.getSavedEmail();
+    if (savedEmail != null && savedEmail.isNotEmpty && _emailController.text.isEmpty) {
+      _emailController.text = savedEmail;
+      viewModel.toggleRememberMe(true);
+    }
   }
 } 
