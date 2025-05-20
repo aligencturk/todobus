@@ -100,6 +100,74 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
+  void _launchUrl(String url, String pageName) async {
+    final Uri uri = Uri.parse(url);
+    
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        _logger.e('$pageName açılamadı: $url');
+        if (mounted) {
+          showPlatformDialog(
+            context: context,
+            builder: (context) => PlatformAlertDialog(
+              title: const Text('Hata'),
+              content: Text('$pageName açılamadı. Lütfen daha sonra tekrar deneyin.'),
+              actions: <Widget>[
+                PlatformDialogAction(
+                  child: const Text('Tamam'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        _logger.i('$pageName açıldı: $url');
+      }
+    } catch (e) {
+      _logger.e('$pageName açılırken hata oluştu: $e');
+      if (mounted) {
+        showPlatformDialog(
+          context: context,
+          builder: (context) => PlatformAlertDialog(
+            title: const Text('Hata'),
+            content: Text('$pageName açılırken bir hata oluştu: ${e.toString()}'),
+            actions: <Widget>[
+              PlatformDialogAction(
+                child: const Text('Tamam'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  void _openMembershipAgreement() {
+    _launchUrl('https://www.todobus.tr/uyelik-sozlesmesi', 'Üyelik Sözleşmesi');
+  }
+
+  void _openPrivacyPolicy() {
+    _launchUrl('https://www.todobus.tr/gizlilik-politikasi', 'Gizlilik Politikası');
+  }
+
+  void _openKVKKTerms() {
+    _launchUrl('https://www.todobus.tr/kvkk-aydinlatma-metni', 'KVKK Aydınlatma Metni');
+  }
+  
+  void _openFAQ() {
+    _launchUrl('https://www.todobus.tr/sss', 'SSS');
+  }
+  
+  void _openContact() {
+    _launchUrl('https://www.todobus.tr/iletisim', 'İletişim');
+  }
+  
+  void _openTermsOfUse() {
+    _launchUrl('https://www.todobus.tr/kullanim-sartlari', 'Kullanım Şartları');
+  }
+
   // Profil düzenleme ekranını aç
   void _navigateToEditProfile() {
     final user = context.read<ProfileViewModel>().user;
@@ -346,9 +414,48 @@ class _ProfileViewState extends State<ProfileView> {
               });
             },
             children: [
-              _buildListItem(context, 'SSS', 'Sıkça Sorulan Sorular'),
-              _buildListItem(context, 'İletişim', 'Bize Ulaşın'),
-              _buildListItem(context, 'Kullanım Şartları', 'Uygulama Koşulları'),
+              _buildListItem(
+                context, 
+                'SSS', 
+                'İncele',
+                onTap: _openFAQ,
+                isLink: true
+              ),
+              _buildListItem(
+                context, 
+                'İletişim', 
+                'İncele',
+                onTap: _openContact,
+                isLink: true
+              ),
+              _buildListItem(
+                context, 
+                'Üyelik Sözleşmesi', 
+                'İncele',
+                onTap: _openMembershipAgreement,
+                isLink: true
+              ),
+              _buildListItem(
+                context, 
+                'Gizlilik Politikası', 
+                'İncele',
+                onTap: _openPrivacyPolicy,
+                isLink: true
+              ),
+              _buildListItem(
+                context, 
+                'KVKK Aydınlatma', 
+                'İncele',
+                onTap: _openKVKKTerms,
+                isLink: true
+              ),
+              _buildListItem(
+                context, 
+                'Kullanım Şartları', 
+                'İncele',
+                onTap: _openTermsOfUse,
+                isLink: true
+              ),
             ],
           ),
           
