@@ -95,6 +95,11 @@ class _AddWorkViewState extends State<AddWorkView> {
       return;
     }
     
+    if (_selectedUsers.isEmpty) {
+      _snackBarService.showError('En az bir kullanıcı seçmelisiniz');
+      return;
+    }
+    
     setState(() {
       _isLoading = true;
     });

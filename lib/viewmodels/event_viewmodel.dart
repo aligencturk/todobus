@@ -65,79 +65,23 @@ class EventViewModel with ChangeNotifier {
       _logger.i('Etkinlikler yükleniyor (Grup ID: $groupID)');
       final response = await _apiService.event.getEvents(groupID: groupID);
       
-      if (response.success && response.data != null) {
-        // Tüm etkinlikleri al
-        final allEvents = response.data!.events;
+      if (response.success) {
+        // Veri varsa işle, yoksa boş liste kullan
+        final allEvents = response.data?.events ?? [];
         _logger.i('${allEvents.length} etkinlik API\'den başarıyla yüklendi');
         
         // Şimdiki zaman
         final now = DateTime.now();
         
-        // Etkinlikleri tarihe göre filtrele ve sırala (sadece gelecek olanlar)
-        _events = allEvents.where((event) {
-          try {
-            // Tarih formatını kontrol et
-            final parts = event.eventDate.split(' ');
-            if (parts.length != 2) {
-              _logger.w('Geçersiz tarih formatı: ${event.eventDate}, etkinlik: ${event.eventTitle}');
-              return false;
-            }
-            
-            final dateParts = parts[0].split('.');
-            final timeParts = parts[1].split(':');
-            
-            if (dateParts.length != 3 || timeParts.length != 2) {
-              _logger.w('Geçersiz tarih/saat formatı: ${event.eventDate}, etkinlik: ${event.eventTitle}');
-              return false;
-            }
-            
-            final eventDate = DateTime(
-              int.parse(dateParts[2]), // Yıl
-              int.parse(dateParts[1]), // Ay
-              int.parse(dateParts[0]), // Gün
-              int.parse(timeParts[0]), // Saat
-              int.parse(timeParts[1]), // Dakika
-            );
-            
-            return eventDate.isAfter(now);
-          } catch (e) {
-            _logger.e('Etkinlik tarihi işlenirken hata: ${event.eventDate}, hata: $e');
-            return false;
-          }
-        }).toList();
+        // Tüm etkinlikleri doğrudan kullan, tarihi çok katı şekilde filtreleme
+        _events = allEvents;
         
-        // Tarihe göre sırala (yakın tarihli olanlar önce)
-        _events.sort((a, b) {
-          try {
-            final aDateParts = a.eventDate.split(' ')[0].split('.');
-            final aTimeParts = a.eventDate.split(' ')[1].split(':');
-            
-            final bDateParts = b.eventDate.split(' ')[0].split('.');
-            final bTimeParts = b.eventDate.split(' ')[1].split(':');
-            
-            final aDate = DateTime(
-              int.parse(aDateParts[2]), // Yıl
-              int.parse(aDateParts[1]), // Ay
-              int.parse(aDateParts[0]), // Gün
-              int.parse(aTimeParts[0]), // Saat
-              int.parse(aTimeParts[1]), // Dakika
-            );
-            
-            final bDate = DateTime(
-              int.parse(bDateParts[2]), // Yıl
-              int.parse(bDateParts[1]), // Ay
-              int.parse(bDateParts[0]), // Gün
-              int.parse(bTimeParts[0]), // Saat
-              int.parse(bTimeParts[1]), // Dakika
-            );
-            
-            return aDate.compareTo(bDate);
-          } catch (e) {
-            return 0;
-          }
-        });
+        _logger.i('${_events.length} etkinlik listeye eklendi');
         
-        _logger.i('${_events.length} yaklaşan etkinlik filtrelendi ve sıralandı');
+        // Test için ilk etkinliğin bilgilerini logla
+        if (_events.isNotEmpty) {
+          _logger.i('İlk etkinlik: ${_events.first.eventTitle}, tarih: ${_events.first.eventDate}');
+        }
         
         _status = EventLoadStatus.loaded;
       } else {

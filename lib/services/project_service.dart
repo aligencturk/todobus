@@ -210,57 +210,57 @@ class ProjectService {
   // Proje görevlerini getir
   Future<List<ProjectWork>> getProjectWorks(int projectID) async {
     try {
+      // 1) Token al
       final token = await _storageService.getToken();
       if (token == null) {
         throw Exception('Oturum bilgisi bulunamadı');
       }
-      
+
+      // 2) Body hazırla
       final body = {
         'userToken': token,
         'projectID': projectID,
       };
-      
+
       _logger.i('Proje görevleri getiriliyor... ProjectID: $projectID');
-      
-      try {
-        final response = await _apiService.post(
-          'service/project/works/all',
-          body: body,
-        );
-        
-        final works = (response['data'] as List)
-            .map((item) => ProjectWork.fromJson(item))
+
+      // 3) API çağrısı yap
+      final response = await _apiService.post(
+        'service/user/project/workList',
+        body: body,
+      );
+
+      // API yanıt yapısı değişti, yeni formatı işle
+      if (response['success'] == true && response['data'] != null) {
+        if (response['data']['works'] != null) {
+          final worksList = response['data']['works'] as List<dynamic>;
+          
+          // Görev listesini dönüştür
+          final works = worksList
+            .map((item) => ProjectWork.fromJson(item as Map<String, dynamic>))
             .toList();
-        
-        _logger.i('${works.length} proje görevi getirildi. ProjectID: $projectID');
-        return works;
-      } catch (e) {
-        // 417 hatası veya görev bulunamadı hatası normal bir durumdur
-        if (e.toString().contains('417') || 
-            e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
-          _logger.i('Proje için henüz görev bulunmuyor (417). ProjectID: $projectID');
-          // Boş liste dön, hata fırlatma
-          return [];
+          
+          _logger.i('${works.length} proje görevi getirildi. ProjectID: $projectID');
+          return works;
+        } else {
+          _logger.i('Projede görev bulunamadı (veri yapısı var ancak boş)');
+          return []; // Boş liste
         }
-        
-        // Genel hataları kontrol et ve sessizce ele al
-        if (e.toString().contains('Bir hata oluştu') || 
-            e.toString().contains('tekrar deneyin')) {
-          _logger.i('Proje görevleri getirilirken genel hata. ProjectID: $projectID, Hata: $e');
-          // Boş liste dön, hata fırlatma
-          return [];
-        }
-        
-        // Diğer hataları sessizce logla ve boş liste dön
-        _logger.d('Proje görevleri getirilirken hata oluştu. ProjectID: $projectID, Hata: $e');
+      } else if (response['410'] == 'Gone') {
+        // 410 Gone durumu - API'nin özel davranışı
+        _logger.i('Proje için henüz görev bulunmuyor (410 Gone). ProjectID: $projectID');
         return [];
       }
+      
+      // Herhangi bir veri bulunamazsa boş liste dön
+      _logger.i('API yanıtında geçerli veri bulunamadı. ProjectID: $projectID');
+      return [];
     } catch (e) {
-      _logger.d('Proje görevleri getirilirken üst seviye hata: $e');
-      return []; // Boş liste dön
+      _logger.e('Proje görevleri getirilirken hata oluştu. ProjectID: $projectID, Hata: $e');
+      return []; // Hata durumunda boş liste dön
     }
   }
-  
+
   // Görev detayını getir
   Future<ProjectWork> getWorkDetail(int projectID, int workID) async {
     try {

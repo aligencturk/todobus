@@ -70,105 +70,89 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         final profileViewModel = Provider.of<ProfileViewModel>(context, listen: false);
         final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
         
-        // Bildirimleri kontrol et
-        await _checkNotifications();
+        // Kullanıcı arayüzünü hızlıca render etmek için boş durumla güncelle
+        setState(() {});
+
+        // Tüm veri yüklemelerini paralel olarak başlat
+        final userFuture = _loadUserData(profileViewModel);
+        final statusesFuture = groupViewModel.getProjectStatuses();
+        final eventsFuture = eventViewModel.loadEvents();
+        final dashboardFuture = dashboardViewModel.loadDashboardData();
+        final groupsFuture = groupViewModel.loadGroups();
+        final notificationsFuture = _checkNotifications();
         
-        // Önce kullanıcı bilgilerini yükle
-        try {
-          _logger.i('Kullanıcı bilgileri yükleniyor...');
-          final userResponse = await _userService.getUser();
-          if (userResponse.success && userResponse.data != null) {
-            profileViewModel.setUser(userResponse.data!.user);
-            _logger.i('Kullanıcı bilgileri başarıyla yüklendi');
-            
-            // Kullanıcıyı kendi ID'sine göre FCM topic'ine abone et
-            final user = userResponse.data!.user;
-            await _notificationService.subscribeToUserTopic(user.userID);
-            _logger.i('Kullanıcı FCM topic\'ine abone edildi: ${user.userID}');
-            
-          } else {
-            _logger.e('Kullanıcı bilgileri yüklenemedi: ${userResponse.errorMessage}');
-          }
-        } catch (e) {
-          _logger.e('Kullanıcı bilgileri alınırken hata: $e');
+        // Statuses'i bekleyen groupsFuture dışında paralel çalıştır
+        await Future.wait([
+          userFuture,
+          statusesFuture,
+          eventsFuture,
+          dashboardFuture,
+          notificationsFuture
+        ]);
+        
+        // Kullanıcı verilerine bağlı işlemler
+        if (profileViewModel.user != null) {
+          // FCM topic'leri için işlemi arka planda yap, UI'ı bloklama
+          _notificationService.subscribeToUserTopic(profileViewModel.user!.userID)
+            .then((_) => _logger.i('Kullanıcı FCM topic\'ine abone edildi: ${profileViewModel.user!.userID}'))
+            .catchError((e) => _logger.e('FCM topic abone işleminde hata: $e'));
         }
         
-        // Proje durumlarını önce yükle (diğer verilere bağlı olarak doğru gösterilmesi için)
-        await groupViewModel.getProjectStatuses();
-        _logger.i('Proje durumları yüklendi');
-        
-        // Etkinlikleri yükle
-        await eventViewModel.loadEvents();
-        _logger.i('Etkinlikler yüklendi: ${eventViewModel.events.length} adet');
-        
-        // İlk veri yüklemeleri - önbellekten ve sunucudan
-        dashboardViewModel.loadDashboardData();
-        
-        // Grup verilerinin yüklenmesi ve ilgili projeksiyonlar
-        await groupViewModel.loadGroups();
+        // Grup verilerini bekle
+        await groupsFuture;
         
         if (mounted) {
           _loadUserProjects(groupViewModel);
-          _logger.i('Gruplar yüklendi, loglar ve projeler istendi');
           
-          // Kullanıcının gruplarına FCM topic olarak abone olmasını sağla
+          // FCM topic aboneliklerini arka planda işle
           if (profileViewModel.user != null) {
             final groups = groupViewModel.groups;
             final groupIds = groups.map((group) => group.groupID).toList();
             
-            // Kullanıcıyı hem kendi ID'sine hem de grup ID'lerine abone et
-            await _notificationService.subscribeUserToRequiredTopics(
+            // Kullanıcıyı gruplarına abone et (arka planda, bloklama yapmadan)
+            _notificationService.subscribeUserToRequiredTopics(
               profileViewModel.user!.userID, 
               groupIds
-            );
-            
-            _logger.i('Kullanıcı FCM topics\'lerine abone edildi: ${groupIds.join(", ")}');
+            ).then((_) => _logger.i('Kullanıcı FCM topics\'lerine abone edildi: ${groupIds.join(", ")}'))
+              .catchError((e) => _logger.e('FCM topics aboneliğinde hata: $e'));
           }
           
-          // Yüklenen verilerle UI'ı güncelle
+          // Tüm veriler yüklendikten sonra tek bir kez UI güncelle
           setState(() {});
+          _logger.i('Dashboard açıldı: Tüm veriler yüklendi');
         }
-        
-        _logger.i('Dashboard açıldı: Veriler yükleniyor...');
       }
     });
   }
   
-  // Bildirimleri kontrol et
-  Future<void> _checkNotifications() async {
-    await _notificationService.fetchNotifications();
-    if (mounted) {
-      setState(() {
-        _unreadNotifications = _notificationService.unreadCount;
-      });
+  // Kullanıcı verilerini yükleme
+  Future<void> _loadUserData(ProfileViewModel profileViewModel) async {
+    try {
+      _logger.i('Kullanıcı bilgileri yükleniyor...');
+      final userResponse = await _userService.getUser();
+      if (userResponse.success && userResponse.data != null) {
+        profileViewModel.setUser(userResponse.data!.user);
+        _logger.i('Kullanıcı bilgileri başarıyla yüklendi');
+      } else {
+        _logger.e('Kullanıcı bilgileri yüklenemedi: ${userResponse.errorMessage}');
+      }
+    } catch (e) {
+      _logger.e('Kullanıcı bilgileri alınırken hata: $e');
     }
   }
   
-  // Verileri yenileme 
-  Future<void> _refreshData() async {
-    _logger.i('Veriler yenileniyor...');
-    
-    // Önceden önbellekten yüklenen verileri koruruz, yenileyiciyi çekerken yenisini alırız
-    final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
-    final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
-
-    // Proje durumlarını yeniden yükle
-    await groupViewModel.getProjectStatuses();
-    _logger.i('Proje durumları yenilendi');
-    
-    // Önce dashboardViewModel verilerini güncelle
-    await dashboardViewModel.loadDashboardData();
-    
-    // Sonra grup verilerini güncelle
-    await groupViewModel.loadGroups();
-    
-    // Son olarak projeleri ve logları yükle
-    if (mounted) {
-      _loadUserProjects(groupViewModel);
-      setState(() {}); // UI'ı güncelle
+  // Bildirimleri kontrol et - daha hızlı ve optimize edilmiş
+  Future<void> _checkNotifications() async {
+    try {
+      await _notificationService.fetchNotifications();
+      if (mounted) {
+        setState(() {
+          _unreadNotifications = _notificationService.unreadCount;
+        });
+      }
+    } catch (e) {
+      _logger.e('Bildirimler yüklenirken hata: $e');
     }
-    
-    _logger.i('Dashboard verileri yenilendi');
   }
 
   Future<void> _logout() async {
@@ -199,9 +183,10 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     final groupViewModel = Provider.of<GroupViewModel>(context);
     final dashboardViewModel = Provider.of<DashboardViewModel>(context);
     final eventViewModel = Provider.of<EventViewModel>(context);
+    final bool isIOS = Platform.isIOS;
 
     return PlatformScaffold(
-      backgroundColor: Platform.isIOS ? CupertinoColors.systemGroupedBackground : Theme.of(context).colorScheme.background,
+      backgroundColor: isIOS ? CupertinoColors.systemGroupedBackground : Theme.of(context).colorScheme.background,
       appBar: PlatformAppBar(
         title: const Text('Ana Sayfa'),
         material: (_, __) => MaterialAppBarData(
@@ -307,140 +292,157 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       ),
       body: SafeArea(
         bottom: false,
-        child: CustomScrollView(
-          slivers: [
-            if (Platform.isIOS)
-              CupertinoSliverRefreshControl(
-                onRefresh: _refreshData,
-              )
-            else
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 10.0, bottom: 5.0),
-                  child: Center(
-                    child: PlatformIconButton(
-                      icon: Icon(context.platformIcons.refresh),
-                      onPressed: _refreshData,
-                    ),
-                  ),
-                ),
-              ),
-            
-            SliverToBoxAdapter(
-              child: _buildWelcomeSection(),
-            ),
-            
-         
-            
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12.0,
-                  mainAxisSpacing: 12.0,
-                  childAspectRatio: 2.0,
-                ),
-                delegate: SliverChildListDelegate([
-                  _buildInfoCard(
-                    context,
-                    title: 'Bekleyen Görevler',
-                    value: '${dashboardViewModel.incompletedTaskCount}',
-                    icon: CupertinoIcons.tray_arrow_up_fill,
-                    color: CupertinoColors.systemIndigo,
-                  ),
-                  _buildInfoCard(
-                    context,
-                    title: 'Gruplar',
-                    value: '${groupViewModel.groups.length}',
-                    icon: CupertinoIcons.group,
-                    color: CupertinoColors.activeGreen,
-                  ),
-                  _buildInfoCard(
-                    context,
-                    title: 'Projeler',
-                    value: '${groupViewModel.totalProjects}',
-                    icon: CupertinoIcons.square_stack_3d_down_right,
-                    color: CupertinoColors.systemOrange,
-                  ),
-                  _buildInfoCard(
-                    context,
-                    title: 'Etkinlikler',
-                    value: '${eventViewModel.events.length}',
-                    icon: CupertinoIcons.calendar_badge_plus,
-                    color: CupertinoColors.systemPurple,
-                  ),
-                ]),
-              ),
-            ),
-            
-            _buildSectionHeader('Son Aktif Gruplar'),
-            SliverToBoxAdapter(
-              child: _buildRecentGroupsList(dashboardViewModel.isLoading),
-            ),
-            
-            _buildSectionHeader('Projelerim'),
-            SliverToBoxAdapter(
-              child: _buildProjectsList(dashboardViewModel.isLoading),
-            ),
-            
-            _buildSectionHeader('Yaklaşan Etkinlikler', onViewAll: () {
-              final parentContext = context;
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (Navigator.of(parentContext).canPop()) {
-                  Navigator.of(parentContext).pop();
-                }
-                if (parentContext.findAncestorStateOfType<MainAppState>() != null) {
-                  parentContext.findAncestorStateOfType<MainAppState>()!.setCurrentIndex(2);
-                }
-              });
-            }),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              sliver: eventViewModel.isLoading && eventViewModel.events.isEmpty
-                ? SliverToBoxAdapter(child: Center(child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: CupertinoActivityIndicator(),
-                  )))
-                : eventViewModel.events.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: _buildEmptyState(
-                        icon: CupertinoIcons.calendar_badge_minus,
-                        message: 'Yaklaşan etkinlik bulunmuyor',
-                      ),
-                    )
-                  : SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          if (index >= eventViewModel.events.length) return null;
-                          final event = eventViewModel.events[index];
-                          return _buildEventItem(
-                            context, 
-                            title: event.eventTitle,
-                            description: event.eventDesc,
-                            date: event.eventDate,
-                            user: event.userFullname,
-                            groupId: event.groupID,
-                          );
-                        },
-                        childCount: eventViewModel.events.length > 5 ? 5 : eventViewModel.events.length,
-                      ),
-                    ),
-            ),
-            
-            _buildSectionHeader('Görevlerim'),
-            _buildMyTasksSection(),
-            
-            
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 90),
-            ),
-          ]
-        )
+        child: _buildDashboardBody(dashboardViewModel, groupViewModel, eventViewModel, isIOS),
       )
     );
   }
-
+  
+  // Dashboard ana içeriğini oluşturma - performans için ayrı metot
+  Widget _buildDashboardBody(
+    DashboardViewModel dashboardViewModel, 
+    GroupViewModel groupViewModel, 
+    EventViewModel eventViewModel,
+    bool isIOS
+  ) {
+    return CustomScrollView(
+      slivers: [
+        if (isIOS)
+          CupertinoSliverRefreshControl(
+            onRefresh: _refreshData,
+          )
+        else
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 10.0, bottom: 5.0),
+              child: Center(
+                child: PlatformIconButton(
+                  icon: Icon(context.platformIcons.refresh),
+                  onPressed: _refreshData,
+                ),
+              ),
+            ),
+          ),
+        
+        SliverToBoxAdapter(
+          child: _buildWelcomeSection(),
+        ),
+        
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12.0,
+              mainAxisSpacing: 12.0,
+              childAspectRatio: 2.0,
+            ),
+            delegate: SliverChildListDelegate([
+              _buildInfoCard(
+                context,
+                title: 'Bekleyen Görevler',
+                value: '${dashboardViewModel.incompletedTaskCount}',
+                icon: CupertinoIcons.tray_arrow_up_fill,
+                color: CupertinoColors.systemIndigo,
+              ),
+              _buildInfoCard(
+                context,
+                title: 'Gruplar',
+                value: '${groupViewModel.groups.length}',
+                icon: CupertinoIcons.group,
+                color: CupertinoColors.activeGreen,
+              ),
+              _buildInfoCard(
+                context,
+                title: 'Projeler',
+                value: '${groupViewModel.totalProjects}',
+                icon: CupertinoIcons.square_stack_3d_down_right,
+                color: CupertinoColors.systemOrange,
+              ),
+              _buildInfoCard(
+                context,
+                title: 'Etkinlikler',
+                value: '${eventViewModel.events.length}',
+                icon: CupertinoIcons.calendar_badge_plus,
+                color: CupertinoColors.systemPurple,
+              ),
+            ]),
+          ),
+        ),
+        
+        _buildSectionHeader('Son Aktif Gruplar'),
+        SliverToBoxAdapter(
+          child: _buildRecentGroupsList(dashboardViewModel.isLoading),
+        ),
+        
+        _buildSectionHeader('Projelerim'),
+        SliverToBoxAdapter(
+          child: _buildProjectsList(dashboardViewModel.isLoading),
+        ),
+        
+        _buildSectionHeader('Yaklaşan Etkinlikler', onViewAll: () {
+          final parentContext = context;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (Navigator.of(parentContext).canPop()) {
+              Navigator.of(parentContext).pop();
+            }
+            if (parentContext.findAncestorStateOfType<MainAppState>() != null) {
+              parentContext.findAncestorStateOfType<MainAppState>()!.setCurrentIndex(2);
+            }
+          });
+        }),
+        _buildEventsList(eventViewModel),
+        
+        _buildSectionHeader('Görevlerim'),
+        _buildMyTasksSection(),
+        
+        
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 90),
+        ),
+      ]
+    );
+  }
+  
+  // Etkinlikler listesi - ayrı metot olarak optimize edildi
+  Widget _buildEventsList(EventViewModel eventViewModel) {
+    final bool isLoading = eventViewModel.isLoading;
+    final events = eventViewModel.events;
+    final bool isEmpty = events.isEmpty;
+    final int displayCount = events.length > 5 ? 5 : events.length;
+    
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      sliver: isLoading && isEmpty
+        ? SliverToBoxAdapter(child: Center(child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: CupertinoActivityIndicator(),
+          )))
+        : isEmpty
+          ? SliverToBoxAdapter(
+              child: _buildEmptyState(
+                icon: CupertinoIcons.calendar_badge_minus,
+                message: 'Yaklaşan etkinlik bulunmuyor',
+              ),
+            )
+          : SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final event = events[index];
+                  return _buildEventItem(
+                    context, 
+                    title: event.eventTitle,
+                    description: event.eventDesc,
+                    date: event.eventDate,
+                    user: event.userFullname,
+                    groupId: event.groupID,
+                  );
+                },
+                childCount: displayCount,
+              ),
+            ),
+    );
+  }
+  
   Widget _buildSectionHeader(String title, {VoidCallback? onViewAll, VoidCallback? onRefresh}) {
     final bool isIOS = Platform.isIOS;
     final titleStyle = isIOS 
@@ -715,18 +717,18 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       return const SizedBox.shrink();
     }
     
-    final recentGroups = groupViewModel.groups.length > 7
-        ? groupViewModel.groups.sublist(0, 7) 
-        : groupViewModel.groups;
+    // Sadece ilk 7 grubu göster - performans optimizasyonu için liste kopyası yapmadan
+    final int groupCount = groupViewModel.groups.length;
+    final int displayCount = groupCount > 7 ? 7 : groupCount;
     
     return SizedBox(
       height: 120,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         scrollDirection: Axis.horizontal,
-        itemCount: recentGroups.length,
+        itemCount: displayCount,
         itemBuilder: (context, index) {
-          final group = recentGroups[index];
+          final group = groupViewModel.groups[index];
           return _buildGroupCard(group);
         },
       ),
@@ -1008,16 +1010,18 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       return const SizedBox.shrink();
     }
     
-    final displayedProjects = _userProjects.length > 7 ? _userProjects.sublist(0, 7) : _userProjects;
+    // Sadece ilk 7 projeyi göster - performans optimizasyonu için liste kopyası yapmadan
+    final int projectCount = _userProjects.length;
+    final int displayCount = projectCount > 7 ? 7 : projectCount;
 
     return SizedBox(
       height: 120,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         scrollDirection: Axis.horizontal,
-        itemCount: displayedProjects.length,
+        itemCount: displayCount,
         itemBuilder: (context, index) {
-          final project = displayedProjects[index];
+          final project = _userProjects[index];
           return _buildProjectCard(project);
         },
       ),
@@ -1173,10 +1177,12 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   Widget _buildMyTasksSection() {
     final dashboardViewModel = Provider.of<DashboardViewModel>(context);
     
-    // Sadece tamamlanmamış görevleri filtrele
-    final incompleteTasks = dashboardViewModel.userTasks
+    // Sadece tamamlanmamış görevleri filtrele - performans optimizasyonu için burada
+    final hasIncompleteTasks = dashboardViewModel.userTasks.any((task) => !task.workCompleted);
+    final incompleteTasks = hasIncompleteTasks ? dashboardViewModel.userTasks
         .where((task) => !task.workCompleted)
-        .toList();
+        .take(5) // Sadece ilk 5 görev - performans için
+        .toList() : [];
     
     if (dashboardViewModel.isLoadingTasks && incompleteTasks.isEmpty) {
       return SliverToBoxAdapter(
@@ -1204,7 +1210,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             final task = incompleteTasks[index];
             return _buildWorkItem(task);
           },
-          childCount: incompleteTasks.length > 5 ? 5 : incompleteTasks.length,
+          childCount: incompleteTasks.length,
         ),
       ),
     );
@@ -1212,100 +1218,23 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   
   Widget _buildWorkItem(UserProjectWork task) {
     final bool isIOS = Platform.isIOS;
+    final bool isCompleted = task.workCompleted;
+    final bool isCompleting = _completingTasksMap.containsKey(task.workID);
     
+    // Biraz daha hızlı render için renk hesaplamalarını optimize edelim
     final cardBackgroundColor = isIOS 
       ? (CupertinoTheme.of(context).brightness == Brightness.light ? CupertinoColors.white : CupertinoColors.tertiarySystemBackground)
       : Theme.of(context).cardColor;
-
-    final bool isCompleted = task.workCompleted;
-    final bool isCompleting = _completingTasksMap.containsKey(task.workID);
-    final _TaskCompletionAnimationState? animationState = isCompleting ? _completingTasksMap[task.workID] : null;
     
-    final Color statusColor = isCompleted 
+    final statusColor = isCompleted 
         ? (isIOS ? CupertinoColors.systemGreen : Colors.green)
         : (isIOS ? CupertinoColors.systemGrey2 : Colors.grey);
-
+    
+    final _TaskCompletionAnimationState? animationState = isCompleting ? _completingTasksMap[task.workID] : null;
+    
+    // Animasyon durumu varsa animasyonlu göster
     if (isCompleting && animationState != null) {
-      // Konfeti efekti ile ileri seviye animasyon
-      return Stack(
-        children: [
-          // Ana görev kartı
-          SlideTransition(
-            position: animationState.slideAnimation,
-            child: ScaleTransition(
-              scale: animationState.scaleAnimation,
-              child: RotationTransition(
-                turns: animationState.rotateAnimation,
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.of(context).push(
-                      CupertinoPageRoute(
-                        builder: (context) => WorkDetailView(
-                          projectId: task.projectID,
-                          groupId: 0,
-                          workId: task.workID,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10.0),
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
-                    decoration: BoxDecoration(
-                      color: cardBackgroundColor,
-                      borderRadius: BorderRadius.circular(10.0),
-                      border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.3), width: 0.5) : null,
-                    ),
-                    child: _buildTaskContent(task, statusColor, isIOS, isCompleted),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          
-          // Konfeti efekti
-          ...List.generate(animationState.confettiAnimations.length, (index) {
-            // Her bir parçacık için rastgele pozisyon ve renk
-            final randomOffsetX = 40.0 + (index * 20.0);
-            final randomOffsetY = -20.0 - (index * 5.0);
-            final randomColor = _confettiColors[math.Random().nextInt(_confettiColors.length)];
-            final size = 5.0 + (index % 3) * 3.0;
-            
-            return Positioned(
-              right: randomOffsetX,
-              top: 25 + randomOffsetY,
-              child: AnimatedBuilder(
-                animation: animationState.confettiAnimations[index],
-                builder: (context, child) {
-                  final value = animationState.confettiAnimations[index].value;
-                  final opacity = 1.0 - value * 0.5; // Yavaşça kaybolur
-                  
-                  return Transform.translate(
-                    offset: Offset(
-                      -100 * value, // Sola doğru hareket
-                      50 * value + 20 * math.sin(value * math.pi * 2), // Parabol yörünge
-                    ),
-                    child: Transform.rotate(
-                      angle: value * math.pi * 2 * (index % 2 == 0 ? 1 : -1), // Dönme efekti
-                      child: Opacity(
-                        opacity: opacity,
-                        child: Container(
-                          width: size,
-                          height: size,
-                          decoration: BoxDecoration(
-                            color: randomColor,
-                            shape: index % 2 == 0 ? BoxShape.circle : BoxShape.rectangle,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            );
-          }),
-        ],
-      );
+      return _buildAnimatedTaskItem(task, animationState, statusColor, isIOS, isCompleted, cardBackgroundColor);
     }
 
     // Normal görünüm
@@ -1334,7 +1263,96 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     );
   }
   
-  // Görev içeriği widget'ı (kod tekrarını önlemek için çıkarıldı)
+  // Animasyonlu görev öğesi oluşturma - performans için ayrı metot
+  Widget _buildAnimatedTaskItem(
+    UserProjectWork task, 
+    _TaskCompletionAnimationState animationState,
+    Color statusColor,
+    bool isIOS,
+    bool isCompleted,
+    Color cardBackgroundColor
+  ) {
+    return Stack(
+      children: [
+        // Ana görev kartı
+        SlideTransition(
+          position: animationState.slideAnimation,
+          child: ScaleTransition(
+            scale: animationState.scaleAnimation,
+            child: RotationTransition(
+              turns: animationState.rotateAnimation,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (context) => WorkDetailView(
+                        projectId: task.projectID,
+                        groupId: 0,
+                        workId: task.workID,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 10.0),
+                  decoration: BoxDecoration(
+                    color: cardBackgroundColor,
+                    borderRadius: BorderRadius.circular(10.0),
+                    border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.3), width: 0.5) : null,
+                  ),
+                  child: _buildTaskContent(task, statusColor, isIOS, isCompleted),
+                ),
+              ),
+            ),
+          ),
+        ),
+        
+        // Konfeti efekti
+        ...List.generate(animationState.confettiAnimations.length, (index) {
+          // Her bir parçacık için rastgele pozisyon ve renk
+          final randomOffsetX = 40.0 + (index * 20.0);
+          final randomOffsetY = -20.0 - (index * 5.0);
+          final randomColor = _confettiColors[math.Random().nextInt(_confettiColors.length)];
+          final size = 5.0 + (index % 3) * 3.0;
+          
+          return Positioned(
+            right: randomOffsetX,
+            top: 25 + randomOffsetY,
+            child: AnimatedBuilder(
+              animation: animationState.confettiAnimations[index],
+              builder: (context, child) {
+                final value = animationState.confettiAnimations[index].value;
+                final opacity = 1.0 - value * 0.5; // Yavaşça kaybolur
+                
+                return Transform.translate(
+                  offset: Offset(
+                    -100 * value, // Sola doğru hareket
+                    50 * value + 20 * math.sin(value * math.pi * 2), // Parabol yörünge
+                  ),
+                  child: Transform.rotate(
+                    angle: value * math.pi * 2 * (index % 2 == 0 ? 1 : -1), // Dönme efekti
+                    child: Opacity(
+                      opacity: opacity,
+                      child: Container(
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          color: randomColor,
+                          shape: index % 2 == 0 ? BoxShape.circle : BoxShape.rectangle,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _buildTaskContent(UserProjectWork task, Color statusColor, bool isIOS, bool isCompleted) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1552,10 +1570,21 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   }
 
   void _loadUserProjects(GroupViewModel groupViewModel) {
-    List<ProjectPreviewItem> allProjects = [];
+    if (!mounted) return;
     
-    for (final group in groupViewModel.groups) {
-      for (final project in group.projects) {
+    // Optimize edilmiş verimli proje listesi oluşturma
+    final List<ProjectPreviewItem> allProjects = [];
+    final groups = groupViewModel.groups;
+    final int groupCount = groups.length;
+    
+    // Kapasiteyi önceden ayarlayarak bellek optimizasyonu sağlanıyor
+    for (int i = 0; i < groupCount; i++) {
+      final group = groups[i];
+      final projects = group.projects;
+      final int projectCount = projects.length;
+      
+      for (int j = 0; j < projectCount; j++) {
+        final project = projects[j];
         allProjects.add(
           ProjectPreviewItem(
             projectID: project.projectID,
@@ -1568,19 +1597,50 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       }
     }
     
-    if (mounted) {
-        setState(() {
-          _userProjects = allProjects;
-        });
-        
-        // Log ekleyelim - hangi durumlara sahip projeler yüklendiğini görelim
-        if (_userProjects.isNotEmpty) {
-          _logger.i('Projeler ve durumları yüklendi: ${_userProjects.map((p) => '${p.projectName}: ${p.projectStatusID}').join(', ')}');
-          
-          // Statuses içinde bu durumlar var mı kontrol edelim
-          final statuses = groupViewModel.cachedProjectStatuses;
-          _logger.i('Mevcut durumlar: ${statuses.map((s) => '${s.statusID}: ${s.statusName} (${s.statusColor})').join(', ')}');
-        }
+    setState(() {
+      _userProjects = allProjects;
+    });
+      
+    // Log ekleyelim - hangi durumlara sahip projeler yüklendiğini görelim
+    if (allProjects.isNotEmpty) {
+      _logger.i('Projeler ve durumları yüklendi: ${allProjects.length} adet');
+      
+      // Statuses içinde bu durumlar var mı kontrol edelim
+      final statuses = groupViewModel.cachedProjectStatuses;
+      if (statuses.isNotEmpty) {
+        _logger.i('Mevcut durumlar: ${statuses.length} adet');
+      }
+    }
+  }
+
+  // Verileri yenileme - optimize edilmiş
+  Future<void> _refreshData() async {
+    _logger.i('Veriler yenileniyor...');
+    
+    // Önceden önbellekten yüklenen verileri koruruz, yenileyiciyi çekerken yenisini alırız
+    final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
+    final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+    
+    try {
+      // Tüm veri yüklemelerini paralel olarak başlat
+      await Future.wait([
+        groupViewModel.getProjectStatuses(),
+        dashboardViewModel.loadDashboardData(),
+        groupViewModel.loadGroups()
+      ]);
+      
+      // Projeleri yükle
+      if (mounted) {
+        _loadUserProjects(groupViewModel);
+        setState(() {}); // UI'ı güncelle
+      }
+      
+      _logger.i('Dashboard verileri yenilendi');
+    } catch (e) {
+      _logger.e('Veriler yenilenirken hata: $e');
+      if (mounted) {
+        _snackBarService.showError('Veriler yenilenirken hata oluştu');
+      }
     }
   }
 }

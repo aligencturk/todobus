@@ -595,9 +595,11 @@ class _ProfileViewState extends State<ProfileView> {
             ),
           ),
         
+        // Profil fotoğrafı ve kullanıcı adı
         Center(
           child: Column(
             children: [
+              // Profil fotoğrafı
               Container(
                 width: 100,
                 height: 100,
@@ -629,8 +631,12 @@ class _ProfileViewState extends State<ProfileView> {
                           ),
                         ),
                       )
-                    : null),
-         Text(
+                    : null,
+              ),
+              
+              // Kullanıcı adı
+              const SizedBox(height: 12),
+              Text(
                 user?.userFullname ?? 'Yükleniyor...',
                 style: platformThemeData(
                   context,
@@ -638,15 +644,11 @@ class _ProfileViewState extends State<ProfileView> {
                   cupertino: (data) => data.textTheme.navLargeTitleTextStyle.copyWith(fontSize: 24),
                 ),
               ),
-       ] ),
-      
-      
-            
-      )  ],
-          );
-        
-      
-    
+            ],
+          ),
+        ),
+      ],
+    );
   }
   
   Widget _buildSectionHeader(BuildContext context, String title) {

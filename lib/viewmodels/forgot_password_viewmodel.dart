@@ -62,7 +62,8 @@ class ForgotPasswordViewModel with ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _errorMessage = response.message ?? 'Şifre sıfırlama isteği başarısız';
+        // Kullanıcı dostu hata mesajını kullan
+        _errorMessage = response.userFriendlyMessage ?? response.message ?? 'Şifre sıfırlama isteği başarısız';
         _logger.w('Şifre sıfırlama başarısız: $_errorMessage');
         _status = ForgotPasswordStatus.error;
         notifyListeners();
@@ -116,7 +117,8 @@ class ForgotPasswordViewModel with ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _errorMessage = response.message ?? 'Doğrulama kodu kontrolü başarısız';
+        // Kullanıcı dostu hata mesajını kullan
+        _errorMessage = response.userFriendlyMessage ?? response.message ?? 'Doğrulama kodu kontrolü başarısız';
         _logger.w('Doğrulama kodu kontrolü başarısız: $_errorMessage');
         _status = ForgotPasswordStatus.error;
         notifyListeners();
@@ -174,7 +176,8 @@ class ForgotPasswordViewModel with ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _errorMessage = response.message ?? 'Şifre sıfırlama başarısız';
+        // Kullanıcı dostu hata mesajını kullan
+        _errorMessage = response.userFriendlyMessage ?? response.message ?? 'Şifre sıfırlama başarısız';
         _logger.w('Şifre sıfırlama başarısız: $_errorMessage');
         _status = ForgotPasswordStatus.error;
         notifyListeners();

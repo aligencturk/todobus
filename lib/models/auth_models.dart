@@ -20,20 +20,57 @@ class LoginResponse {
   final bool success;
   final LoginData? data;
   final String? errorMessage;
+  final int? statusCode;
+  final String? userFriendlyMessage;
 
   LoginResponse({
     required this.error,
     required this.success,
     this.data,
     this.errorMessage,
+    this.statusCode,
+    this.userFriendlyMessage,
   });
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    bool success = json['success'] ?? false;
+    String? errorMessage = json['errorMessage'] ?? json['error_message'];
+    String? userFriendlyMessage;
+
+    if (!success) {
+      String baseMessage = errorMessage ?? 'Giriş yapılırken bilinmeyen bir hata oluştu.';
+      if (json.containsKey('417')) {
+        baseMessage = 'E-posta adresi veya şifre hatalı.';
+        userFriendlyMessage = 'API Hatası: 417 - $baseMessage';
+      } else if (statusCode == 400) {
+        baseMessage = 'E-posta veya şifre hatalı.';
+        userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else if (statusCode == 401) {
+        baseMessage = 'Hesabınız aktif değil. Lütfen e-postanızı kontrol edin.';
+        userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else if (statusCode == 404) {
+        baseMessage = 'Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı.';
+        userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else {
+        if (statusCode != null) {
+          userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+        } else {
+          userFriendlyMessage = baseMessage;
+        }
+      }
+    }
+    
     return LoginResponse(
-      error: json['error'] ?? false,
-      success: json['success'] ?? false,
+      error: json['error'] ?? !success,
+      success: success,
       data: json['data'] != null ? LoginData.fromJson(json['data']) : null,
-      errorMessage: json['errorMessage'],
+      errorMessage: errorMessage,
+      statusCode: statusCode,
+      userFriendlyMessage: userFriendlyMessage,
     );
   }
 }
@@ -97,18 +134,46 @@ class RegisterResponse {
   final bool error;
   final bool success;
   final String? message;
+  final int? statusCode;
+  final String? userFriendlyMessage;
 
   RegisterResponse({
     required this.error,
     required this.success,
     this.message,
+    this.statusCode,
+    this.userFriendlyMessage,
   });
 
   factory RegisterResponse.fromJson(Map<String, dynamic> json) {
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    bool success = json['success'] ?? false;
+    String? message = json['message'];
+    String? userFriendlyMessage;
+
+    if (!success) {
+      String baseMessage = message ?? 'Kayıt işlemi sırasında bilinmeyen bir hata oluştu.';
+      if (json.containsKey('417') || statusCode == 417) {
+        baseMessage = 'Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın veya başka bir e-posta adresi kullanın.';
+        userFriendlyMessage = 'API Hatası: 417 - $baseMessage';
+      } else {
+        if (statusCode != null) {
+          userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+        } else {
+          userFriendlyMessage = baseMessage;
+        }
+      }
+    }
+    
     return RegisterResponse(
-      error: json['error'] ?? false,
-      success: json['success'] ?? false,
-      message: json['message'],
+      error: json['error'] ?? !success,
+      success: success,
+      message: message,
+      statusCode: statusCode,
+      userFriendlyMessage: userFriendlyMessage,
     );
   }
 }
@@ -132,20 +197,47 @@ class ForgotPasswordResponse {
   final bool success;
   final String? message;
   final ForgotPasswordData? data;
+  final int? statusCode;
+  final String? userFriendlyMessage;
 
   ForgotPasswordResponse({
     required this.error,
     required this.success,
     this.message,
     this.data,
+    this.statusCode,
+    this.userFriendlyMessage,
   });
 
   factory ForgotPasswordResponse.fromJson(Map<String, dynamic> json) {
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    // Kullanıcı dostu mesaj oluştur
+    String? friendlyMessage;
+    if (!(json['success'] ?? false)) {
+      String baseMessage;
+      if (statusCode == 404) {
+        baseMessage = 'Bu e-posta adresiyle kayıtlı hesap bulunamadı.';
+      } else {
+        baseMessage = json['message'] ?? 'Şifre sıfırlama işlemi sırasında bir hata oluştu.';
+      }
+
+      if (statusCode != null) {
+        friendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else {
+        friendlyMessage = baseMessage;
+      }
+    }
+    
     return ForgotPasswordResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,
       message: json['message'],
       data: json['data'] != null ? ForgotPasswordData.fromJson(json['data']) : null,
+      statusCode: statusCode,
+      userFriendlyMessage: friendlyMessage,
     );
   }
 }
@@ -185,20 +277,38 @@ class CodeCheckResponse {
   final bool success;
   final String? message;
   final CodeCheckData? data;
+  final String? userFriendlyMessage;
 
   CodeCheckResponse({
     required this.error,
     required this.success,
     this.message,
     this.data,
+    this.userFriendlyMessage,
   });
 
   factory CodeCheckResponse.fromJson(Map<String, dynamic> json) {
+    // Kullanıcı dostu mesaj oluştur
+    String? friendlyMessage;
+    if (!json['success']) {
+      final message = json['message'] as String?;
+      if (message != null) {
+        if (message.contains('hatalı')) {
+          friendlyMessage = 'Girdiğiniz kod hatalı. Lütfen tekrar kontrol edin.';
+        } else if (message.contains('süresi')) {
+          friendlyMessage = 'Doğrulama kodunun süresi dolmuş. Lütfen yeni kod talep edin.';
+        } else {
+          friendlyMessage = 'Doğrulama kodu kontrolü sırasında bir hata oluştu.';
+        }
+      }
+    }
+    
     return CodeCheckResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,
       message: json['message'],
       data: json['data'] != null ? CodeCheckData.fromJson(json['data']) : null,
+      userFriendlyMessage: friendlyMessage,
     );
   }
 }
@@ -240,18 +350,36 @@ class UpdatePasswordResponse {
   final bool error;
   final bool success;
   final String? message;
+  final String? userFriendlyMessage;
 
   UpdatePasswordResponse({
     required this.error,
     required this.success,
     this.message,
+    this.userFriendlyMessage,
   });
 
   factory UpdatePasswordResponse.fromJson(Map<String, dynamic> json) {
+    // Kullanıcı dostu mesaj oluştur
+    String? friendlyMessage;
+    if (!json['success']) {
+      final message = json['message'] as String?;
+      if (message != null) {
+        if (message.contains('eşleşmiyor')) {
+          friendlyMessage = 'Girdiğiniz şifreler birbiriyle eşleşmiyor. Lütfen tekrar deneyin.';
+        } else if (message.contains('token')) {
+          friendlyMessage = 'Şifre sıfırlama bağlantınızın süresi dolmuş. Lütfen yeni bir şifre sıfırlama işlemi başlatın.';
+        } else {
+          friendlyMessage = 'Şifre güncellenirken bir hata oluştu.';
+        }
+      }
+    }
+    
     return UpdatePasswordResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,
       message: json['message'],
+      userFriendlyMessage: friendlyMessage,
     );
   }
 } 

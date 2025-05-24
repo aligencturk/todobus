@@ -133,28 +133,26 @@ class _EventsViewState extends State<EventsView> {
                     },
                   ),
                   Expanded(
-                    child: eventViewModel.events.isEmpty
-                        ? _EmptyEventView(onCreateEvent: _navigateToCreateEventView)
-                        : _EventCalendarList(
-                            events: eventViewModel.events,
-                            eventsByDay: _eventsByDay,
-                            focusedDay: _focusedDay,
-                            selectedDay: _selectedDay,
-                            calendarFormat: _calendarFormat,
-                            getEventsForDay: _getEventsForDay,
-                            onFormatChanged: (format) => setState(() => _calendarFormat = format),
-                            onSelectedDayChanged: (selected, focused) {
-                              setState(() {
-                                _selectedDay = selected;
-                                _focusedDay = focused;
-                              });
-                            },
-                            onPageChanged: (focusedDay) => _focusedDay = focusedDay,
-                            onEventTap: _navigateToEventDetail,
-                            onCreateEventTap: _navigateToCreateEventView,
-                            onDeleteEvent: _showDeleteConfirmation,
-                            onEditEvent: _navigateToEditEventView,
-                          ),
+                    child: _EventCalendarList(
+                      events: eventViewModel.events,
+                      eventsByDay: _eventsByDay,
+                      focusedDay: _focusedDay,
+                      selectedDay: _selectedDay,
+                      calendarFormat: _calendarFormat,
+                      getEventsForDay: _getEventsForDay,
+                      onFormatChanged: (format) => setState(() => _calendarFormat = format),
+                      onSelectedDayChanged: (selected, focused) {
+                        setState(() {
+                          _selectedDay = selected;
+                          _focusedDay = focused;
+                        });
+                      },
+                      onPageChanged: (focusedDay) => _focusedDay = focusedDay,
+                      onEventTap: _navigateToEventDetail,
+                      onCreateEventTap: _navigateToCreateEventView,
+                      onDeleteEvent: _showDeleteConfirmation,
+                      onEditEvent: _navigateToEditEventView,
+                    ),
                   ),
                 ],
               ),

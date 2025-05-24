@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
+import '../services/data_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum LoginStatus { initial, loading, success, error }
+enum LoginStatus { initial, loading, success, error, dataLoading }
 
 class LoginViewModel extends ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LoggerService _logger = LoggerService();
+  final DataService _dataService = DataService();
   
   LoginStatus _status = LoginStatus.initial;
   String _errorMessage = '';
@@ -51,13 +53,13 @@ class LoginViewModel extends ChangeNotifier {
   // "Beni Hatırla" değerini değiştir
   void toggleRememberMe(bool value) {
     _rememberMe = value;
-    notifyListeners();
+    _safeNotifyListeners();
   }
   
   // Şifre görünürlüğünü değiştir
   void togglePasswordVisibility() {
     _obscurePassword = !_obscurePassword;
-    notifyListeners();
+    _safeNotifyListeners();
   }
   
   // E-posta adresini kaydet
@@ -72,26 +74,47 @@ class LoginViewModel extends ChangeNotifier {
     await prefs.remove(_emailKey);
   }
   
+  // Tüm uygulama verilerini yükle
+  Future<void> _loadAllData(String userID) async {
+    _status = LoginStatus.dataLoading;
+    _safeNotifyListeners();
+    
+    _logger.i('Tüm veriler yükleniyor...');
+    
+    try {
+      // Tüm verileri tek seferde yükle
+      await _dataService.loadAllData(userID);
+      
+      _logger.i('Tüm veriler başarıyla yüklendi');
+      _status = LoginStatus.success;
+      _safeNotifyListeners();
+    } catch (e) {
+      _logger.e('Veri yükleme hatası', e);
+      // Veri yükleme hatası olsa bile kullanıcı girişi kabul edilir
+      _status = LoginStatus.success;
+      _safeNotifyListeners();
+    }
+  }
+
   // Giriş işlemi
   Future<bool> login(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
       _errorMessage = 'E-posta ve şifre alanları boş bırakılamaz';
       _status = LoginStatus.error;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
 
     try {
       _status = LoginStatus.loading;
       _errorMessage = '';
-      notifyListeners();
+      _safeNotifyListeners();
 
       _logger.i('Giriş denemesi: $email');
       final response = await _apiService.auth.login(email, password);
 
       if (response.success) {
         _logger.i('Giriş başarılı: Kullanıcı ID: ${response.data?.userID}');
-        _status = LoginStatus.success;
         
         // "Beni Hatırla" seçili ise e-postayı kaydet, değilse sil
         if (_rememberMe) {
@@ -100,20 +123,23 @@ class LoginViewModel extends ChangeNotifier {
           await _clearSavedEmail();
         }
         
-        notifyListeners();
+        // Tüm verileri yükle
+        await _loadAllData(response.data?.userID?.toString() ?? '');
+        
         return true;
       } else {
-        _errorMessage = response.errorMessage ?? 'Giriş başarısız';
+        // Kullanıcı dostu hata mesajını kullan
+        _errorMessage = response.userFriendlyMessage ?? response.errorMessage ?? 'Giriş başarısız';
         _logger.w('Giriş başarısız: $_errorMessage');
         _status = LoginStatus.error;
-        notifyListeners();
+        _safeNotifyListeners();
         return false;
       }
     } catch (e) {
       _errorMessage = 'Bir hata oluştu: ${e.toString()}';
-      _logger.e('Giriş hatası:', e);
+      _logger.e('Giriş hatası', e);
       _status = LoginStatus.error;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -127,6 +153,6 @@ class LoginViewModel extends ChangeNotifier {
   void reset() {
     _status = LoginStatus.initial;
     _errorMessage = '';
-    notifyListeners();
+    _safeNotifyListeners();
   }
 } 

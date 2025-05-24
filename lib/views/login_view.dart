@@ -17,23 +17,56 @@ class _LoginViewState extends State<LoginView> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  late LoginViewModel _viewModel;
+  bool _loginSuccess = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewModel = LoginViewModel();
+    _loadSavedEmail();
+    
+    // ViewModel durumunu dinle
+    _viewModel.addListener(_checkLoginStateAndNavigate);
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _viewModel.removeListener(_checkLoginStateAndNavigate);
     super.dispose();
+  }
+  
+  // Giriş durumunu kontrol et ve tamamlandığında ana sayfaya geç
+  void _checkLoginStateAndNavigate() {
+    if (_loginSuccess && _viewModel.status == LoginStatus.success && mounted) {
+      _loginSuccess = false; // Tekrar çağrılmasını engelle
+      Navigator.of(context).pushReplacement(
+        CupertinoPageRoute(
+          builder: (context) => const MainApp(),
+        ),
+      );
+    }
+  }
+
+  // Kaydedilmiş e-posta adresini yükle
+  void _loadSavedEmail() async {
+    final savedEmail = await _viewModel.getSavedEmail();
+    if (savedEmail != null && savedEmail.isNotEmpty) {
+      setState(() {
+        _emailController.text = savedEmail;
+      });
+      _viewModel.toggleRememberMe(true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => LoginViewModel(),
+      create: (_) => _viewModel,
       child: Consumer<LoginViewModel>(
         builder: (context, viewModel, _) {
-          // Kaydedilmiş e-posta varsa yükle
-          _loadSavedEmail(viewModel);
-          
           return CupertinoPageScaffold(
             backgroundColor: CupertinoColors.systemBackground,
             child: SafeArea(
@@ -184,7 +217,6 @@ class _LoginViewState extends State<LoginView> {
                                             color: const Color(0xFF7F8C8D),
                                             fontWeight: FontWeight.w500,
                                             decoration: TextDecoration.none,
-                                            
                                           ),
                                         ),
                                         const Spacer(),
@@ -254,21 +286,19 @@ class _LoginViewState extends State<LoginView> {
                             padding: const EdgeInsets.only(bottom: 20),
                             child: CupertinoButton(
                               padding: EdgeInsets.zero,
-                              onPressed: viewModel.status == LoginStatus.loading
+                              onPressed: viewModel.status == LoginStatus.loading || viewModel.status == LoginStatus.dataLoading
                                   ? null
                                   : () async {
                                       if (_formKey.currentState?.validate() ?? false) {
+                                        // Giriş işlemini başlat
                                         final success = await viewModel.login(
                                           _emailController.text.trim(),
                                           _passwordController.text,
                                         );
                                         
-                                        if (success && mounted) {
-                                          Navigator.of(context).pushReplacement(
-                                            CupertinoPageRoute(
-                                              builder: (context) => const MainApp(),
-                                            ),
-                                          );
+                                        // Başarılı giriş yapıldıysa flag'i ayarla
+                                        if (success) {
+                                          _loginSuccess = true;
                                         }
                                       }
                                     },
@@ -283,15 +313,34 @@ class _LoginViewState extends State<LoginView> {
                                       ? const CupertinoActivityIndicator(
                                           color: CupertinoColors.white,
                                         )
-                                      : const Text(
-                                          'Giriş Yap',
-                                          style: TextStyle(
-                                            color: CupertinoColors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            decoration: TextDecoration.none,
-                                          ),
-                                        ),
+                                      : viewModel.status == LoginStatus.dataLoading
+                                          ? Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              children: [
+                                                const CupertinoActivityIndicator(
+                                                  color: CupertinoColors.white,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                const Text(
+                                                  'Veriler Yükleniyor...',
+                                                  style: TextStyle(
+                                                    color: CupertinoColors.white,
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    decoration: TextDecoration.none,
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : const Text(
+                                              'Giriş Yap',
+                                              style: TextStyle(
+                                                color: CupertinoColors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w600,
+                                                decoration: TextDecoration.none,
+                                              ),
+                                            ),
                                 ),
                               ),
                             ),
@@ -330,7 +379,7 @@ class _LoginViewState extends State<LoginView> {
                               ),
                             ),
                           ),
-                             ],
+                        ],
                       ),
                     ),
                   ),
@@ -341,14 +390,5 @@ class _LoginViewState extends State<LoginView> {
         },
       ),
     );
-  }
-  
-  // Kaydedilmiş e-posta adresini yükle
-  void _loadSavedEmail(LoginViewModel viewModel) async {
-    final savedEmail = await viewModel.getSavedEmail();
-    if (savedEmail != null && savedEmail.isNotEmpty && _emailController.text.isEmpty) {
-      _emailController.text = savedEmail;
-      viewModel.toggleRememberMe(true);
-    }
   }
 } 
