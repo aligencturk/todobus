@@ -285,7 +285,27 @@ class GroupViewModel with ChangeNotifier {
     }
   }
   
- 
+  // Grup kullanıcılarını getir
+  Future<List<GroupUser>> getGroupUsers(int groupID) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _safeNotifyListeners();
+      
+      final groupDetail = await _apiService.group.getGroupDetail(groupID);
+      
+      _status = GroupLoadStatus.loaded;
+      _safeNotifyListeners();
+      
+      return groupDetail.users;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString();
+      _logger.e('Grup kullanıcıları yüklenirken hata: $e');
+      _safeNotifyListeners();
+      throw Exception('Grup kullanıcıları yüklenemedi: $e');
+    }
+  }
+  
   // Proje detaylarını getir
   Future<ProjectDetail?> getProjectDetail(int projectID, int groupID) async {
     try {
@@ -419,6 +439,58 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
       _logger.e('Kullanıcı projeden çıkarılırken hata: $e');
+      _safeNotifyListeners();
+      return false;
+    }
+  }
+  
+  // Projeye kullanıcıları ekle
+  Future<bool> addUsersToProject(int groupID, int projectID, List<Map<String, int>> users) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _errorMessage = '';
+      _safeNotifyListeners();
+      
+      bool allSuccess = true;
+      
+      // Her bir kullanıcı için ayrı API çağrısı yap
+      for (var user in users) {
+        final projectDetail = await getProjectDetail(projectID, groupID);
+        if (projectDetail == null) {
+          _logger.e('Proje detayları alınamadı');
+          allSuccess = false;
+          continue;
+        }
+        
+        // Kullanıcı zaten projede mi kontrol et
+        final projectUserIds = projectDetail.users.map((u) => u.userID).toSet();
+        if (projectUserIds.contains(user['userID'])) {
+          _logger.i('Kullanıcı zaten projede: ${user['userID']}');
+          continue;
+        }
+        
+        // Kullanıcıyı projeye ekle
+        final success = await _apiService.project.addUserToProject(
+          groupID: groupID,
+          projectID: projectID,
+          userId: user['userID']!,
+          userRole: user['userRole']!,
+        );
+        
+        if (!success) {
+          _logger.e('Kullanıcı projeye eklenemedi: ${user['userID']}');
+          allSuccess = false;
+        }
+      }
+      
+      _status = GroupLoadStatus.loaded;
+      _safeNotifyListeners();
+      
+      return allSuccess;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString();
+      _logger.e('Kullanıcılar projeye eklenirken hata: $e');
       _safeNotifyListeners();
       return false;
     }

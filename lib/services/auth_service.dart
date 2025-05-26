@@ -53,9 +53,16 @@ class AuthService {
       }
 
       return loginResponse;
-    } catch (e) {
-      _logger.e('Giriş sırasında hata: $e');
-      throw Exception('Giriş yapılırken bir hata oluştu: $e');
+    } catch (e, s) {
+      _logger.e('Giriş sırasında kritik hata: $e', null, s);
+      return LoginResponse(
+        error: true,
+        success: false,
+        errorMessage: e.toString(),
+        statusCode: null,
+        userFriendlyMessage: 'Giriş yapılırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve daha sonra tekrar deneyin.',
+        data: null,
+      );
     }
   }
 

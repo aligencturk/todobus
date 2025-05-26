@@ -19,6 +19,8 @@ import 'services/base_api_service.dart';
 import 'views/login_view.dart';
 import 'main_app.dart';
 import 'services/snackbar_service.dart';
+// Batarya optimizasyonu için gerekli paket
+import 'package:disable_battery_optimization/disable_battery_optimization.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +38,13 @@ void main() async {
     
     // Arka plan mesaj işleyicisini ayarla
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+    
+    // iOS için bildirim ayarlarını yapılandır
+    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      alert: true, // Bildirim göster
+      badge: true, // Rozet göster
+      sound: true, // Ses çal
+    );
   } catch (e) {
     logger.e('Firebase başlatılırken hata: $e');
   }
@@ -69,6 +78,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   final StorageService _storageService = StorageService();
+  final LoggerService _logger = LoggerService();
   bool _isLoggedIn = false;
   bool _isLoading = true;
 
@@ -76,6 +86,48 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _checkLoginStatus();
+    _setupPushNotifications();
+  }
+
+  Future<void> _setupPushNotifications() async {
+    try {
+      // Bildirim izinlerini kontrol et ve iste
+      final settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+        criticalAlert: true,
+      );
+      
+      _logger.i('Bildirim izin durumu: ${settings.authorizationStatus}');
+      
+      // Batarya optimizasyonu kontrolü ve istemi
+      await _checkBatteryOptimization();
+      
+    } catch (e) {
+      _logger.e('Bildirim ayarları yapılandırılırken hata: $e');
+    }
+  }
+
+  Future<void> _checkBatteryOptimization() async {
+    try {
+      // Tüm batarya optimizasyonları devre dışı bırakılmış mı kontrol et
+      final isAllOptimizationsDisabled = 
+          await DisableBatteryOptimization.isAllBatteryOptimizationDisabled;
+      
+      if (isAllOptimizationsDisabled != null && !isAllOptimizationsDisabled) {
+        // Kullanıcıya batarya optimizasyonlarını devre dışı bırakması için bilgi ver
+        DisableBatteryOptimization.showDisableAllOptimizationsSettings(
+          "Otomatik Başlatmayı Etkinleştir",
+          "Bildirimleri düzgün alabilmek için otomatik başlatmayı etkinleştirin",
+          "Cihazınızda ek batarya optimizasyonları var",
+          "Bildirimleri arka planda alabilmek için batarya optimizasyonlarını devre dışı bırakın"
+        );
+      }
+    } catch (e) {
+      _logger.e('Batarya optimizasyonu kontrolü sırasında hata: $e');
+    }
   }
 
   Future<void> _checkLoginStatus() async {

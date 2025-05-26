@@ -754,9 +754,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                   color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
                   size: 20,
                 ),
-                onPressed: () {
-                  // Üye ekleme işlevi eklenecek
-                },
+                onPressed: _showAddUserDialog,
               ),
             ],
           ),
@@ -2082,6 +2080,245 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
           _isDisposed = false;
           _isLoading = false;
         });
+      }
+    }
+  }
+  
+  // Projeye üye ekleme dialogu
+  void _showAddUserDialog() async {
+    final isIOS = isCupertino(context);
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Gruptaki kullanıcıları getir
+      final groupUsers = await Provider.of<GroupViewModel>(context, listen: false)
+          .getGroupUsers(widget.groupId);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      // Projede olmayan kullanıcıları filtrele
+      final projectUserIds = _projectDetail!.users.map((u) => u.userID).toSet();
+      final availableUsers = groupUsers.where((u) => !projectUserIds.contains(u.userID)).toList();
+      
+      if (availableUsers.isEmpty) {
+        _snackBarService.showInfo('Gruptaki tüm kullanıcılar zaten bu projede');
+        return;
+      }
+      
+      // Seçilen kullanıcılar
+      List<int> selectedUserIds = [];
+      
+      if (isIOS) {
+        showCupertinoDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return CupertinoAlertDialog(
+                  title: const Text('Projeye Üye Ekle'),
+                  content: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: double.maxFinite,
+                      height: 300,
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Eklemek istediğiniz kullanıcıları seçin:'),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: availableUsers.length,
+                              itemBuilder: (context, index) {
+                                final user = availableUsers[index];
+                                final isSelected = selectedUserIds.contains(user.userID);
+                                
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isSelected) {
+                                        selectedUserIds.remove(user.userID);
+                                      } else {
+                                        selectedUserIds.add(user.userID);
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                    decoration: BoxDecoration(
+                                      color: isSelected 
+                                          ? CupertinoColors.activeBlue.withOpacity(0.1)
+                                          : null,
+                                      border: index < availableUsers.length - 1
+                                          ? Border(
+                                              bottom: BorderSide(
+                                                color: CupertinoColors.systemGrey5,
+                                                width: 0.5,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isSelected
+                                              ? CupertinoIcons.checkmark_circle_fill
+                                              : CupertinoIcons.circle,
+                                          color: isSelected
+                                              ? CupertinoColors.activeBlue
+                                              : CupertinoColors.systemGrey,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(child: Text(user.userName)),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    CupertinoDialogAction(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('İptal'),
+                    ),
+                    CupertinoDialogAction(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        if (selectedUserIds.isNotEmpty) {
+                          _addUsersToProject(selectedUserIds);
+                        }
+                      },
+                      isDefaultAction: true,
+                      child: const Text('Ekle'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return AlertDialog(
+                  title: const Text('Projeye Üye Ekle'),
+                  content: Container(
+                    width: double.maxFinite,
+                    height: 300,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Eklemek istediğiniz kullanıcıları seçin:'),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: availableUsers.length,
+                            itemBuilder: (context, index) {
+                              final user = availableUsers[index];
+                              final isSelected = selectedUserIds.contains(user.userID);
+                              
+                              return CheckboxListTile(
+                                title: Text(user.userName),
+                                value: isSelected,
+                                onChanged: (bool? value) {
+                                  setState(() {
+                                    if (value == true) {
+                                      selectedUserIds.add(user.userID);
+                                    } else {
+                                      selectedUserIds.remove(user.userID);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('İptal'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        if (selectedUserIds.isNotEmpty) {
+                          _addUsersToProject(selectedUserIds);
+                        }
+                      },
+                      child: const Text('Ekle'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showErrorSnackbar('Grup üyeleri yüklenemedi: ${_formatErrorMessage(e.toString())}');
+      }
+    }
+  }
+  
+  // Kullanıcıları projeye ekle
+  Future<void> _addUsersToProject(List<int> userIds) async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Kullanıcıları ekle - varsayılan olarak rol 1 (üye) olarak ekliyoruz
+      List<Map<String, int>> usersToAdd = userIds.map((id) => {
+        "userID": id,
+        "userRole": 1
+      }).toList();
+      
+      final success = await Provider.of<GroupViewModel>(context, listen: false)
+          .addUsersToProject(widget.groupId, widget.projectId, usersToAdd);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (success) {
+        // Başarıyla eklendiğinde proje detaylarını yeniden yükle
+        await _loadProjectDetail();
+        _snackBarService.showSuccess('Kullanıcılar projeye başarıyla eklendi');
+      } else {
+        _showErrorSnackbar('Kullanıcılar eklenemedi');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showErrorSnackbar('Kullanıcılar eklenirken hata oluştu: ${_formatErrorMessage(e.toString())}');
       }
     }
   }

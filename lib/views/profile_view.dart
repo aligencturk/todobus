@@ -11,6 +11,7 @@ import '../viewmodels/profile_viewmodel.dart';
 import '../models/user_model.dart';
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
+import '../services/auth_service.dart';
 import 'login_view.dart';
 
 class ProfileView extends StatefulWidget {
@@ -24,12 +25,15 @@ class _ProfileViewState extends State<ProfileView> {
   final StorageService _storageService = StorageService();
   final LoggerService _logger = LoggerService();
   final ImagePicker _imagePicker = ImagePicker();
+  final AuthService _authService = AuthService();
+  final TextEditingController _activationCodeController = TextEditingController();
   
   // Genişletilebilir panellerin durumlarını takip etmek için
   bool _isAccountSectionExpanded = false;
   bool _isHelpSectionExpanded = false;
   bool _isAppInfoSectionExpanded = false;
   bool _isLoadingImage = false;
+  bool _isVerifyingCode = false;
   
   @override
   void initState() {
@@ -286,6 +290,159 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
+  // Hesap aktivasyon diyaloğunu göster
+  void _showActivationDialog(BuildContext context) {
+    String dialogErrorMessage = '';  // Diyalog için yerel hata mesajı
+    bool isVerifyingCodeLocal = false; // Diyalog için yerel yükleme durumu
+    final activationCodeController = TextEditingController(); // Yerel controller
+    
+    showPlatformDialog(
+      context: context,
+      barrierDismissible: false, // Dışarı tıklayarak kapatılamaz
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => PlatformAlertDialog(
+          title: const Text('Hesap Aktivasyonu'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'E-postanıza gönderilen doğrulama kodunu girerek hesabınızı aktifleştirebilirsiniz.',
+                style: TextStyle(
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              isCupertino(context)
+                  ? CupertinoTextField(
+                      controller: activationCodeController,
+                      placeholder: 'Doğrulama kodu',
+                      keyboardType: TextInputType.number,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: CupertinoColors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: CupertinoColors.systemGrey4),
+                      ),
+                    )
+                  : TextField(
+                      controller: activationCodeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Doğrulama kodu',
+                        border: OutlineInputBorder(),
+                        filled: true,
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+              if (dialogErrorMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    dialogErrorMessage,
+                    style: TextStyle(
+                      color: platformThemeData(
+                        context,
+                        material: (data) => Colors.red,
+                        cupertino: (data) => CupertinoColors.systemRed,
+                      ),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          actions: <Widget>[
+            PlatformDialogAction(
+              child: const Text('İptal'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                activationCodeController.clear();
+              },
+            ),
+            PlatformDialogAction(
+              child: isVerifyingCodeLocal 
+                  ? PlatformCircularProgressIndicator()
+                  : const Text('Doğrula'),
+              onPressed: isVerifyingCodeLocal 
+                  ? null 
+                  : () async {
+                      // Aktivasyon kodunu doğrula
+                      final code = activationCodeController.text.trim();
+                      
+                      if (code.isEmpty) {
+                        setDialogState(() {
+                          dialogErrorMessage = 'Lütfen doğrulama kodunu giriniz.';
+                        });
+                        return;
+                      }
+                      
+                      // Sadece sayısal değer mi kontrol et
+                      if (!RegExp(r'^\d+$').hasMatch(code)) {
+                        setDialogState(() {
+                          dialogErrorMessage = 'Doğrulama kodu sadece rakamlardan oluşmalıdır.';
+                        });
+                        return;
+                      }
+                      
+                      setDialogState(() {
+                        isVerifyingCodeLocal = true;
+                        dialogErrorMessage = '';
+                      });
+                      
+                      try {
+                        // StorageService'den user_id'yi alıyoruz token olarak kullanmak için
+                        final userId = await _storageService.getUserId();
+                        
+                        if (userId == null) {
+                          setDialogState(() {
+                            dialogErrorMessage = 'Kullanıcı bilgisi bulunamadı. Lütfen tekrar giriş yapınız.';
+                            isVerifyingCodeLocal = false;
+                          });
+                          return;
+                        }
+                        
+                        _logger.i('Aktivasyon kodu doğrulanıyor: $code, userId: $userId');
+                        
+                        final response = await _authService.checkVerificationCode(
+                          code,
+                          userId.toString(),
+                        );
+                        
+                        if (response.success) {
+                          // Doğrulama başarılı, profil bilgilerini güncelle
+                          context.read<ProfileViewModel>().loadUserProfile();
+                          
+                          Navigator.of(dialogContext).pop();
+                          activationCodeController.clear();
+                          
+                          _showSuccessDialog('Hesabınız başarıyla doğrulandı! Artık tüm özellikleri kullanabilirsiniz.');
+                        } else {
+                          _logger.w('Aktivasyon kodu doğrulama başarısız: ${response.message}');
+                          setDialogState(() {
+                            dialogErrorMessage = response.userFriendlyMessage ?? 
+                                response.message ?? 
+                                'Doğrulama kodu geçersiz veya süresi dolmuş. Lütfen tekrar deneyiniz.';
+                            isVerifyingCodeLocal = false;
+                          });
+                        }
+                      } catch (e) {
+                        _logger.e('Hesap doğrulama sırasında hata: $e');
+                        setDialogState(() {
+                          dialogErrorMessage = 'Doğrulama sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.';
+                          isVerifyingCodeLocal = false;
+                        });
+                      }
+                    },
+            ),
+          ],
+        ),
+      ),
+    ).then((_) {
+      // Dialog kapandığında kaynakları temizle
+      activationCodeController.dispose();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ProfileViewModel>(
@@ -374,6 +531,9 @@ class _ProfileViewState extends State<ProfileView> {
         children: [
           _buildProfileHeader(context, user),
           const SizedBox(height: 24),
+          
+          // Hesap aktivasyon uyarısı ve doğrulama kodu girişi için modal dialog kullanılacak
+          // Artık buraya bir bölüm eklemiyoruz, bunun yerine profil başlığında göstereceğiz
           
           // Hesap Bilgileri bölümü - genişletilebilir panel
           _buildExpandableSection(
@@ -560,78 +720,88 @@ class _ProfileViewState extends State<ProfileView> {
   Widget _buildProfileHeader(BuildContext context, User? user) {
     String profileImageUrl = user?.profilePhoto ?? '';
     bool hasProfileImage = profileImageUrl.isNotEmpty && profileImageUrl != 'null';
+    bool isNotActivated = user != null && user.userStatus == 'not_activated';
     
     return Column(
       children: [
-        // Aktivasyon durumu uyarısı
-        if (user != null && user.userStatus == 'not_activated')
-          Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: platformThemeData(
-                context,
-                material: (data) => Colors.orange.shade100,
-                cupertino: (data) => CupertinoColors.systemOrange.withOpacity(0.2),
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isCupertino(context) ? CupertinoIcons.exclamationmark_triangle : Icons.warning_amber_outlined,
-                  color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Hesabınız henüz aktifleştirilmemiş. Lütfen e-posta adresinize gönderilen aktivasyon bağlantısını kullanın veya destek ekibiyle iletişime geçin.',
-                    style: TextStyle(
-                      color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange.shade800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        
         // Profil fotoğrafı ve kullanıcı adı
         Center(
           child: Column(
             children: [
               // Profil fotoğrafı
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: hasProfileImage 
-                      ? null 
-                      : platformThemeData(
-                          context,
-                          material: (data) => Colors.blue.shade100,
-                          cupertino: (data) => CupertinoColors.activeBlue.withOpacity(0.2),
-                        ),
-                  shape: BoxShape.circle,
-                  image: hasProfileImage
-                      ? DecorationImage(
-                          image: NetworkImage(profileImageUrl),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                ),
-                child: !hasProfileImage 
-                    ? Center(
-                        child: Icon(
-                          context.platformIcons.person,
-                          size: 50,
-                          color: platformThemeData(
-                            context,
-                            material: (data) => Colors.blue,
-                            cupertino: (data) => CupertinoColors.activeBlue,
+              Stack(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: hasProfileImage 
+                          ? null 
+                          : platformThemeData(
+                              context,
+                              material: (data) => Colors.blue.shade100,
+                              cupertino: (data) => CupertinoColors.activeBlue.withOpacity(0.2),
+                            ),
+                      shape: BoxShape.circle,
+                      image: hasProfileImage
+                          ? DecorationImage(
+                              image: NetworkImage(profileImageUrl),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: !hasProfileImage 
+                        ? Center(
+                            child: Icon(
+                              context.platformIcons.person,
+                              size: 50,
+                              color: platformThemeData(
+                                context,
+                                material: (data) => Colors.blue,
+                                cupertino: (data) => CupertinoColors.activeBlue,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  
+                  // Aktivasyon durumu rozeti
+                  if (isNotActivated)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: GestureDetector(
+                        onTap: () => _showActivationDialog(context),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: platformThemeData(
+                              context,
+                              material: (data) => Colors.orange,
+                              cupertino: (data) => CupertinoColors.systemOrange,
+                            ),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: platformThemeData(
+                                context,
+                                material: (data) => Colors.white,
+                                cupertino: (data) => CupertinoColors.white,
+                              ),
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            isCupertino(context) 
+                                ? CupertinoIcons.exclamationmark 
+                                : Icons.priority_high,
+                            color: Colors.white,
+                            size: 16,
                           ),
                         ),
-                      )
-                    : null,
+                      ),
+                    ),
+                ],
               ),
               
               // Kullanıcı adı
@@ -644,6 +814,55 @@ class _ProfileViewState extends State<ProfileView> {
                   cupertino: (data) => data.textTheme.navLargeTitleTextStyle.copyWith(fontSize: 24),
                 ),
               ),
+              
+              // Aktivasyon durumu mesajı
+              if (isNotActivated)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: GestureDetector(
+                    onTap: () => _showActivationDialog(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: platformThemeData(
+                          context,
+                          material: (data) => Colors.orange.shade100,
+                          cupertino: (data) => CupertinoColors.systemOrange.withOpacity(0.2),
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isCupertino(context) 
+                                ? CupertinoIcons.exclamationmark_triangle 
+                                : Icons.warning_amber_rounded,
+                            color: platformThemeData(
+                              context,
+                              material: (data) => Colors.orange.shade800,
+                              cupertino: (data) => CupertinoColors.systemOrange,
+                            ),
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Hesabı Doğrula',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: platformThemeData(
+                                context,
+                                material: (data) => Colors.orange.shade800,
+                                cupertino: (data) => CupertinoColors.systemOrange,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -809,6 +1028,26 @@ class _ProfileViewState extends State<ProfileView> {
       ),
     );
   }
+
+  // Başarı mesajı diyalog olarak göster
+  void _showSuccessDialog(String message) {
+    showPlatformDialog(
+      context: context,
+      builder: (dialogContext) => PlatformAlertDialog(
+        title: const Text('Başarılı'),
+        content: Text(message),
+        actions: <Widget>[
+          PlatformDialogAction(
+            child: const Text('Tamam'),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              Navigator.of(context).pop(); // Ana sayfaya dön
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // Profil Düzenleme Ekranı
@@ -831,7 +1070,7 @@ class _EditProfileViewState extends State<EditProfileView> {
   late TextEditingController _phoneController;
   late TextEditingController _birthdayController;
   
-  int _selectedGender = 0;
+  String _selectedGender = "0"; // String tipine değiştirildi
   bool _isLoading = false;
   bool _isLoadingImage = false;
   String _errorMessage = '';
@@ -845,10 +1084,15 @@ class _EditProfileViewState extends State<EditProfileView> {
     _phoneController = TextEditingController(text: widget.user.userPhone);
     _birthdayController = TextEditingController(text: widget.user.userBirthday);
     
+    // Cinsiyet değerini String olarak ayarla
+    // Eğer userGender sayı değilse veya boşsa "0" olarak ayarla
     try {
-      _selectedGender = int.parse(widget.user.userGender);
+      _selectedGender = widget.user.userGender.isNotEmpty ? widget.user.userGender : "0";
+      // Geçerli bir sayı olup olmadığını kontrol et
+      int.parse(_selectedGender);
     } catch (e) {
-      _selectedGender = 0;
+      _logger.e('Cinsiyet verisi geçersiz: ${widget.user.userGender}', e);
+      _selectedGender = "0";
     }
   }
   
@@ -960,29 +1204,51 @@ class _EditProfileViewState extends State<EditProfileView> {
     });
     
     try {
+      // Gender değerini güvenli bir şekilde dönüştür
+      int userGender;
+      try {
+        userGender = int.parse(_selectedGender);
+      } catch (e) {
+        _logger.e('Gender dönüştürme hatası: $_selectedGender', e);
+        userGender = 0; // Varsayılan değer
+      }
+      
+      // Tarih formatını kontrol et
+      String birthday = _birthdayController.text.trim();
+      if (birthday.isNotEmpty && !RegExp(r'^\d{2}\.\d{2}\.\d{4}$').hasMatch(birthday)) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Doğum tarihi GG.AA.YYYY formatında olmalıdır';
+        });
+        return;
+      }
+      
+      // Profil güncelleme işlemini çağır
       await context.read<ProfileViewModel>().updateUserProfile(
-        userFullname: _fullNameController.text,
-        userEmail: _emailController.text,
-        userBirthday: _birthdayController.text,
-        userPhone: _phoneController.text,
-        userGender: _selectedGender,
+        userFullname: _fullNameController.text.trim(),
+        userEmail: _emailController.text.trim(),
+        userBirthday: birthday,
+        userPhone: _phoneController.text.trim(),
+        userGender: userGender,
         profilePhoto: _profileImageBase64 ?? widget.user.profilePhoto,
       );
       
       if (mounted) {
-        if (context.read<ProfileViewModel>().status == ProfileStatus.updateSuccess) {
+        final viewModel = context.read<ProfileViewModel>();
+        if (viewModel.status == ProfileStatus.updateSuccess) {
           // Başarı mesajını göster
-          _showSuccessDialog('Profil başarıyla güncellendi');
         } else {
           setState(() {
-            _errorMessage = context.read<ProfileViewModel>().errorMessage;
+            _errorMessage = viewModel.errorMessage.isNotEmpty 
+                ? viewModel.errorMessage 
+                : 'Profil güncellenirken bir hata oluştu. Lütfen tekrar deneyiniz.';
           });
         }
       }
-    } catch (e) {
-      _logger.e('Profil güncellenirken hata: $e');
+    } catch (e, stackTrace) {
+      _logger.e('Profil güncellenirken hata: $e', null, stackTrace);
       setState(() {
-        _errorMessage = 'Bir hata oluştu: ${e.toString()}';
+        _errorMessage = 'Profil güncellenirken bir hata oluştu: ${e.toString()}';
       });
     } finally {
       if (mounted) {
@@ -991,26 +1257,6 @@ class _EditProfileViewState extends State<EditProfileView> {
         });
       }
     }
-  }
-  
-  // Başarı mesajı diyalog olarak göster
-  void _showSuccessDialog(String message) {
-    showPlatformDialog(
-      context: context,
-      builder: (dialogContext) => PlatformAlertDialog(
-        title: const Text('Başarılı'),
-        content: Text(message),
-        actions: <Widget>[
-          PlatformDialogAction(
-            child: const Text('Tamam'),
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              Navigator.of(context).pop(); // Ana sayfaya dön
-            },
-          ),
-        ],
-      ),
-    );
   }
   
   @override
@@ -1321,11 +1567,11 @@ class _EditProfileViewState extends State<EditProfileView> {
           ),
           child: Column(
             children: [
-              _buildGenderOption(context, 'Belirtilmemiş', 0),
+              _buildGenderOption(context, 'Belirtilmemiş', '0'),
               const Divider(height: 1),
-              _buildGenderOption(context, 'Erkek', 1),
+              _buildGenderOption(context, 'Erkek', '1'),
               const Divider(height: 1),
-              _buildGenderOption(context, 'Kadın', 2),
+              _buildGenderOption(context, 'Kadın', '2'),
             ],
           ),
         ),
@@ -1334,7 +1580,7 @@ class _EditProfileViewState extends State<EditProfileView> {
   }
   
   // Cinsiyet seçim opsiyonu
-  Widget _buildGenderOption(BuildContext context, String label, int value) {
+  Widget _buildGenderOption(BuildContext context, String label, String value) { // value parametresi String tipine değiştirildi
     return InkWell(
       onTap: () {
         setState(() {
@@ -1353,10 +1599,10 @@ class _EditProfileViewState extends State<EditProfileView> {
                   ? const Icon(CupertinoIcons.check_mark, color: CupertinoColors.activeBlue)
                   : const SizedBox(width: 24)
             else
-              Radio<int>(
+              Radio<String>( // Radio tipi String olarak değiştirildi
                 value: value,
                 groupValue: _selectedGender,
-                onChanged: (int? newValue) {
+                onChanged: (String? newValue) {
                   if (newValue != null) {
                     setState(() {
                       _selectedGender = newValue;

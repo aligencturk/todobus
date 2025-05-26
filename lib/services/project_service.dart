@@ -497,4 +497,45 @@ class ProjectService {
       throw Exception('Proje silinirken hata: $e');
     }
   }
+
+  // Kullanıcıyı projeye ekle (userID ve userRole ile)
+  Future<bool> addUserToProject({
+    required int groupID,
+    required int projectID,
+    required int userId,
+    required int userRole,
+  }) async {
+    try {
+      final userToken = await _storageService.getToken();
+      if (userToken == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+      
+      _logger.i('Kullanıcı projeye ekleniyor: ProjectID: $projectID, UserID: $userId, Role: $userRole (GroupID: $groupID)');
+      
+      final response = await _apiService.put(
+        'service/user/project/adduser',
+        body: {
+          'userToken': userToken,
+          'groupID': groupID,
+          'projectID': projectID,
+          'userID': userId,
+          'userRole': userRole,
+        },
+        requiresToken: true,
+      );
+      
+      if (response['success'] == true) {
+        _logger.i('Kullanıcı projeye başarıyla eklendi');
+        return true;
+      } else {
+        final errorMsg = response['message'] ?? response['errorMessage'] ?? 'Bilinmeyen hata';
+        _logger.e('Kullanıcı projeye eklenemedi: $errorMsg');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Kullanıcı projeye eklenirken hata: $e');
+      return false;
+    }
+  }
 } 

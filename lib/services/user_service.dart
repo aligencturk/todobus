@@ -70,35 +70,99 @@ class UserService {
     required String profilePhoto,
   }) async {
     try {
+      _logger.i('Kullanıcı profili güncelleme başlatılıyor...');
+      _logger.i('userFullname: $userFullname');
+      _logger.i('userEmail: $userEmail');
+      _logger.i('userBirthday: $userBirthday');
+      _logger.i('userPhone: $userPhone');
+      _logger.i('userGender: $userGender');
+      
+      // Veri kontrolü
+      if (userFullname.isEmpty) {
+        return UserResponse(
+          error: true,
+          success: false,
+          errorMessage: 'Ad Soyad alanı boş olamaz',
+        );
+      }
+      
+      if (userEmail.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(userEmail)) {
+        return UserResponse(
+          error: true,
+          success: false,
+          errorMessage: 'Geçerli bir e-posta adresi giriniz',
+        );
+      }
+      
+      // Doğum tarihi formatını kontrol et (eğer varsa)
+      if (userBirthday.isNotEmpty && !RegExp(r'^\d{2}\.\d{2}\.\d{4}$').hasMatch(userBirthday)) {
+        return UserResponse(
+          error: true,
+          success: false,
+          errorMessage: 'Doğum tarihi GG.AA.YYYY formatında olmalıdır',
+        );
+      }
+      
+      // UserGender değerini kontrol et ve sınırla
+      final validatedGender = userGender >= 0 && userGender <= 2 ? userGender : 0;
+      
       final token = await _storageService.getToken();
       if (token == null) {
-        throw Exception('Oturum bilgisi bulunamadı');
+        _logger.w('Profil güncellenirken token bulunamadı');
+        return UserResponse(
+          error: true,
+          success: false,
+          errorMessage: 'Oturum bilgisi bulunamadı. Lütfen tekrar giriş yapınız.',
+        );
       }
 
       final body = {
         'userToken': token,
-        'userFullname': userFullname,
-        'userEmail': userEmail,
-        'userBirthday': userBirthday,
-        'userPhone': userPhone,
-        'userGender': userGender,
+        'userFullname': userFullname.trim(),
+        'userEmail': userEmail.trim(),
+        'userBirthday': userBirthday.trim(),
+        'userPhone': userPhone.trim(),
+        'userGender': validatedGender,
         'profilePhoto': profilePhoto,
       };
 
       _logger.i('Kullanıcı profili güncelleniyor...');
-      final response = await _apiService.put('service/user/update/account', body: body);
       
-      final userResponse = UserResponse.fromJson(response);
-      if (userResponse.success) {
-        _logger.i('Kullanıcı profili başarıyla güncellendi');
-      } else {
-        _logger.w('Kullanıcı profili güncellenemedi: ${userResponse.errorMessage}');
+      try {
+        final response = await _apiService.put('service/user/update/account', body: body);
+        
+        if (response == null) {
+          _logger.w('API yanıtı boş döndü');
+          return UserResponse(
+            error: true,
+            success: false,
+            errorMessage: 'Sunucudan yanıt alınamadı. Lütfen internet bağlantınızı kontrol ediniz.',
+          );
+        }
+        
+        final userResponse = UserResponse.fromJson(response);
+        if (userResponse.success) {
+          _logger.i('Kullanıcı profili başarıyla güncellendi');
+        } else {
+          _logger.w('Kullanıcı profili güncellenemedi: ${userResponse.errorMessage}');
+        }
+        
+        return userResponse;
+      } catch (apiError) {
+        _logger.e('API isteği sırasında hata: $apiError');
+        return UserResponse(
+          error: true,
+          success: false,
+          errorMessage: 'Sunucu iletişiminde bir hata oluştu: ${apiError.toString()}',
+        );
       }
-      
-      return userResponse;
     } catch (e) {
       _logger.e('Kullanıcı profili güncellenirken hata: $e');
-      throw Exception('Kullanıcı profili güncellenemedi: $e');
+      return UserResponse(
+        error: true,
+        success: false,
+        errorMessage: 'Profil güncellenirken bir sorun oluştu. Lütfen daha sonra tekrar deneyiniz.',
+      );
     }
   }
 

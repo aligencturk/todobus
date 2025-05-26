@@ -17,7 +17,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     debugPrint("Firebase başlatılırken hata: $e");
   }
   
-  // Arka planda alınan bildirimi logla
+  // Arka planda alınan bildirimi detaylı logla
   debugPrint("================ ARKA PLAN BİLDİRİMİ ALINDI ================");
   debugPrint("Bildirim ID: ${message.messageId}");
   debugPrint("Gönderim Zamanı: ${message.sentTime}");
@@ -28,11 +28,37 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     debugPrint("$key: $value");
   });
   
-  // Bildirim başlığı ve içeriği
+  // Bildirim içeriği detaylı yazdırma
   if (message.notification != null) {
+    debugPrint("------- Bildirim İçeriği -------");
     debugPrint("Başlık: ${message.notification!.title}");
     debugPrint("İçerik: ${message.notification!.body}");
+    debugPrint("Android Kanal ID: ${message.notification!.android?.channelId}");
+    debugPrint("Android Öncelik: ${message.notification!.android?.priority}");
   }
   
+  // iOS özel alanları kontrol et
+  if (message.notification?.apple != null) {
+    debugPrint("------- iOS Bildirim Detayları -------");
+    debugPrint("Badge: ${message.notification!.apple!.badge}");
+    debugPrint("Sound: ${message.notification!.apple!.sound}");
+  }
+  
+  // Content-available kontrolü
+  if (message.data.containsKey('content-available')) {
+    debugPrint("Content-Available: ${message.data['content-available']}");
+  }
+  
+  // Bildirim kaynağını kontrol et
+  debugPrint("------- Bildirim Kaynağı -------");
+  debugPrint("Mesaj Tipi: ${message.messageType}");
+  debugPrint("Kaynak: ${message.from}");
+  
+  // Burada bildirimleri işleyebilirsiniz
+  // Örnek: Yerel bildirim gösterme, veritabanı güncelleme, vb.
+  
   debugPrint("==============================================================");
+  
+  // Arka plan işlemi tamamlandı
+  return Future.value();
 } 
