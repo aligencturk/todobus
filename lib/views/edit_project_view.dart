@@ -140,6 +140,7 @@ class _EditProjectViewState extends State<EditProjectView> {
         projectDesc,
         _formatDate(_startDate),
         _formatDate(_endDate),
+        [],
       );
       
       if (success && mounted) {

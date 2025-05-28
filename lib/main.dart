@@ -17,13 +17,17 @@ import 'services/firebase_messaging_service.dart';
 import 'services/notification_viewmodel.dart';
 import 'services/base_api_service.dart';
 import 'views/login_view.dart';
+import 'views/splash_screen.dart';
 import 'main_app.dart';
 import 'services/snackbar_service.dart';
 // Batarya optimizasyonu için gerekli paket
 import 'package:disable_battery_optimization/disable_battery_optimization.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Native splash screen için gerekli
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   
   // Logger servisi başlat
   final logger = LoggerService();
@@ -64,6 +68,9 @@ void main() async {
   } catch (e) {
     logger.e('Bildirim servisi başlatılırken hata: $e');
   }
+  
+  // Native splash screen'i kaldır, kendi özel splash screen'imize geçiş yapacağız
+  FlutterNativeSplash.remove();
   
   runApp(const MyApp());
 }
@@ -176,7 +183,9 @@ class _MyAppState extends State<MyApp> {
             ),
             scaffoldMessengerKey: SnackBarService.scaffoldMessengerKey,
             navigatorKey: BaseApiService.navigatorKey,
-            home: _isLoading
+            home: SplashScreen(
+              duration: const Duration(seconds: 3),
+              child: _isLoading
                 ? PlatformScaffold(
                     body: Center(
                       child: PlatformCircularProgressIndicator(),
@@ -185,6 +194,7 @@ class _MyAppState extends State<MyApp> {
                 : _isLoggedIn
                     ? const MainApp()
                     : const LoginView(),
+            ),
           ),
         ),
       ),

@@ -2111,8 +2111,8 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
         return;
       }
       
-      // Seçilen kullanıcılar
-      List<int> selectedUserIds = [];
+      // Seçilen kullanıcılar ve rolleri
+      Map<int, int> selectedUserRoles = {}; // userID -> userRole
       
       if (isIOS) {
         showCupertinoDialog(
@@ -2139,15 +2139,16 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                               itemCount: availableUsers.length,
                               itemBuilder: (context, index) {
                                 final user = availableUsers[index];
-                                final isSelected = selectedUserIds.contains(user.userID);
+                                final isSelected = selectedUserRoles.containsKey(user.userID);
                                 
                                 return GestureDetector(
                                   onTap: () {
                                     setState(() {
                                       if (isSelected) {
-                                        selectedUserIds.remove(user.userID);
+                                        selectedUserRoles.remove(user.userID);
                                       } else {
-                                        selectedUserIds.add(user.userID);
+                                        // Varsayılan olarak normal üye (2) rolü ile ekle
+                                        selectedUserRoles[user.userID] = 2;
                                       }
                                     });
                                   },
@@ -2166,18 +2167,48 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                                             )
                                           : null,
                                     ),
-                                    child: Row(
+                                    child: Column(
                                       children: [
-                                        Icon(
-                                          isSelected
-                                              ? CupertinoIcons.checkmark_circle_fill
-                                              : CupertinoIcons.circle,
-                                          color: isSelected
-                                              ? CupertinoColors.activeBlue
-                                              : CupertinoColors.systemGrey,
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              isSelected
+                                                  ? CupertinoIcons.checkmark_circle_fill
+                                                  : CupertinoIcons.circle,
+                                              color: isSelected
+                                                  ? CupertinoColors.activeBlue
+                                                  : CupertinoColors.systemGrey,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(child: Text(user.userName)),
+                                          ],
                                         ),
-                                        const SizedBox(width: 10),
-                                        Expanded(child: Text(user.userName)),
+                                        if (isSelected) ...[
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              CupertinoSegmentedControl<int>(
+                                                children: const {
+                                                  1: Padding(
+                                                    padding: EdgeInsets.symmetric(horizontal: 12),
+                                                    child: Text('Yönetici'),
+                                                  ),
+                                                  2: Padding(
+                                                    padding: EdgeInsets.symmetric(horizontal: 12),
+                                                    child: Text('Üye'),
+                                                  ),
+                                                },
+                                                groupValue: selectedUserRoles[user.userID] ?? 2,
+                                                onValueChanged: (value) {
+                                                  setState(() {
+                                                    selectedUserRoles[user.userID] = value;
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -2197,8 +2228,8 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                     CupertinoDialogAction(
                       onPressed: () {
                         Navigator.pop(context);
-                        if (selectedUserIds.isNotEmpty) {
-                          _addUsersToProject(selectedUserIds);
+                        if (selectedUserRoles.isNotEmpty) {
+                          _addUsersToProject(selectedUserRoles);
                         }
                       },
                       isDefaultAction: true,
@@ -2232,20 +2263,56 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                             itemCount: availableUsers.length,
                             itemBuilder: (context, index) {
                               final user = availableUsers[index];
-                              final isSelected = selectedUserIds.contains(user.userID);
+                              final isSelected = selectedUserRoles.containsKey(user.userID);
                               
-                              return CheckboxListTile(
-                                title: Text(user.userName),
-                                value: isSelected,
-                                onChanged: (bool? value) {
-                                  setState(() {
-                                    if (value == true) {
-                                      selectedUserIds.add(user.userID);
-                                    } else {
-                                      selectedUserIds.remove(user.userID);
-                                    }
-                                  });
-                                },
+                              return Column(
+                                children: [
+                                  CheckboxListTile(
+                                    title: Text(user.userName),
+                                    value: isSelected,
+                                    onChanged: (bool? value) {
+                                      setState(() {
+                                        if (value == true) {
+                                          // Varsayılan olarak normal üye (2) rolü ile ekle
+                                          selectedUserRoles[user.userID] = 2;
+                                        } else {
+                                          selectedUserRoles.remove(user.userID);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  if (isSelected) ...[
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 8.0),
+                                      child: Row(
+                                        children: [
+                                          const Text('Rol: '),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: SegmentedButton<int>(
+                                              segments: const [
+                                                ButtonSegment<int>(
+                                                  value: 1,
+                                                  label: Text('Yönetici'),
+                                                ),
+                                                ButtonSegment<int>(
+                                                  value: 2,
+                                                  label: Text('Üye'),
+                                                ),
+                                              ],
+                                              selected: {selectedUserRoles[user.userID] ?? 2},
+                                              onSelectionChanged: (Set<int> newSelection) {
+                                                setState(() {
+                                                  selectedUserRoles[user.userID] = newSelection.first;
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               );
                             },
                           ),
@@ -2261,8 +2328,8 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        if (selectedUserIds.isNotEmpty) {
-                          _addUsersToProject(selectedUserIds);
+                        if (selectedUserRoles.isNotEmpty) {
+                          _addUsersToProject(selectedUserRoles);
                         }
                       },
                       child: const Text('Ekle'),
@@ -2285,16 +2352,16 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
   }
   
   // Kullanıcıları projeye ekle
-  Future<void> _addUsersToProject(List<int> userIds) async {
+  Future<void> _addUsersToProject(Map<int, int> userRoles) async {
     setState(() {
       _isLoading = true;
     });
     
     try {
-      // Kullanıcıları ekle - varsayılan olarak rol 1 (üye) olarak ekliyoruz
-      List<Map<String, int>> usersToAdd = userIds.map((id) => {
-        "userID": id,
-        "userRole": 1
+      // Kullanıcıları ve rollerini listeye dönüştür
+      List<Map<String, int>> usersToAdd = userRoles.entries.map((entry) => {
+        "userID": entry.key,
+        "userRole": entry.value
       }).toList();
       
       final success = await Provider.of<GroupViewModel>(context, listen: false)

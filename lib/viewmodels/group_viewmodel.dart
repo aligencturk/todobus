@@ -381,7 +381,8 @@ class GroupViewModel with ChangeNotifier {
     String projectName, 
     String projectDesc, 
     String projectStartDate, 
-    String projectEndDate
+    String projectEndDate,
+    List<Map<String, dynamic>>? users
   ) async {
     try {
       _status = GroupLoadStatus.loading;
@@ -395,7 +396,8 @@ class GroupViewModel with ChangeNotifier {
         projectName, 
         projectDesc, 
         projectStartDate, 
-        projectEndDate
+        projectEndDate,
+        users
       );
       
       _status = GroupLoadStatus.loaded;
@@ -419,31 +421,6 @@ class GroupViewModel with ChangeNotifier {
     }
   }
   
-  // Projeden kullanıcı çıkar
-  Future<bool> removeUserFromProject(int groupID, int projectID, int userID) async {
-    try {
-      _status = GroupLoadStatus.loading;
-      _errorMessage = '';
-      _safeNotifyListeners();
-      
-      final success = await _apiService.project.removeUserFromProject(groupID, projectID, userID);
-      
-      if (success) {
-        _status = GroupLoadStatus.loaded;
-        _safeNotifyListeners();
-        return true;
-      }
-      
-      return false;
-    } catch (e) {
-      _status = GroupLoadStatus.error;
-      _errorMessage = e.toString();
-      _logger.e('Kullanıcı projeden çıkarılırken hata: $e');
-      _safeNotifyListeners();
-      return false;
-    }
-  }
-  
   // Projeye kullanıcıları ekle
   Future<bool> addUsersToProject(int groupID, int projectID, List<Map<String, int>> users) async {
     try {
@@ -451,42 +428,60 @@ class GroupViewModel with ChangeNotifier {
       _errorMessage = '';
       _safeNotifyListeners();
       
-      bool allSuccess = true;
+      // Önce proje detaylarını al
+      final projectDetail = await getProjectDetail(projectID, groupID);
+      if (projectDetail == null) {
+        _logger.e('Proje detayları alınamadı');
+        _status = GroupLoadStatus.error;
+        _errorMessage = 'Proje detayları alınamadı';
+        _safeNotifyListeners();
+        return false;
+      }
       
-      // Her bir kullanıcı için ayrı API çağrısı yap
-      for (var user in users) {
-        final projectDetail = await getProjectDetail(projectID, groupID);
-        if (projectDetail == null) {
-          _logger.e('Proje detayları alınamadı');
-          allSuccess = false;
-          continue;
-        }
-        
+      // Mevcut kullanıcıları yeni kullanıcılarla birleştir
+      List<Map<String, dynamic>> allUsers = [];
+      
+      // Mevcut kullanıcıları ekle
+      for (var user in projectDetail.users) {
+        allUsers.add({
+          'userID': user.userID,
+          'userRole': user.userRoleID
+        });
+      }
+      
+      // Yeni kullanıcıları ekle (eğer zaten yoksa)
+      for (var newUser in users) {
         // Kullanıcı zaten projede mi kontrol et
-        final projectUserIds = projectDetail.users.map((u) => u.userID).toSet();
-        if (projectUserIds.contains(user['userID'])) {
-          _logger.i('Kullanıcı zaten projede: ${user['userID']}');
-          continue;
+        bool userExists = false;
+        for (var existingUser in allUsers) {
+          if (existingUser['userID'] == newUser['userID']) {
+            userExists = true;
+            break;
+          }
         }
         
-        // Kullanıcıyı projeye ekle
-        final success = await _apiService.project.addUserToProject(
-          groupID: groupID,
-          projectID: projectID,
-          userId: user['userID']!,
-          userRole: user['userRole']!,
-        );
-        
-        if (!success) {
-          _logger.e('Kullanıcı projeye eklenemedi: ${user['userID']}');
-          allSuccess = false;
+        // Eğer kullanıcı zaten yoksa ekle
+        if (!userExists) {
+          allUsers.add(newUser);
         }
       }
+      
+      // Proje bilgilerini güncelleyerek tüm kullanıcıları gönder
+      final success = await _apiService.project.updateProject(
+        groupID,
+        projectID,
+        projectDetail.projectStatusID,
+        projectDetail.projectName,
+        projectDetail.projectDesc,
+        projectDetail.proStartDate,
+        projectDetail.proEndDate,
+        allUsers
+      );
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
       
-      return allSuccess;
+      return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
@@ -752,5 +747,58 @@ class GroupViewModel with ChangeNotifier {
     _groups = [];
     _isLoadingFromApi = false;
     _safeNotifyListeners();
+  }
+  
+  // Projeden kullanıcı çıkar
+  Future<bool> removeUserFromProject(int groupID, int projectID, int userID) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _errorMessage = '';
+      _safeNotifyListeners();
+      
+      // Önce proje detaylarını al
+      final projectDetail = await getProjectDetail(projectID, groupID);
+      if (projectDetail == null) {
+        _logger.e('Proje detayları alınamadı');
+        _status = GroupLoadStatus.error;
+        _errorMessage = 'Proje detayları alınamadı';
+        _safeNotifyListeners();
+        return false;
+      }
+      
+      // Çıkarılacak kullanıcı hariç tüm kullanıcıları dahil et
+      List<Map<String, dynamic>> updatedUsers = [];
+      for (var user in projectDetail.users) {
+        if (user.userID != userID) {
+          updatedUsers.add({
+            'userID': user.userID,
+            'userRole': user.userRoleID
+          });
+        }
+      }
+      
+      // Proje bilgilerini güncelleyerek kullanıcıyı çıkar
+      final success = await _apiService.project.updateProject(
+        groupID,
+        projectID,
+        projectDetail.projectStatusID,
+        projectDetail.projectName,
+        projectDetail.projectDesc,
+        projectDetail.proStartDate,
+        projectDetail.proEndDate,
+        updatedUsers
+      );
+      
+      _status = GroupLoadStatus.loaded;
+      _safeNotifyListeners();
+      
+      return success;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString();
+      _logger.e('Kullanıcı projeden çıkarılırken hata: $e');
+      _safeNotifyListeners();
+      return false;
+    }
   }
 } 

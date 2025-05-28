@@ -101,7 +101,8 @@ class ProjectService {
     String projectName, 
     String projectDesc, 
     String projectStartDate, 
-    String projectEndDate
+    String projectEndDate,
+    List<Map<String, dynamic>>? users
   ) async {
     try {
       final userToken = _storageService.getToken();
@@ -111,18 +112,25 @@ class ProjectService {
       
       _logger.i('Proje güncelleniyor: ID: $projectID, Name: $projectName (GroupID: $groupID)');
       
+      final Map<String, dynamic> body = {
+        'userToken': userToken,
+        'groupID': groupID,
+        'projectID': projectID,
+        'projectStatus': projectStatus,
+        'projectName': projectName,
+        'projectDesc': projectDesc,
+        'projectStartDate': projectStartDate,
+        'projectEndDate': projectEndDate,
+      };
+      
+      // Eğer users parametresi varsa body'ye ekle
+      if (users != null) {
+        body['users'] = users;
+      }
+      
       final response = await _apiService.put(
         'service/user/project/update',
-        body: {
-          'userToken': userToken,
-          'groupID': groupID,
-          'projectID': projectID,
-          'projectStatus': projectStatus,
-          'projectName': projectName,
-          'projectDesc': projectDesc,
-          'projectStartDate': projectStartDate,
-          'projectEndDate': projectEndDate,
-        },
+        body: body,
         requiresToken: true,
       );
       

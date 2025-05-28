@@ -154,3 +154,31 @@ flutter_launcher_icons:
   macos:
     generate: true
     image_path: "assets/icon.png"
+
+# Flutter Native Splash yapılandırması
+flutter_native_splash:
+  color: "#3949AB"  # Daha canlı bir mavi renk
+  image: "assets/icon.png"
+  color_dark: "#1A237E"  # Koyu tema için daha koyu mavi
+  image_dark: "assets/icon.png"
+  
+  android_12:
+    image: "assets/icon.png"
+    icon_background_color: "#3949AB"
+    icon_background_color_dark: "#1A237E"
+    
+  fullscreen: true
+  android: true
+  ios: true
+  web: false
+  
+  android_gravity: center
+  ios_content_mode: center
+  web_image_mode: center
+  
+  # Animasyon
+  branding: assets/icon.png
+  branding_mode: bottom
+  
+  # Durumlar
+  android_screen_orientation: portrait
