@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:animated_text_kit/animated_text_kit.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 class SplashScreen extends StatefulWidget {
   final Widget child;
@@ -16,24 +14,12 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
+class _SplashScreenState extends State<SplashScreen> {
   bool _showChild = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-    _animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
-    
-    _controller.forward();
     
     Future.delayed(widget.duration, () {
       if (mounted) {
@@ -45,12 +31,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     if (_showChild) {
       return widget.child;
@@ -58,48 +38,12 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     
     return Scaffold(
       body: Container(
-        color: const Color(0xFF3949AB),
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo Animasyonu
-              ScaleTransition(
-                scale: _animation,
-                child: Image.asset(
-                  'assets/icon.png',
-                  width: 150,
-                  height: 150,
-                ),
-              ),
-              
-              const SizedBox(height: 30),
-              
-              // Animasyonlu Yazı
-              AnimatedTextKit(
-                animatedTexts: [
-                  TypewriterAnimatedText(
-                    'TODOBUS',
-                    textStyle: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0,
-                    ),
-                    speed: const Duration(milliseconds: 200),
-                  ),
-                ],
-                totalRepeatCount: 1,
-              ),
-              
-              const SizedBox(height: 50),
-              
-              // Yükleniyor animasyonu
-              const SpinKitThreeBounce(
-                color: Colors.white,
-                size: 30.0,
-              ),
-            ],
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/splash.png'),
+            fit: BoxFit.cover,
           ),
         ),
       ),

@@ -23,6 +23,26 @@ import 'work_detail_view.dart';
 import 'event_detail_view.dart';
 import 'notifications_view.dart';
 
+// Dashboard widget'ları için enum tanımı
+enum DashboardWidgetType {
+  welcomeSection,
+  infoCards,
+  recentGroups,
+  projects,
+  upcomingEvents,
+  myTasks,
+}
+
+// Dashboard widget'larının görüntü adları
+Map<DashboardWidgetType, String> dashboardWidgetNames = {
+  DashboardWidgetType.welcomeSection: 'Karşılama Bölümü',
+  DashboardWidgetType.infoCards: 'Bilgi Kartları',
+  DashboardWidgetType.recentGroups: 'Son Aktif Gruplar',
+  DashboardWidgetType.projects: 'Projelerim',
+  DashboardWidgetType.upcomingEvents: 'Yaklaşan Etkinlikler',
+  DashboardWidgetType.myTasks: 'Görevlerim',
+};
+
 class DashboardView extends StatefulWidget {
   const DashboardView({Key? key}) : super(key: key);
 
@@ -58,6 +78,18 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     Colors.teal,
     Colors.pink
   ];
+  
+  // Dashboard widget'larının sırası
+  List<DashboardWidgetType> _widgetOrder = [];
+  // Varsayılan widget sırası
+  final List<DashboardWidgetType> _defaultWidgetOrder = [
+    DashboardWidgetType.welcomeSection,
+    DashboardWidgetType.infoCards,
+    DashboardWidgetType.recentGroups,
+    DashboardWidgetType.projects,
+    DashboardWidgetType.upcomingEvents,
+    DashboardWidgetType.myTasks,
+  ];
 
   @override
   void initState() {
@@ -72,6 +104,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         
         // Kullanıcı arayüzünü hızlıca render etmek için boş durumla güncelle
         setState(() {});
+
+        // Widget sırasını yükle
+        await _loadWidgetOrder();
 
         // Tüm veri yüklemelerini paralel olarak başlat
         final userFuture = _loadUserData(profileViewModel);
@@ -123,6 +158,187 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         }
       }
     });
+  }
+  
+  // Widget sırasını yükleme
+  Future<void> _loadWidgetOrder() async {
+    final order = await _storageService.getDashboardWidgetOrder();
+    if (order.isNotEmpty) {
+      setState(() {
+        _widgetOrder = order;
+      });
+      _logger.i('Widget sırası yüklendi: ${order.map((e) => e.toString()).join(', ')}');
+    } else {
+      setState(() {
+        _widgetOrder = List.from(_defaultWidgetOrder);
+      });
+      _logger.i('Varsayılan widget sırası kullanılıyor');
+    }
+  }
+  
+  // Widget sırasını kaydetme
+  Future<void> _saveWidgetOrder() async {
+    await _storageService.saveDashboardWidgetOrder(_widgetOrder);
+    _logger.i('Widget sırası kaydedildi: ${_widgetOrder.map((e) => e.toString()).join(', ')}');
+  }
+  
+  // Widget sırasını değiştirme (ayarlar ekranından çağrılır)
+  void _changeWidgetOrder(int oldIndex, int newIndex) {
+    setState(() {
+      if (oldIndex < newIndex) {
+        newIndex -= 1;
+      }
+      final item = _widgetOrder.removeAt(oldIndex);
+      _widgetOrder.insert(newIndex, item);
+    });
+    _saveWidgetOrder();
+  }
+  
+  // Widget sırasını sıfırlama
+  void _resetWidgetOrder() {
+    setState(() {
+      _widgetOrder = List.from(_defaultWidgetOrder);
+    });
+    _saveWidgetOrder();
+    _snackBarService.showSuccess('Widget sırası sıfırlandı');
+  }
+  
+  // Widget sırasını düzenleme ekranını göster
+  void _showWidgetOrderingScreen() {
+    final bool isIOS = Platform.isIOS;
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: isIOS ? CupertinoColors.systemBackground : Theme.of(context).colorScheme.background,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Widget Sıralaması',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isIOS ? CupertinoTheme.of(context).textTheme.textStyle.color : Theme.of(context).textTheme.titleLarge?.color,
+                    ),
+                  ),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      _resetWidgetOrder();
+                      Navigator.pop(context);
+                    },
+                    child: Text(
+                      'Sıfırla',
+                      style: TextStyle(
+                        color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                'Ana sayfada görünen widget\'ların sırasını değiştirmek için aşağıdaki öğeleri sürükleyip bırakın.',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Expanded(
+              child: ReorderableListView.builder(
+                itemCount: _widgetOrder.length,
+                onReorder: (oldIndex, newIndex) {
+                  _changeWidgetOrder(oldIndex, newIndex);
+                },
+                itemBuilder: (context, index) {
+                  final widgetType = _widgetOrder[index];
+                  final widgetName = dashboardWidgetNames[widgetType] ?? 'Bilinmeyen Widget';
+                  
+                  return Container(
+                    key: ValueKey(widgetType),
+                    margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                    decoration: BoxDecoration(
+                      color: isIOS ? CupertinoColors.tertiarySystemBackground : Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isIOS ? CupertinoColors.separator : Colors.grey[300]!,
+                        width: 0.5,
+                      ),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      leading: Icon(
+                        _getIconForWidgetType(widgetType),
+                        color: isIOS ? CupertinoColors.activeBlue : Theme.of(context).primaryColor,
+                      ),
+                      title: Text(
+                        widgetName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: isIOS ? CupertinoTheme.of(context).textTheme.textStyle.color : Theme.of(context).textTheme.titleMedium?.color,
+                        ),
+                      ),
+                      trailing: Icon(
+                        isIOS ? CupertinoIcons.line_horizontal_3 : Icons.drag_handle,
+                        color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: PlatformElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                },
+                child: const Text('Tamam'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // Widget türüne göre ikon döndürme
+  IconData _getIconForWidgetType(DashboardWidgetType type) {
+    final bool isIOS = Platform.isIOS;
+    
+    switch (type) {
+      case DashboardWidgetType.welcomeSection:
+        return isIOS ? CupertinoIcons.person_crop_circle : Icons.person;
+      case DashboardWidgetType.infoCards:
+        return isIOS ? CupertinoIcons.square_grid_2x2 : Icons.dashboard;
+      case DashboardWidgetType.recentGroups:
+        return isIOS ? CupertinoIcons.group : Icons.group;
+      case DashboardWidgetType.projects:
+        return isIOS ? CupertinoIcons.square_stack_3d_down_right : Icons.folder;
+      case DashboardWidgetType.upcomingEvents:
+        return isIOS ? CupertinoIcons.calendar : Icons.event;
+      case DashboardWidgetType.myTasks:
+        return isIOS ? CupertinoIcons.square_list : Icons.task;
+    }
   }
   
   // Kullanıcı verilerini yükleme
@@ -190,6 +406,31 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       appBar: PlatformAppBar(
         title: const Text('Ana Sayfa'),
         material: (_, __) => MaterialAppBarData(
+          leading: GestureDetector(
+            onTap: _showWidgetOrderingScreen,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.sort,
+                    size: 20,
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Düzen',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).primaryColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           actions: <Widget>[
             IconButton(
               icon: Stack(
@@ -238,6 +479,31 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         cupertino: (_, __) => CupertinoNavigationBarData(
           backgroundColor: CupertinoColors.systemGroupedBackground.withAlpha(200),
           border: null,
+          leading: GestureDetector(
+            onTap: _showWidgetOrderingScreen,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    CupertinoIcons.slider_horizontal_3,
+                    size: 18,
+                    color: CupertinoColors.activeBlue,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Düzen',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: CupertinoColors.activeBlue,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -323,78 +589,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             ),
           ),
         
-        SliverToBoxAdapter(
-          child: _buildWelcomeSection(),
-        ),
-        
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12.0,
-              mainAxisSpacing: 12.0,
-              childAspectRatio: 2.0,
-            ),
-            delegate: SliverChildListDelegate([
-              _buildInfoCard(
-                context,
-                title: 'Bekleyen Görevler',
-                value: '${dashboardViewModel.incompletedTaskCount}',
-                icon: CupertinoIcons.tray_arrow_up_fill,
-                color: CupertinoColors.systemIndigo,
-              ),
-              _buildInfoCard(
-                context,
-                title: 'Gruplar',
-                value: '${groupViewModel.groups.length}',
-                icon: CupertinoIcons.group,
-                color: CupertinoColors.activeGreen,
-              ),
-              _buildInfoCard(
-                context,
-                title: 'Projeler',
-                value: '${groupViewModel.totalProjects}',
-                icon: CupertinoIcons.square_stack_3d_down_right,
-                color: CupertinoColors.systemOrange,
-              ),
-              _buildInfoCard(
-                context,
-                title: 'Etkinlikler',
-                value: '${eventViewModel.events.length}',
-                icon: CupertinoIcons.calendar_badge_plus,
-                color: CupertinoColors.systemPurple,
-              ),
-            ]),
-          ),
-        ),
-        
-        _buildSectionHeader('Son Aktif Gruplar'),
-        SliverToBoxAdapter(
-          child: _buildRecentGroupsList(dashboardViewModel.isLoading),
-        ),
-        
-        _buildSectionHeader('Projelerim'),
-        SliverToBoxAdapter(
-          child: _buildProjectsList(dashboardViewModel.isLoading),
-        ),
-        
-        _buildSectionHeader('Yaklaşan Etkinlikler', onViewAll: () {
-          final parentContext = context;
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (Navigator.of(parentContext).canPop()) {
-              Navigator.of(parentContext).pop();
-            }
-            if (parentContext.findAncestorStateOfType<MainAppState>() != null) {
-              parentContext.findAncestorStateOfType<MainAppState>()!.setCurrentIndex(2);
-            }
-          });
-        }),
-        _buildEventsList(eventViewModel),
-        
-        _buildSectionHeader('Görevlerim'),
-        _buildMyTasksSection(),
-        
+        // Widget'ları sıraya göre oluştur
+        ..._buildWidgetsInOrder(dashboardViewModel, groupViewModel, eventViewModel),
         
         const SliverToBoxAdapter(
           child: SizedBox(height: 90),
@@ -403,85 +599,114 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     );
   }
   
-  // Etkinlikler listesi - ayrı metot olarak optimize edildi
-  Widget _buildEventsList(EventViewModel eventViewModel) {
-    final bool isLoading = eventViewModel.isLoading;
-    final events = eventViewModel.events;
-    final bool isEmpty = events.isEmpty;
-    final int displayCount = events.length > 5 ? 5 : events.length;
+  // Widget'ları belirlenen sıraya göre oluşturma
+  List<Widget> _buildWidgetsInOrder(
+    DashboardViewModel dashboardViewModel, 
+    GroupViewModel groupViewModel, 
+    EventViewModel eventViewModel
+  ) {
+    final List<Widget> widgets = [];
     
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      sliver: isLoading && isEmpty
-        ? SliverToBoxAdapter(child: Center(child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: CupertinoActivityIndicator(),
-          )))
-        : isEmpty
-          ? SliverToBoxAdapter(
-              child: _buildEmptyState(
-                icon: CupertinoIcons.calendar_badge_minus,
-                message: 'Yaklaşan etkinlik bulunmuyor',
-              ),
-            )
-          : SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final event = events[index];
-                  return _buildEventItem(
-                    context, 
-                    title: event.eventTitle,
-                    description: event.eventDesc,
-                    date: event.eventDate,
-                    user: event.userFullname,
-                    groupId: event.groupID,
-                  );
-                },
-                childCount: displayCount,
+    // Widget sırası boşsa varsayılan sırayı kullan
+    final order = _widgetOrder.isEmpty ? _defaultWidgetOrder : _widgetOrder;
+    
+    for (final widgetType in order) {
+      switch (widgetType) {
+        case DashboardWidgetType.welcomeSection:
+          widgets.add(
+            SliverToBoxAdapter(
+              child: _buildWelcomeSection(),
+            ),
+          );
+          break;
+          
+        case DashboardWidgetType.infoCards:
+          widgets.add(
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12.0,
+                  mainAxisSpacing: 12.0,
+                  childAspectRatio: 2.0,
+                ),
+                delegate: SliverChildListDelegate([
+                  _buildInfoCard(
+                    context,
+                    title: 'Bekleyen Görevler',
+                    value: '${dashboardViewModel.incompletedTaskCount}',
+                    icon: CupertinoIcons.tray_arrow_up_fill,
+                    color: CupertinoColors.systemIndigo,
+                  ),
+                  _buildInfoCard(
+                    context,
+                    title: 'Gruplar',
+                    value: '${groupViewModel.groups.length}',
+                    icon: CupertinoIcons.group,
+                    color: CupertinoColors.activeGreen,
+                  ),
+                  _buildInfoCard(
+                    context,
+                    title: 'Projeler',
+                    value: '${groupViewModel.totalProjects}',
+                    icon: CupertinoIcons.square_stack_3d_down_right,
+                    color: CupertinoColors.systemOrange,
+                  ),
+                  _buildInfoCard(
+                    context,
+                    title: 'Etkinlikler',
+                    value: '${eventViewModel.events.length}',
+                    icon: CupertinoIcons.calendar_badge_plus,
+                    color: CupertinoColors.systemPurple,
+                  ),
+                ]),
               ),
             ),
-    );
-  }
-  
-  Widget _buildSectionHeader(String title, {VoidCallback? onViewAll, VoidCallback? onRefresh}) {
-    final bool isIOS = Platform.isIOS;
-    final titleStyle = isIOS 
-      ? CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(fontWeight: FontWeight.bold, fontSize: 20)
-      : Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18, fontWeight: FontWeight.bold);
-
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 24.0, bottom: 8.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(title, style: titleStyle),
-            if (onViewAll != null)
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: onViewAll,
-                child: Text(
-                  'Tümü',
-                  style: TextStyle(
-                    color: isIOS ? CupertinoColors.activeBlue : Theme.of(context).primaryColor,
-                    fontSize: 15,
-                  ),
-                ),
-              )
-            else if (onRefresh != null)
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: onRefresh,
-                child: Icon(
-                  isIOS ? CupertinoIcons.refresh : Icons.refresh,
-                  size: 22,
-                  color: isIOS ? CupertinoColors.activeBlue : Theme.of(context).primaryColor,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
+          );
+          break;
+          
+        case DashboardWidgetType.recentGroups:
+          widgets.add(_buildSectionHeader('Son Aktif Gruplar'));
+          widgets.add(
+            SliverToBoxAdapter(
+              child: _buildRecentGroupsList(dashboardViewModel.isLoading),
+            ),
+          );
+          break;
+          
+        case DashboardWidgetType.projects:
+          widgets.add(_buildSectionHeader('Projelerim'));
+          widgets.add(
+            SliverToBoxAdapter(
+              child: _buildProjectsList(dashboardViewModel.isLoading),
+            ),
+          );
+          break;
+          
+        case DashboardWidgetType.upcomingEvents:
+          widgets.add(_buildSectionHeader('Yaklaşan Etkinlikler', onViewAll: () {
+            final parentContext = context;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (Navigator.of(parentContext).canPop()) {
+                Navigator.of(parentContext).pop();
+              }
+              if (parentContext.findAncestorStateOfType<MainAppState>() != null) {
+                parentContext.findAncestorStateOfType<MainAppState>()!.setCurrentIndex(2);
+              }
+            });
+          }));
+          widgets.add(_buildEventsList(eventViewModel));
+          break;
+          
+        case DashboardWidgetType.myTasks:
+          widgets.add(_buildSectionHeader('Görevlerim'));
+          widgets.add(_buildMyTasksSection());
+          break;
+      }
+    }
+    
+    return widgets;
   }
   
   Widget _buildWelcomeSection() {
@@ -591,122 +816,6 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     );
   }
   
-  
-  Widget _buildEventItem(
-    BuildContext context, {
-    required String title,
-    required String description,
-    required String date,
-    required String user,
-    required int groupId,
-  }) {
-    final bool isIOS = Platform.isIOS;
-    final cardBackgroundColor = isIOS 
-      ? (CupertinoTheme.of(context).brightness == Brightness.light ? CupertinoColors.white : CupertinoColors.tertiarySystemBackground)
-      : Theme.of(context).cardColor;
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(
-            builder: (context) => EventDetailPage(
-              groupId: groupId,
-              eventTitle: title,
-              eventDescription: description,
-              eventDate: date,
-              eventUser: user,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10.0),
-        padding: const EdgeInsets.all(12.0),
-        decoration: BoxDecoration(
-          color: cardBackgroundColor,
-          borderRadius: BorderRadius.circular(10.0),
-          border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.3), width: 0.5) : null,
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: (isIOS ? CupertinoColors.systemIndigo : Colors.indigo).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                isIOS ? CupertinoIcons.calendar : Icons.event,
-                color: isIOS ? CupertinoColors.systemIndigo : Colors.indigo,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: isIOS 
-                        ? CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontWeight: FontWeight.w600, fontSize: 15)
-                        : Theme.of(context).textTheme.titleSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (description.isNotEmpty) ...[
-                    const SizedBox(height: 3),
-                    Text(
-                      description,
-                      style: (isIOS 
-                          ? CupertinoTheme.of(context).textTheme.pickerTextStyle.copyWith(color: CupertinoColors.secondaryLabel, fontSize: 13)
-                          : Theme.of(context).textTheme.bodySmall
-                      )?.copyWith(color: CupertinoColors.secondaryLabel, fontSize: 13),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        isIOS ? CupertinoIcons.person : Icons.person_outline,
-                        size: 12,
-                        color: CupertinoColors.tertiaryLabel,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        user,
-                        style: (isIOS ? CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(fontSize: 11) : Theme.of(context).textTheme.bodySmall)
-                            ?.copyWith(color: CupertinoColors.tertiaryLabel, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: (isIOS ? CupertinoColors.systemOrange : Colors.orange).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                date,
-                style: TextStyle(
-                  color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 10,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildRecentGroupsList(bool isLoadingOverall) {
     final groupViewModel = Provider.of<GroupViewModel>(context);
     
@@ -1642,6 +1751,202 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         _snackBarService.showError('Veriler yenilenirken hata oluştu');
       }
     }
+  }
+
+  // Etkinlikler listesi - ayrı metot olarak optimize edildi
+  Widget _buildEventsList(EventViewModel eventViewModel) {
+    final bool isLoading = eventViewModel.isLoading;
+    final events = eventViewModel.events;
+    final bool isEmpty = events.isEmpty;
+    final int displayCount = events.length > 5 ? 5 : events.length;
+    
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      sliver: isLoading && isEmpty
+        ? SliverToBoxAdapter(child: Center(child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: CupertinoActivityIndicator(),
+          )))
+        : isEmpty
+          ? SliverToBoxAdapter(
+              child: _buildEmptyState(
+                icon: CupertinoIcons.calendar_badge_minus,
+                message: 'Yaklaşan etkinlik bulunmuyor',
+              ),
+            )
+          : SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  final event = events[index];
+                  return _buildEventItem(
+                    context, 
+                    title: event.eventTitle,
+                    description: event.eventDesc,
+                    date: event.eventDate,
+                    user: event.userFullname,
+                    groupId: event.groupID,
+                  );
+                },
+                childCount: displayCount,
+              ),
+            ),
+    );
+  }
+  
+  Widget _buildSectionHeader(String title, {VoidCallback? onViewAll, VoidCallback? onRefresh}) {
+    final bool isIOS = Platform.isIOS;
+    final titleStyle = isIOS 
+      ? CupertinoTheme.of(context).textTheme.navTitleTextStyle.copyWith(fontWeight: FontWeight.bold, fontSize: 20)
+      : Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 18, fontWeight: FontWeight.bold);
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 24.0, bottom: 8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: titleStyle),
+            if (onViewAll != null)
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: onViewAll,
+                child: Text(
+                  'Tümü',
+                  style: TextStyle(
+                    color: isIOS ? CupertinoColors.activeBlue : Theme.of(context).primaryColor,
+                    fontSize: 15,
+                  ),
+                ),
+              )
+            else if (onRefresh != null)
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: onRefresh,
+                child: Icon(
+                  isIOS ? CupertinoIcons.refresh : Icons.refresh,
+                  size: 22,
+                  color: isIOS ? CupertinoColors.activeBlue : Theme.of(context).primaryColor,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildEventItem(
+    BuildContext context, {
+    required String title,
+    required String description,
+    required String date,
+    required String user,
+    required int groupId,
+  }) {
+    final bool isIOS = Platform.isIOS;
+    final cardBackgroundColor = isIOS 
+      ? (CupertinoTheme.of(context).brightness == Brightness.light ? CupertinoColors.white : CupertinoColors.tertiarySystemBackground)
+      : Theme.of(context).cardColor;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          CupertinoPageRoute(
+            builder: (context) => EventDetailPage(
+              groupId: groupId,
+              eventTitle: title,
+              eventDescription: description,
+              eventDate: date,
+              eventUser: user,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10.0),
+        padding: const EdgeInsets.all(12.0),
+        decoration: BoxDecoration(
+          color: cardBackgroundColor,
+          borderRadius: BorderRadius.circular(10.0),
+          border: isIOS ? Border.all(color: CupertinoColors.separator.withOpacity(0.3), width: 0.5) : null,
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (isIOS ? CupertinoColors.systemIndigo : Colors.indigo).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                isIOS ? CupertinoIcons.calendar : Icons.event,
+                color: isIOS ? CupertinoColors.systemIndigo : Colors.indigo,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: isIOS 
+                        ? CupertinoTheme.of(context).textTheme.textStyle.copyWith(fontWeight: FontWeight.w600, fontSize: 15)
+                        : Theme.of(context).textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      description,
+                      style: (isIOS 
+                          ? CupertinoTheme.of(context).textTheme.pickerTextStyle.copyWith(color: CupertinoColors.secondaryLabel, fontSize: 13)
+                          : Theme.of(context).textTheme.bodySmall
+                      )?.copyWith(color: CupertinoColors.secondaryLabel, fontSize: 13),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        isIOS ? CupertinoIcons.person : Icons.person_outline,
+                        size: 12,
+                        color: CupertinoColors.tertiaryLabel,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        user,
+                        style: (isIOS ? CupertinoTheme.of(context).textTheme.tabLabelTextStyle.copyWith(fontSize: 11) : Theme.of(context).textTheme.bodySmall)
+                            ?.copyWith(color: CupertinoColors.tertiaryLabel, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: (isIOS ? CupertinoColors.systemOrange : Colors.orange).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                date,
+                style: TextStyle(
+                  color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

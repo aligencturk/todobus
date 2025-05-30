@@ -382,4 +382,67 @@ class UpdatePasswordResponse {
       userFriendlyMessage: friendlyMessage,
     );
   }
+}
+
+// Tekrar kod gönderme isteği
+class AgainSendCodeRequest {
+  final String userToken;
+
+  AgainSendCodeRequest({
+    required this.userToken,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'userToken': userToken,
+      };
+}
+
+// Tekrar kod gönderme yanıtı
+class AgainSendCodeResponse {
+  final bool error;
+  final bool success;
+  final String? message;
+  final AgainSendCodeData? data;
+  final String? userFriendlyMessage;
+
+  AgainSendCodeResponse({
+    required this.error,
+    required this.success,
+    this.message,
+    this.data,
+    this.userFriendlyMessage,
+  });
+
+  factory AgainSendCodeResponse.fromJson(Map<String, dynamic> json) {
+    // error_message ve message field'larını kontrol et
+    String? message = json['message'] ?? json['error_message'];
+    
+    // Kullanıcı dostu mesaj oluştur
+    String? friendlyMessage;
+    if (!json['success']) {
+      friendlyMessage = message ?? 'Yeni doğrulama kodu gönderilirken bir hata oluştu.';
+    }
+    
+    return AgainSendCodeResponse(
+      error: json['error'] ?? false,
+      success: json['success'] ?? false,
+      message: message,
+      data: json['data'] != null ? AgainSendCodeData.fromJson(json['data']) : null,
+      userFriendlyMessage: friendlyMessage,
+    );
+  }
+}
+
+class AgainSendCodeData {
+  final String codeToken;
+
+  AgainSendCodeData({
+    required this.codeToken,
+  });
+
+  factory AgainSendCodeData.fromJson(Map<String, dynamic> json) {
+    return AgainSendCodeData(
+      codeToken: json['codeToken'],
+    );
+  }
 } 

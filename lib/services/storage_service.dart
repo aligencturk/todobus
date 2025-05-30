@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/logger_service.dart';
 import '../models/user_model.dart';
+import '../views/dashboard_view.dart';
 
 class StorageService {
   static final StorageService _instance = StorageService._internal();
@@ -12,6 +13,7 @@ class StorageService {
   static const String keyUserToken = 'user_token';
   static const String keyUserId = 'user_id';
   static const String keyIsLoggedIn = 'is_logged_in';
+  static const String keyDashboardWidgetOrder = 'dashboard_widget_order';
 
   factory StorageService() {
     return _instance;
@@ -64,6 +66,51 @@ class StorageService {
   bool isLoggedIn() {
     _ensureInitializedSync();
     return _prefs.getBool(keyIsLoggedIn) ?? false;
+  }
+
+  // Dashboard widget sırasını kaydetme
+  Future<bool> saveDashboardWidgetOrder(List<DashboardWidgetType> order) async {
+    await _ensureInitialized();
+    
+    // Enum değerlerini int listesine dönüştür
+    final List<int> orderIndices = order.map((type) => type.index).toList();
+    
+    // Int listesini kaydet
+    final result = await _prefs.setStringList(
+      keyDashboardWidgetOrder, 
+      orderIndices.map((i) => i.toString()).toList()
+    );
+    
+    _logger.d('Dashboard widget sırası kaydedildi: ${orderIndices.join(", ")}');
+    return result;
+  }
+  
+  // Dashboard widget sırasını getirme
+  List<DashboardWidgetType> getDashboardWidgetOrder() {
+    _ensureInitializedSync();
+    
+    // Kaydedilen string listesini al
+    final List<String>? savedOrder = _prefs.getStringList(keyDashboardWidgetOrder);
+    
+    if (savedOrder == null || savedOrder.isEmpty) {
+      return [];
+    }
+    
+    try {
+      // String listesini int listesine dönüştür
+      final List<int> orderIndices = savedOrder.map((s) => int.parse(s)).toList();
+      
+      // Int listesini enum listesine dönüştür
+      final List<DashboardWidgetType> result = orderIndices
+          .map((i) => DashboardWidgetType.values[i])
+          .toList();
+      
+      _logger.d('Dashboard widget sırası alındı: ${orderIndices.join(", ")}');
+      return result;
+    } catch (e) {
+      _logger.e('Dashboard widget sırası alınırken hata: $e');
+      return [];
+    }
   }
 
   // Çıkış işlemi - sadece giriş bilgilerini temizle

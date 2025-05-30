@@ -240,4 +240,37 @@ class AuthService {
       );
     }
   }
+  
+  // Tekrar doğrulama kodu gönderme
+  Future<AgainSendCodeResponse> againSendCode(String userToken) async {
+    try {
+      _logger.i('Yeni doğrulama kodu gönderiliyor');
+      
+      final codeRequest = AgainSendCodeRequest(
+        userToken: userToken,
+      );
+      
+      final response = await _apiService.post(
+        'service/auth/code/againSendCode',
+        body: codeRequest.toJson(),
+      );
+      
+      final codeResponse = AgainSendCodeResponse.fromJson(response);
+      
+      if (codeResponse.success) {
+        _logger.i('Yeni doğrulama kodu başarıyla gönderildi');
+      } else {
+        _logger.w('Yeni doğrulama kodu gönderme başarısız: ${codeResponse.message}');
+      }
+      
+      return codeResponse;
+    } catch (e, s) {
+      _logger.e('Yeni doğrulama kodu gönderme sırasında kritik hata: $e', null, s);
+      return AgainSendCodeResponse(
+        error: true,
+        success: false,
+        message: e.toString(),
+      );
+    }
+  }
 } 

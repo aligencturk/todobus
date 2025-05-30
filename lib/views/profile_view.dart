@@ -5,6 +5,7 @@ import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import '../viewmodels/profile_viewmodel.dart';
@@ -13,6 +14,8 @@ import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import '../services/auth_service.dart';
 import 'login_view.dart';
+import 'account_activation_view.dart';
+
 
 class ProfileView extends StatefulWidget {
   const ProfileView({Key? key}) : super(key: key);
@@ -26,14 +29,12 @@ class _ProfileViewState extends State<ProfileView> {
   final LoggerService _logger = LoggerService();
   final ImagePicker _imagePicker = ImagePicker();
   final AuthService _authService = AuthService();
-  final TextEditingController _activationCodeController = TextEditingController();
   
   // Genişletilebilir panellerin durumlarını takip etmek için
   bool _isAccountSectionExpanded = false;
   bool _isHelpSectionExpanded = false;
   bool _isAppInfoSectionExpanded = false;
   bool _isLoadingImage = false;
-  bool _isVerifyingCode = false;
   
   @override
   void initState() {
@@ -42,6 +43,11 @@ class _ProfileViewState extends State<ProfileView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProfileViewModel>().loadUserProfile();
     });
+  }
+  
+  @override
+  void dispose() {
+    super.dispose();
   }
   
   Future<void> _logout() async {
@@ -197,250 +203,20 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // Profil fotoğrafı seçme
-  Future<void> _pickProfileImage() async {
-    try {
-      final XFile? pickedImage = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 70,
-      );
-      
-      if (pickedImage == null) return;
-      
-      setState(() {
-        _isLoadingImage = true;
-      });
-      
-      // Resmi kırp
-      final croppedFile = await _cropImage(File(pickedImage.path));
-      if (croppedFile == null) {
-        setState(() {
-          _isLoadingImage = false;
-        });
-        return;
-      }
-      
-      // Dosyayı base64'e dönüştür
-      final bytes = await croppedFile.readAsBytes();
-      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-      
-      // Profil fotoğrafını güncelle
-      final viewModel = context.read<ProfileViewModel>();
-      await viewModel.updateProfilePhoto(base64Image);
-      
-      setState(() {
-        _isLoadingImage = false;
-      });
-      
-      if (viewModel.status == ProfileStatus.updateError) {
-        _showErrorMessage(viewModel.errorMessage);
-      }
-    } catch (e) {
-      _logger.e('Profil fotoğrafı seçilirken hata: $e');
-      setState(() {
-        _isLoadingImage = false;
-      });
-      _showErrorMessage('Görsel seçilirken bir hata oluştu: ${e.toString()}');
-    }
-  }
-  
-  // Resmi kırpma
-  Future<File?> _cropImage(File imageFile) async {
-    try {
-      final croppedFile = await ImageCropper().cropImage(
-        sourcePath: imageFile.path,
-        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        compressQuality: 70,
-        compressFormat: ImageCompressFormat.jpg,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Profil Fotoğrafını Düzenle',
-            toolbarColor: Colors.blue,
-            toolbarWidgetColor: Colors.white,
-            lockAspectRatio: true,
-          ),
-          IOSUiSettings(
-            title: 'Profil Fotoğrafını Düzenle',
-            aspectRatioLockEnabled: true,
-          ),
-        ],
-      );
-      
-      return croppedFile != null ? File(croppedFile.path) : null;
-    } catch (e) {
-      _logger.e('Resim kırpılırken hata: $e');
-      return null;
-    }
-  }
-  
-  // Hata mesajı göster
-  void _showErrorMessage(String message) {
-    showPlatformDialog(
-      context: context,
-      builder: (context) => PlatformAlertDialog(
-        title: const Text('Hata'),
-        content: Text(message),
-        actions: <Widget>[
-          PlatformDialogAction(
-            child: const Text('Tamam'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
+  // Hesap aktivasyon sayfasına yönlendir
+  Future<void> _navigateToActivation() async {
+    final result = await Navigator.push(
+      context,
+      platformPageRoute(
+        context: context,
+        builder: (context) => const AccountActivationView(),
       ),
     );
-  }
-
-  // Hesap aktivasyon diyaloğunu göster
-  void _showActivationDialog(BuildContext context) {
-    String dialogErrorMessage = '';  // Diyalog için yerel hata mesajı
-    bool isVerifyingCodeLocal = false; // Diyalog için yerel yükleme durumu
-    final activationCodeController = TextEditingController(); // Yerel controller
     
-    showPlatformDialog(
-      context: context,
-      barrierDismissible: false, // Dışarı tıklayarak kapatılamaz
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => PlatformAlertDialog(
-          title: const Text('Hesap Aktivasyonu'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'E-postanıza gönderilen doğrulama kodunu girerek hesabınızı aktifleştirebilirsiniz.',
-                style: TextStyle(
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 16),
-              isCupertino(context)
-                  ? CupertinoTextField(
-                      controller: activationCodeController,
-                      placeholder: 'Doğrulama kodu',
-                      keyboardType: TextInputType.number,
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: CupertinoColors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: CupertinoColors.systemGrey4),
-                      ),
-                    )
-                  : TextField(
-                      controller: activationCodeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Doğrulama kodu',
-                        border: OutlineInputBorder(),
-                        filled: true,
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-              if (dialogErrorMessage.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Text(
-                    dialogErrorMessage,
-                    style: TextStyle(
-                      color: platformThemeData(
-                        context,
-                        material: (data) => Colors.red,
-                        cupertino: (data) => CupertinoColors.systemRed,
-                      ),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          actions: <Widget>[
-            PlatformDialogAction(
-              child: const Text('İptal'),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                activationCodeController.clear();
-              },
-            ),
-            PlatformDialogAction(
-              child: isVerifyingCodeLocal 
-                  ? PlatformCircularProgressIndicator()
-                  : const Text('Doğrula'),
-              onPressed: isVerifyingCodeLocal 
-                  ? null 
-                  : () async {
-                      // Aktivasyon kodunu doğrula
-                      final code = activationCodeController.text.trim();
-                      
-                      if (code.isEmpty) {
-                        setDialogState(() {
-                          dialogErrorMessage = 'Lütfen doğrulama kodunu giriniz.';
-                        });
-                        return;
-                      }
-                      
-                      // Sadece sayısal değer mi kontrol et
-                      if (!RegExp(r'^\d+$').hasMatch(code)) {
-                        setDialogState(() {
-                          dialogErrorMessage = 'Doğrulama kodu sadece rakamlardan oluşmalıdır.';
-                        });
-                        return;
-                      }
-                      
-                      setDialogState(() {
-                        isVerifyingCodeLocal = true;
-                        dialogErrorMessage = '';
-                      });
-                      
-                      try {
-                        // StorageService'den user_id'yi alıyoruz token olarak kullanmak için
-                        final userId = await _storageService.getUserId();
-                        
-                        if (userId == null) {
-                          setDialogState(() {
-                            dialogErrorMessage = 'Kullanıcı bilgisi bulunamadı. Lütfen tekrar giriş yapınız.';
-                            isVerifyingCodeLocal = false;
-                          });
-                          return;
-                        }
-                        
-                        _logger.i('Aktivasyon kodu doğrulanıyor: $code, userId: $userId');
-                        
-                        final response = await _authService.checkVerificationCode(
-                          code,
-                          userId.toString(),
-                        );
-                        
-                        if (response.success) {
-                          // Doğrulama başarılı, profil bilgilerini güncelle
-                          context.read<ProfileViewModel>().loadUserProfile();
-                          
-                          Navigator.of(dialogContext).pop();
-                          activationCodeController.clear();
-                          
-                          _showSuccessDialog('Hesabınız başarıyla doğrulandı! Artık tüm özellikleri kullanabilirsiniz.');
-                        } else {
-                          _logger.w('Aktivasyon kodu doğrulama başarısız: ${response.message}');
-                          setDialogState(() {
-                            dialogErrorMessage = response.userFriendlyMessage ?? 
-                                response.message ?? 
-                                'Doğrulama kodu geçersiz veya süresi dolmuş. Lütfen tekrar deneyiniz.';
-                            isVerifyingCodeLocal = false;
-                          });
-                        }
-                      } catch (e) {
-                        _logger.e('Hesap doğrulama sırasında hata: $e');
-                        setDialogState(() {
-                          dialogErrorMessage = 'Doğrulama sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.';
-                          isVerifyingCodeLocal = false;
-                        });
-                      }
-                    },
-            ),
-          ],
-        ),
-      ),
-    ).then((_) {
-      // Dialog kapandığında kaynakları temizle
-      activationCodeController.dispose();
-    });
+    // Eğer aktivasyon başarılı olduysa profil bilgilerini yenile
+    if (result == true && mounted) {
+      context.read<ProfileViewModel>().loadUserProfile();
+    }
   }
 
   @override
@@ -771,7 +547,7 @@ class _ProfileViewState extends State<ProfileView> {
                       right: 0,
                       bottom: 0,
                       child: GestureDetector(
-                        onTap: () => _showActivationDialog(context),
+                        onTap: () => _navigateToActivation(),
                         child: Container(
                           width: 32,
                           height: 32,
@@ -820,7 +596,7 @@ class _ProfileViewState extends State<ProfileView> {
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
                   child: GestureDetector(
-                    onTap: () => _showActivationDialog(context),
+                    onTap: () => _navigateToActivation(),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -869,23 +645,7 @@ class _ProfileViewState extends State<ProfileView> {
       ],
     );
   }
-  
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: platformThemeData(
-          context,
-          material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          cupertino: (data) => data.textTheme.navTitleTextStyle.copyWith(
-            fontWeight: FontWeight.bold,
-            color: CupertinoColors.activeBlue,
-          ),
-        ),
-      ),
-    );
-  }
+
   
   Widget _buildExpandableSection(
     BuildContext context, {
@@ -1025,26 +785,6 @@ class _ProfileViewState extends State<ProfileView> {
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  // Başarı mesajı diyalog olarak göster
-  void _showSuccessDialog(String message) {
-    showPlatformDialog(
-      context: context,
-      builder: (dialogContext) => PlatformAlertDialog(
-        title: const Text('Başarılı'),
-        content: Text(message),
-        actions: <Widget>[
-          PlatformDialogAction(
-            child: const Text('Tamam'),
-            onPressed: () {
-              Navigator.of(dialogContext).pop();
-              Navigator.of(context).pop(); // Ana sayfaya dön
-            },
-          ),
-        ],
       ),
     );
   }
@@ -1237,6 +977,15 @@ class _EditProfileViewState extends State<EditProfileView> {
         final viewModel = context.read<ProfileViewModel>();
         if (viewModel.status == ProfileStatus.updateSuccess) {
           // Başarı mesajını göster
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Profil başarıyla güncellendi'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          // Önceki sayfaya dön
+          Navigator.of(context).pop();
         } else {
           setState(() {
             _errorMessage = viewModel.errorMessage.isNotEmpty 

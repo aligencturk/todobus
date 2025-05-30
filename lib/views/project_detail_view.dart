@@ -9,6 +9,7 @@ import '../viewmodels/group_viewmodel.dart';
 import '../views/edit_project_view.dart';
 import '../views/work_detail_view.dart';
 import '../views/add_work_view.dart';
+import '../views/project_report_view.dart';
 import '../services/storage_service.dart';
 
 class ProjectDetailView extends StatefulWidget {
@@ -175,6 +176,12 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
         title: Text(_projectDetail?.projectName ?? 'Proje Detayı'),
         trailingActions: _projectDetail != null
             ? [
+                PlatformIconButton(
+                  icon: Icon(
+                    isCupertino(context) ? CupertinoIcons.doc_text : Icons.description,
+                  ),
+                  onPressed: _showProjectReport,
+                ),
                 PlatformIconButton(
                   icon: Icon(
                     isCupertino(context) ? CupertinoIcons.pencil : Icons.edit,
@@ -1158,6 +1165,22 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       await _loadProjectDetail();
       _snackBarService.showSuccess('Proje başarıyla güncellendi');
     }
+  }
+  
+  // Proje raporu gösterme işlevi
+  void _showProjectReport() async {
+    if (_projectDetail == null) return;
+    
+    Navigator.of(context).push(
+      platformPageRoute(
+        context: context,
+        builder: (context) => ProjectReportView(
+          projectId: widget.projectId,
+          groupId: widget.groupId,
+          projectDetail: _projectDetail,
+        ),
+      ),
+    );
   }
   
   // Kullanıcıyı projeden çıkarma doğrulama
