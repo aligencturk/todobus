@@ -3,8 +3,6 @@ import '../services/logger_service.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 import 'base_api_service.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 class GroupService {
   static final GroupService _instance = GroupService._internal();
@@ -23,7 +21,7 @@ class GroupService {
     try {
       _logger.i('Grup listesi getiriliyor...');
       
-      final token = await _storageService.getToken();
+      final token = _storageService.getToken();
       if (token == null) {
         throw Exception('Kullanıcı token bilgisi bulunamadı');
       }
@@ -54,7 +52,7 @@ class GroupService {
     try {
       _logger.i('Grup detayı getiriliyor... (GroupID: $groupID)');
       
-      final token = await _storageService.getToken();
+      final token =  _storageService.getToken();
       if (token == null) {
         throw Exception('Kullanıcı token bilgisi bulunamadı');
       }
@@ -87,7 +85,7 @@ class GroupService {
     try {
       _logger.i('Grup oluşturuluyor: $groupName');
       
-      final token = await _storageService.getToken();
+      final token =  _storageService.getToken();
       if (token == null) {
         throw Exception('Kullanıcı token bilgisi bulunamadı');
       }

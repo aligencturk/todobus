@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'logger_service.dart';
 
 /// Uygulama verilerini yönetmek için kullanılan servis
