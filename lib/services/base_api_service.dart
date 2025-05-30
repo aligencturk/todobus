@@ -1,7 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import '../services/logger_service.dart';
@@ -85,23 +83,7 @@ class BaseApiService {
       }
     });
   }
-  
-  // Yanıt durumunu kontrol et
-  bool _checkResponseStatus(http.Response response) {
-    // 401 hatası varsa login sayfasına yönlendir
-    if (response.statusCode == 401) {
-      _handle401Error();
-      return false;
-    }
-    
-    // 410 Gone, bu API'de başarı yanıtı temsil ediyor
-    if (response.statusCode == 410 || response.statusCode == 200) {
-      return true;
-    }
-    
-    return false;
-  }
-
+ 
   // POST isteği yap
   Future<Map<String, dynamic>> post(
     String endpoint, {
@@ -146,7 +128,7 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = _handleNetworkException(e);
+      final userMessage = (e);
       _logger.e('İstek hatası: $userMessage');
       throw Exception(userMessage);
     }
@@ -210,7 +192,7 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = _handleNetworkException(e);
+      final userMessage = (e);
       _logger.e('İstek hatası: $userMessage, Detay: $e');
       throw Exception(userMessage);
     }
@@ -265,7 +247,7 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = _handleNetworkException(e);
+      final userMessage = (e);
       _logger.e('İstek hatası: $userMessage');
       throw Exception(userMessage);
     }
@@ -315,7 +297,7 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = _handleNetworkException(e);
+      final userMessage = (e);
       _logger.e('İstek hatası: $userMessage');
       throw Exception(userMessage);
     }
@@ -360,17 +342,4 @@ class BaseApiService {
     }
   }
   
-  // Ağ hatalarını kullanıcı dostu mesajlara çevir
-  String _handleNetworkException(dynamic exception) {
-    if (exception is SocketException) {
-      return 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
-    } else if (exception is TimeoutException) {
-      return 'İşlem zaman aşımına uğradı, lütfen tekrar deneyin.';
-    } else if (exception is FormatException) {
-      return 'Sunucudan geçersiz veri alındı.';
-    } else {
-      // Diğer tüm hatalar
-      return 'Bir hata oluştu, lütfen tekrar deneyin.';
-    }
   }
-} 
