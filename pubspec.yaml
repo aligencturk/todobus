@@ -167,17 +167,18 @@ flutter_launcher_icons:
 
 # Flutter Native Splash yapılandırması
 flutter_native_splash:
-  color: "#3949AB"  # Daha canlı bir mavi renk
-  image: "assets/splash.png"
-  color_dark: "#1A237E"  # Koyu tema için daha koyu mavi
-  image_dark: "assets/icon.png"
+  # Native splash'i splash_screen.dart ile aynı yapmak için
+  color: "#FFFFFF"  # Beyaz arka plan
+  image: "assets/splash.png" # Splash görüntüsünü geri ekliyoruz
+  color_dark: "#FFFFFF"  # Koyu tema için de beyaz
+  image_dark: "assets/splash.png" # Koyu tema için de aynı görüntü
   
   android_12:
-    image: "assets/splash.png"
-    icon_background_color: "#3949AB"
-    icon_background_color_dark: "#1A237E"
+    image: "assets/splash.png" # Android 12 için de aynı görüntü
+    icon_background_color: "#FFFFFF"
+    icon_background_color_dark: "#FFFFFF"
     
-  fullscreen: true
+  fullscreen: true  # Fullscreen'i açıyoruz splash_screen.dart gibi
   android: true
   ios: true
   web: false
@@ -186,9 +187,7 @@ flutter_native_splash:
   ios_content_mode: center
   web_image_mode: center
   
-  # Animasyon
-  branding: assets/icon.png
-  branding_mode: bottom
+  # Animasyon ve branding kaldırılmış durumda
   
   # Durumlar
   android_screen_orientation: portrait

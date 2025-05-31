@@ -163,21 +163,44 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _checkBatteryOptimization() async {
     try {
-      // Tüm batarya optimizasyonları devre dışı bırakılmış mı kontrol et
-      final isAllOptimizationsDisabled = 
-          await DisableBatteryOptimization.isAllBatteryOptimizationDisabled;
-      
-      if (isAllOptimizationsDisabled != null && !isAllOptimizationsDisabled) {
-        // Kullanıcıya batarya optimizasyonlarını devre dışı bırakması için bilgi ver
-        DisableBatteryOptimization.showDisableAllOptimizationsSettings(
-          "Otomatik Başlatmayı Etkinleştir",
-          "Bildirimleri düzgün alabilmek için otomatik başlatmayı etkinleştirin",
-          "Cihazınızda ek batarya optimizasyonları var",
-          "Bildirimleri arka planda alabilmek için batarya optimizasyonlarını devre dışı bırakın"
-        );
+      // Sadece Android platformunda batarya optimizasyonu kontrolü yap
+      if (Platform.isAndroid) {
+        _logger.i('Android cihazında batarya optimizasyonu kontrolü başlatılıyor...');
+        
+        // Önce plugin'in kullanılabilir olup olmadığını kontrol et
+        bool? isAutoStartEnabled;
+        try {
+          isAutoStartEnabled = await DisableBatteryOptimization.isAutoStartEnabled;
+          _logger.i('Plugin erişimi başarılı, devam ediliyor...');
+        } catch (pluginError) {
+          _logger.e('Plugin erişiminde hata: $pluginError');
+          return; // Plugin çalışmıyorsa fonksiyondan çık
+        }
+        
+        // Tüm batarya optimizasyonları devre dışı bırakılmış mı kontrol et
+        final isAllOptimizationsDisabled = 
+            await DisableBatteryOptimization.isAllBatteryOptimizationDisabled;
+        
+        _logger.i('Batarya optimizasyonu durumu: $isAllOptimizationsDisabled');
+        
+        if (isAllOptimizationsDisabled != null && !isAllOptimizationsDisabled) {
+          _logger.i('Batarya optimizasyonu ayarları penceresi gösteriliyor...');
+          // Kullanıcıya batarya optimizasyonlarını devre dışı bırakması için bilgi ver
+          DisableBatteryOptimization.showDisableAllOptimizationsSettings(
+            "Otomatik Başlatmayı Etkinleştir",
+            "Bildirimleri düzgün alabilmek için otomatik başlatmayı etkinleştirin",
+            "Cihazınızda ek batarya optimizasyonları var",
+            "Bildirimleri arka planda alabilmek için batarya optimizasyonlarını devre dışı bırakın"
+          );
+        } else {
+          _logger.i('Batarya optimizasyonları zaten devre dışı veya desteklenmiyor.');
+        }
+      } else {
+        _logger.i('iOS cihazında batarya optimizasyonu kontrolü gerekli değil.');
       }
     } catch (e) {
       _logger.e('Batarya optimizasyonu kontrolü sırasında hata: $e');
+      // Hata durumunda uygulamanın çalışmaya devam etmesini sağla
     }
   }
 

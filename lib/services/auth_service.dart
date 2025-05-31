@@ -159,14 +159,17 @@ class AuthService {
   }
   
   // Doğrulama kodu kontrolü
-  Future<CodeCheckResponse> checkVerificationCode(String code, String token) async {
+  Future<CodeCheckResponse> checkVerificationCode(String code, String codeToken) async {
     try {
       _logger.i('Doğrulama kodu kontrol ediliyor: $code');
+      _logger.i('Kullanılacak codeToken: ${codeToken.length > 8 ? '${codeToken.substring(0, 8)}...' : codeToken}');
       
       final codeRequest = CodeCheckRequest(
         code: code,
-        token: token,
+        codeToken: codeToken,
       );
+      
+      _logger.d('API\'ye gönderilecek payload: ${codeRequest.toJson()}');
       
       final response = await _apiService.post(
         'service/auth/code/checkCode',
@@ -255,21 +258,77 @@ class AuthService {
         body: codeRequest.toJson(),
       );
       
+      // Debug: Raw API response'unu logla
+      _logger.d('Raw API response: $response');
+      
       final codeResponse = AgainSendCodeResponse.fromJson(response);
       
-      if (codeResponse.success) {
-        _logger.i('Yeni doğrulama kodu başarıyla gönderildi');
-      } else {
-        _logger.w('Yeni doğrulama kodu gönderme başarısız: ${codeResponse.message}');
-      }
+      // Debug: Parse edilmiş response'u detaylı logla
+      _logger.d('Parsed response - success: ${codeResponse.success}, statusCode: ${codeResponse.statusCode}, message: ${codeResponse.message}');
+      _logger.d('Response data: ${codeResponse.data?.codeToken != null ? "codeToken var (${codeResponse.data!.codeToken.length} karakter)" : "codeToken yok"}');
       
-      return codeResponse;
+      // Status code'a göre işlem yap
+      if (codeResponse.statusCode == 410) {
+        // 410 = Başarılı kod gönderildi
+        _logger.i('Yeni doğrulama kodu başarıyla gönderildi');
+        return codeResponse.copyWith(success: true);
+      } else if (codeResponse.statusCode == 417) {
+        // 417 = Bekleme süresi var
+        _logger.w('Kod gönderme için bekleme süresi: ${codeResponse.message}');
+        return codeResponse.copyWith(success: false);
+      } else {
+        // Diğer status code'lar hata
+        _logger.w('Yeni doğrulama kodu gönderme başarısız: ${codeResponse.statusCode} - ${codeResponse.message}');
+        return codeResponse.copyWith(success: false);
+      }
     } catch (e, s) {
       _logger.e('Yeni doğrulama kodu gönderme sırasında kritik hata: $e', null, s);
       return AgainSendCodeResponse(
         error: true,
         success: false,
         message: e.toString(),
+      );
+    }
+  }
+  
+  // Kullanıcı hesap silme
+  Future<DeleteUserResponse> deleteUser(String userToken) async {
+    try {
+      _logger.i('Kullanıcı hesap silme işlemi başlatılıyor');
+      
+      final deleteRequest = DeleteUserRequest(
+        userToken: userToken,
+      );
+      
+      final response = await _apiService.delete(
+        'service/user/account/delete',
+        body: deleteRequest.toJson(),
+      );
+      
+      final deleteResponse = DeleteUserResponse.fromJson(response);
+      
+      if (deleteResponse.success) {
+        _logger.i('Kullanıcı hesabı başarıyla silindi');
+      } else {
+        if (deleteResponse.statusCode == 400) {
+          _logger.w('Hesap silme: Geçersiz token veya kullanıcı bilgisi');
+        } else if (deleteResponse.statusCode == 401) {
+          _logger.w('Hesap silme: Yetki hatası');
+        } else if (deleteResponse.statusCode == 404) {
+          _logger.w('Hesap silme: Kullanıcı bulunamadı');
+        } else {
+          _logger.w('Hesap silme başarısız: ${deleteResponse.statusCode} - ${deleteResponse.message}');
+        }
+      }
+      
+      return deleteResponse;
+    } catch (e, s) {
+      _logger.e('Kullanıcı hesap silme sırasında kritik hata: $e', null, s);
+      return DeleteUserResponse(
+        error: true,
+        success: false,
+        message: e.toString(),
+        userFriendlyMessage: 'Hesap silme işlemi sırasında bir sorun oluştu. Lütfen daha sonra tekrar deneyin.',
       );
     }
   }

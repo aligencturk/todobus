@@ -259,16 +259,16 @@ class ForgotPasswordData {
 // Doğrulama kodu kontrolü
 class CodeCheckRequest {
   final String code;
-  final String token;
+  final String codeToken;
 
   CodeCheckRequest({
     required this.code,
-    required this.token,
+    required this.codeToken,
   });
 
   Map<String, dynamic> toJson() => {
         'code': code,
-        'token': token,
+        'codeToken': codeToken,
       };
 }
 
@@ -402,6 +402,7 @@ class AgainSendCodeResponse {
   final bool error;
   final bool success;
   final String? message;
+  final int? statusCode;
   final AgainSendCodeData? data;
   final String? userFriendlyMessage;
 
@@ -409,6 +410,7 @@ class AgainSendCodeResponse {
     required this.error,
     required this.success,
     this.message,
+    this.statusCode,
     this.data,
     this.userFriendlyMessage,
   });
@@ -427,8 +429,27 @@ class AgainSendCodeResponse {
       error: json['error'] ?? false,
       success: json['success'] ?? false,
       message: message,
+      statusCode: json['status_code'] ?? json['statusCode'],
       data: json['data'] != null ? AgainSendCodeData.fromJson(json['data']) : null,
       userFriendlyMessage: friendlyMessage,
+    );
+  }
+  
+  AgainSendCodeResponse copyWith({
+    bool? error,
+    bool? success,
+    String? message,
+    int? statusCode,
+    AgainSendCodeData? data,
+    String? userFriendlyMessage,
+  }) {
+    return AgainSendCodeResponse(
+      error: error ?? this.error,
+      success: success ?? this.success,
+      message: message ?? this.message,
+      statusCode: statusCode ?? this.statusCode,
+      data: data ?? this.data,
+      userFriendlyMessage: userFriendlyMessage ?? this.userFriendlyMessage,
     );
   }
 }
@@ -443,6 +464,73 @@ class AgainSendCodeData {
   factory AgainSendCodeData.fromJson(Map<String, dynamic> json) {
     return AgainSendCodeData(
       codeToken: json['codeToken'],
+    );
+  }
+}
+
+// Kullanıcı hesap silme isteği
+class DeleteUserRequest {
+  final String userToken;
+
+  DeleteUserRequest({
+    required this.userToken,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'userToken': userToken,
+      };
+}
+
+// Kullanıcı hesap silme yanıtı
+class DeleteUserResponse {
+  final bool error;
+  final bool success;
+  final String? message;
+  final int? statusCode;
+  final String? userFriendlyMessage;
+
+  DeleteUserResponse({
+    required this.error,
+    required this.success,
+    this.message,
+    this.statusCode,
+    this.userFriendlyMessage,
+  });
+
+  factory DeleteUserResponse.fromJson(Map<String, dynamic> json) {
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    bool success = json['success'] ?? false;
+    String? message = json['message'];
+    String? userFriendlyMessage;
+
+    if (!success) {
+      String baseMessage = message ?? 'Hesap silme işlemi sırasında bilinmeyen bir hata oluştu.';
+      if (statusCode == 400) {
+        baseMessage = 'Geçersiz token veya kullanıcı bilgisi.';
+      } else if (statusCode == 401) {
+        baseMessage = 'Bu işlem için yetkiniz bulunmuyor.';
+      } else if (statusCode == 404) {
+        baseMessage = 'Kullanıcı hesabı bulunamadı.';
+      }
+      
+      if (statusCode != null) {
+        userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else {
+        userFriendlyMessage = baseMessage;
+      }
+    } else {
+      userFriendlyMessage = 'Hesabınız başarıyla silindi.';
+    }
+    
+    return DeleteUserResponse(
+      error: json['error'] ?? !success,
+      success: success,
+      message: message,
+      statusCode: statusCode,
+      userFriendlyMessage: userFriendlyMessage,
     );
   }
 } 

@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import '../viewmodels/profile_viewmodel.dart';
 import '../models/user_model.dart';
+import '../models/auth_models.dart';
 import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 import '../services/auth_service.dart';
@@ -219,6 +220,339 @@ class _ProfileViewState extends State<ProfileView> {
     }
   }
 
+  // Hesap silme işlemini başlat - Profesyonel ve vazgeçirir yaklaşım
+  Future<void> _initiateDeleteAccount() async {
+    // İlk doğrulama: Ciddi uyarı
+    final seriousWarning = await _showSeriousWarningDialog();
+    if (!seriousWarning) return;
+
+    // Şifre doğrulaması
+    final passwordConfirm = await _showPasswordConfirmation();
+    if (!passwordConfirm) return;
+
+    // Son onay ve bekleme süresi
+    final finalConfirm = await _showFinalConfirmationWithDelay();
+    if (!finalConfirm) return;
+
+    // Hesap silme işlemini gerçekleştir
+    await _performDeleteAccount();
+  }
+
+  // Ciddi uyarı diyalogu
+  Future<bool> _showSeriousWarningDialog() async {
+    final result = await showPlatformDialog<bool>(
+      context: context,
+      builder: (context) => PlatformAlertDialog(
+        title: Text(
+          'Hesap Silme İşlemi',
+          style: TextStyle(
+            color: platformThemeData(
+              context,
+              material: (data) => Colors.red.shade800,
+              cupertino: (data) => CupertinoColors.systemRed,
+            ),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: const Text(
+          'UYARI: Bu işlem kalıcıdır ve geri alınamaz.\n\n'
+          'Hesabınız silindiğinde:\n'
+          '• Tüm verileriniz kalıcı olarak silinecektir\n'
+          '• Profil bilgileriniz kurtarılamayacaktır\n'
+          '• Aynı e-posta ile yeniden kayıt olsanız bile geçmiş verileriniz geri gelmeyecektir\n'
+          '• İşlem tamamlandıktan sonra herhangi bir geri alma imkanı bulunmamaktadır\n\n'
+          'Bu riskleri kabul edip devam etmek istediğinizden emin misiniz?'
+        ),
+        actions: <Widget>[
+          PlatformDialogAction(
+            child: const Text('İptal Et'),
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          PlatformDialogAction(
+            child: Text(
+              'Riskleri Anlıyorum, Devam Et',
+              style: TextStyle(
+                color: platformThemeData(
+                  context,
+                  material: (data) => Colors.red.shade800,
+                  cupertino: (data) => CupertinoColors.systemRed,
+                ),
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  // Şifre doğrulama diyalogu
+  Future<bool> _showPasswordConfirmation() async {
+    final passwordController = TextEditingController();
+    bool obscurePassword = true;
+
+    final result = await showPlatformDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => PlatformAlertDialog(
+          title: const Text('Güvenlik Doğrulaması'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Kimlik doğrulaması için mevcut şifrenizi giriniz:'),
+              const SizedBox(height: 16),
+              isCupertino(context)
+                  ? Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: CupertinoColors.systemGrey4),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: CupertinoTextField(
+                              controller: passwordController,
+                              placeholder: 'Mevcut şifreniz',
+                              obscureText: obscurePassword,
+                              padding: const EdgeInsets.all(12),
+                              decoration: const BoxDecoration(),
+                            ),
+                          ),
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            onPressed: () {
+                              setState(() {
+                                obscurePassword = !obscurePassword;
+                              });
+                            },
+                            child: Icon(
+                              obscurePassword 
+                                  ? CupertinoIcons.eye 
+                                  : CupertinoIcons.eye_slash,
+                              color: CupertinoColors.systemGrey,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : TextField(
+                      controller: passwordController,
+                      decoration: InputDecoration(
+                        hintText: 'Mevcut şifreniz',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscurePassword 
+                                ? Icons.visibility_off 
+                                : Icons.visibility,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              obscurePassword = !obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
+                      obscureText: obscurePassword,
+                    ),
+            ],
+          ),
+          actions: <Widget>[
+            PlatformDialogAction(
+              child: const Text('İptal'),
+              onPressed: () => Navigator.pop(dialogContext, false),
+            ),
+            PlatformDialogAction(
+              child: const Text('Doğrula'),
+              onPressed: () async {
+                if (passwordController.text.isEmpty) {
+                  _showErrorMessage('Şifre alanı boş olamaz');
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    
+    passwordController.dispose();
+    return result ?? false;
+  }
+
+  // Bekleme süresi ile son onay
+  Future<bool> _showFinalConfirmationWithDelay() async {
+    bool canProceed = false;
+    
+    final result = await showPlatformDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) {
+          // 5 saniye sonra buton aktif olsun
+          if (!canProceed) {
+            Timer(const Duration(seconds: 5), () {
+              if (mounted) {
+                setState(() {
+                  canProceed = true;
+                });
+              }
+            });
+          }
+          
+          return PlatformAlertDialog(
+            title: const Text('Son Onay'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Bu işlemi gerçekleştirmek için 5 saniye bekletiyoruz. Bu süreyi kararınızı bir kez daha düşünmek için kullanın.\n\n'
+                  'Hesabınızı sildiğinizde tüm verileriniz kalıcı olarak kaybolacaktır.',
+                  style: TextStyle(fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 16),
+                if (!canProceed)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: PlatformCircularProgressIndicator(),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Lütfen bekleyiniz...'),
+                    ],
+                  ),
+              ],
+            ),
+            actions: <Widget>[
+              PlatformDialogAction(
+                child: const Text('Vazgeç'),
+                onPressed: () => Navigator.pop(dialogContext, false),
+              ),
+              PlatformDialogAction(
+                child: Text(
+                  'Hesabımı Sil',
+                  style: TextStyle(
+                    color: canProceed
+                        ? platformThemeData(
+                            context,
+                            material: (data) => Colors.red.shade800,
+                            cupertino: (data) => CupertinoColors.systemRed,
+                          )
+                        : platformThemeData(
+                            context,
+                            material: (data) => Colors.grey,
+                            cupertino: (data) => CupertinoColors.systemGrey,
+                          ),
+                  ),
+                ),
+                onPressed: canProceed
+                    ? () => Navigator.pop(dialogContext, true)
+                    : null,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    
+    return result ?? false;
+  }
+
+  // Hesap silme işlemini gerçekleştir
+  Future<void> _performDeleteAccount() async {
+    try {
+      // Loading dialog göster
+      showPlatformDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PlatformAlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PlatformCircularProgressIndicator(),
+              const SizedBox(width: 16),
+              const Text('İşlem gerçekleştiriliyor...'),
+            ],
+          ),
+        ),
+      );
+
+      final user = context.read<ProfileViewModel>().user;
+      if (user?.userToken == null) {
+        Navigator.pop(context);
+        _showErrorMessage('Kullanıcı oturum bilgisi bulunamadı');
+        return;
+      }
+
+      final response = await _authService.deleteUser(user!.userToken);
+      
+      Navigator.pop(context);
+
+      if (response.success) {
+        await _storageService.clearUserData();
+        _logger.i('Kullanıcı hesabı başarıyla silindi');
+        
+        if (mounted) {
+          showPlatformDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => PlatformAlertDialog(
+              title: const Text('İşlem Tamamlandı'),
+              content: const Text(
+                'Hesabınız başarıyla silindi. Uygulamadan çıkış yapılıyor.',
+              ),
+              actions: <Widget>[
+                PlatformDialogAction(
+                  child: const Text('Tamam'),
+                  onPressed: () {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      platformPageRoute(
+                        context: context,
+                        builder: (context) => const LoginView(),
+                      ),
+                      (route) => false,
+                    );
+                  },
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        _showErrorMessage(
+          response.userFriendlyMessage ?? 
+          response.message ?? 
+          'Hesap silme işlemi başarısız oldu'
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      _logger.e('Hesap silme hatası: $e');
+      _showErrorMessage('İşlem sırasında bir hata oluştu: ${e.toString()}');
+    }
+  }
+
+  // Hata mesajı göster
+  void _showErrorMessage(String message) {
+    showPlatformDialog(
+      context: context,
+      builder: (context) => PlatformAlertDialog(
+        title: const Text('Hata'),
+        content: Text(message),
+        actions: <Widget>[
+          PlatformDialogAction(
+            child: const Text('Tamam'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ProfileViewModel>(
@@ -333,6 +667,11 @@ class _ProfileViewState extends State<ProfileView> {
                 '********', 
                 onTap: () => _navigateToChangePasswordView(),
                 isLink: false
+              ),
+              // Hesap silme seçeneği - kırmızı renkte
+              Container(
+                margin: const EdgeInsets.only(top: 16, right: 16, left: 16),
+                child: _buildDeleteAccountItem(context),
               ),
             ],
           ),
@@ -788,6 +1127,180 @@ class _ProfileViewState extends State<ProfileView> {
       ),
     );
   }
+
+  // Hesap silme öğesi - profesyonel görünüm
+  Widget _buildDeleteAccountItem(BuildContext context) {
+    return GestureDetector(
+      onTap: _showAccountManagementOptions,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: platformThemeData(
+            context,
+            material: (data) => Colors.grey.shade50,
+            cupertino: (data) => CupertinoColors.systemGrey6,
+          ),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: platformThemeData(
+              context,
+              material: (data) => Colors.grey.shade300,
+              cupertino: (data) => CupertinoColors.systemGrey4,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isCupertino(context) ? CupertinoIcons.settings : Icons.settings,
+              color: platformThemeData(
+                context,
+                material: (data) => Colors.grey.shade600,
+                cupertino: (data) => CupertinoColors.systemGrey,
+              ),
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Hesap Yönetimi',
+                style: TextStyle(
+                  color: platformThemeData(
+                    context,
+                    material: (data) => Colors.grey.shade700,
+                    cupertino: (data) => CupertinoColors.label,
+                  ),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            Icon(
+              context.platformIcons.rightChevron,
+              size: 16,
+              color: platformThemeData(
+                context,
+                material: (data) => Colors.grey.shade500,
+                cupertino: (data) => CupertinoColors.systemGrey2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Hesap yönetimi seçenekleri
+  Future<void> _showAccountManagementOptions() async {
+    showPlatformDialog(
+      context: context,
+      builder: (context) => PlatformAlertDialog(
+        title: const Text('Hesap Yönetimi'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Hesabınızla ilgili işlemler:',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Hesap silme seçeneği
+              GestureDetector(
+                onTap: () {
+                  Navigator.pop(context);
+                  _initiateDeleteAccount();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: platformThemeData(
+                      context,
+                      material: (data) => Colors.red.shade50,
+                      cupertino: (data) => CupertinoColors.systemRed.withOpacity(0.1),
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: platformThemeData(
+                        context,
+                        material: (data) => Colors.red.shade200,
+                        cupertino: (data) => CupertinoColors.systemRed.withOpacity(0.3),
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isCupertino(context) ? CupertinoIcons.trash : Icons.delete_outline,
+                        color: platformThemeData(
+                          context,
+                          material: (data) => Colors.red.shade600,
+                          cupertino: (data) => CupertinoColors.systemRed,
+                        ),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hesabı Kalıcı Olarak Sil',
+                              style: TextStyle(
+                                color: platformThemeData(
+                                  context,
+                                  material: (data) => Colors.red.shade700,
+                                  cupertino: (data) => CupertinoColors.systemRed,
+                                ),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Bu işlem geri alınamaz ve tüm verileriniz silinir',
+                              style: TextStyle(
+                                color: platformThemeData(
+                                  context,
+                                  material: (data) => Colors.red.shade500,
+                                  cupertino: (data) => CupertinoColors.systemRed.withOpacity(0.7),
+                                ),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        context.platformIcons.rightChevron,
+                        size: 14,
+                        color: platformThemeData(
+                          context,
+                          material: (data) => Colors.red.shade400,
+                          cupertino: (data) => CupertinoColors.systemRed.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: <Widget>[
+          PlatformDialogAction(
+            child: const Text('İptal'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // Profil Düzenleme Ekranı
@@ -976,16 +1489,23 @@ class _EditProfileViewState extends State<EditProfileView> {
       if (mounted) {
         final viewModel = context.read<ProfileViewModel>();
         if (viewModel.status == ProfileStatus.updateSuccess) {
-          // Başarı mesajını göster
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Profil başarıyla güncellendi'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
+          // Başarı mesajını platform uyumlu dialog ile göster
+          showPlatformDialog(
+            context: context,
+            builder: (dialogContext) => PlatformAlertDialog(
+              title: const Text('Başarılı'),
+              content: const Text('Profil başarıyla güncellendi'),
+              actions: <Widget>[
+                PlatformDialogAction(
+                  child: const Text('Tamam'),
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    Navigator.of(context).pop(); // Önceki sayfaya dön
+                  },
+                ),
+              ],
             ),
           );
-          // Önceki sayfaya dön
-          Navigator.of(context).pop();
         } else {
           setState(() {
             _errorMessage = viewModel.errorMessage.isNotEmpty 
@@ -994,8 +1514,8 @@ class _EditProfileViewState extends State<EditProfileView> {
           });
         }
       }
-    } catch (e, stackTrace) {
-      _logger.e('Profil güncellenirken hata: $e', null, stackTrace);
+    } catch (e) {
+      _logger.e('Profil güncellenirken hata: $e');
       setState(() {
         _errorMessage = 'Profil güncellenirken bir hata oluştu: ${e.toString()}';
       });
@@ -1417,7 +1937,7 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
       if (mounted) {
         final viewModel = context.read<ProfileViewModel>();
         if (viewModel.status == ProfileStatus.passwordChanged) {
-          // Başarı mesajını göster
+          // Başarı mesajını platform uyumlu dialog ile göster
           _showSuccessDialog('Şifreniz başarıyla güncellendi');
         } else {
           setState(() {
