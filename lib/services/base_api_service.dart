@@ -128,9 +128,13 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = (e);
-      _logger.e('İstek hatası: $userMessage');
-      throw Exception(userMessage);
+      // Eğer zaten bir Exception ise, re-throw et
+      if (e is Exception) {
+        rethrow;
+      }
+      // Diğer hatalar için Exception'a wrap et
+      _logger.e('İstek hatası: $e');
+      throw Exception(e.toString());
     }
   }
 
@@ -192,9 +196,13 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = (e);
-      _logger.e('İstek hatası: $userMessage, Detay: $e');
-      throw Exception(userMessage);
+      // Eğer zaten bir Exception ise, re-throw et
+      if (e is Exception) {
+        rethrow;
+      }
+      // Diğer hatalar için Exception'a wrap et
+      _logger.e('İstek hatası: $e');
+      throw Exception(e.toString());
     }
   }
 
@@ -247,9 +255,13 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = (e);
-      _logger.e('İstek hatası: $userMessage');
-      throw Exception(userMessage);
+      // Eğer zaten bir Exception ise, re-throw et
+      if (e is Exception) {
+        rethrow;
+      }
+      // Diğer hatalar için Exception'a wrap et
+      _logger.e('İstek hatası: $e');
+      throw Exception(e.toString());
     }
   }
 
@@ -297,9 +309,13 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = (e);
-      _logger.e('İstek hatası: $userMessage');
-      throw Exception(userMessage);
+      // Eğer zaten bir Exception ise, re-throw et
+      if (e is Exception) {
+        rethrow;
+      }
+      // Diğer hatalar için Exception'a wrap et
+      _logger.e('İstek hatası: $e');
+      throw Exception(e.toString());
     }
   }
 
@@ -329,7 +345,7 @@ class BaseApiService {
       case 404:
         return 'İstenen kaynak bulunamadı.';
       case 417:
-        return 'Bu projeye ait henüz görev bulunmamaktadır.';
+        return 'E-posta adresi veya şifre hatalı.'; // Login için varsayılan 417 mesajı
       case 429:
         return 'Çok fazla istek gönderdiniz, lütfen biraz bekleyin.';
       case 500:

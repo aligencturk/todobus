@@ -55,12 +55,22 @@ class AuthService {
       return loginResponse;
     } catch (e, s) {
       _logger.e('Giriş sırasında kritik hata: $e', null, s);
+      
+      // Exception'dan gerçek mesajı extract et
+      String errorMessage = e.toString();
+      String userFriendlyMessage = errorMessage;
+      
+      // "Exception: " prefix'ini temizle
+      if (errorMessage.startsWith('Exception: ')) {
+        userFriendlyMessage = errorMessage.substring('Exception: '.length);
+      }
+      
       return LoginResponse(
         error: true,
         success: false,
-        errorMessage: e.toString(),
+        errorMessage: errorMessage,
         statusCode: null,
-        userFriendlyMessage: 'Giriş yapılırken bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve daha sonra tekrar deneyin.',
+        userFriendlyMessage: userFriendlyMessage,
         data: null,
       );
     }

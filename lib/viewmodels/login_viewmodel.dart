@@ -136,8 +136,14 @@ class LoginViewModel extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _errorMessage = 'Bir hata oluştu: ${e.toString()}';
-      _logger.e('Giriş hatası', e);
+      // Exception mesajını temizle
+      String cleanErrorMessage = e.toString();
+      if (cleanErrorMessage.startsWith('Exception: ')) {
+        cleanErrorMessage = cleanErrorMessage.substring('Exception: '.length);
+      }
+      
+      _errorMessage = cleanErrorMessage;
+      _logger.w('Giriş başarısız: $cleanErrorMessage');
       _status = LoginStatus.error;
       _safeNotifyListeners();
       return false;
