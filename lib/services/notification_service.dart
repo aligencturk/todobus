@@ -204,7 +204,6 @@ class NotificationService {
     _logger.i('Bildirim Verileri: ${message.data}');
     
     RemoteNotification? notification = message.notification;
-    AndroidNotification? android = message.notification?.android;
     
     // Ön planda bildirim göster
     if (notification != null) {
@@ -894,5 +893,113 @@ class NotificationService {
     
     _logger.i('Firebase Admin SDK veya FCM HTTP v1 API kullanarak bu mesajları gönderebilirsiniz.');
     _logger.i('https://firebase.google.com/docs/cloud-messaging/send-message adresini ziyaret edin.');
+  }
+
+  /// Kullanıcıya güncelleme bildirimi gönder
+  Future<bool> sendUpdateNotificationToUser({
+    required int userId,
+    required String currentVersion,
+    required String newVersion,
+    bool isForced = false,
+  }) async {
+    try {
+      final title = isForced ? '⚠️ Zorunlu Güncelleme' : '🚀 Yeni Sürüm Mevcut';
+      final body = isForced 
+          ? 'Bu sürüm artık desteklenmiyor. Uygulamayı hemen güncellemelisiniz.'
+          : 'TodoBus $newVersion sürümü yayınlandı! Yeni özellikler ve iyileştirmeler sizi bekliyor.';
+      
+      final data = {
+        'type': 'app_update',
+        'current_version': currentVersion,
+        'new_version': newVersion,
+        'force_update': isForced.toString(),
+        'action': 'update_app',
+        'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+      };
+      
+      return await sendNotificationToUserTopic(
+        userId: userId,
+        title: title,
+        body: body,
+        data: data,
+      );
+    } catch (e) {
+      _logger.e('Güncelleme bildirimi gönderilirken hata: $e');
+      return false;
+    }
+  }
+
+  /// Tüm kullanıcılara toplu güncelleme bildirimi gönder
+  Future<bool> sendUpdateNotificationToAllUsers({
+    required String currentVersion,
+    required String newVersion,
+    bool isForced = false,
+  }) async {
+    try {
+      final title = isForced ? '⚠️ Zorunlu Güncelleme' : '🚀 Yeni Sürüm Mevcut';
+      final body = isForced 
+          ? 'Bu sürüm artık desteklenmiyor. Uygulamayı hemen güncellemelisiniz.'
+          : 'TodoBus $newVersion sürümü yayınlandı! Yeni özellikler ve iyileştirmeler sizi bekliyor.';
+      
+      final data = {
+        'type': 'app_update',
+        'current_version': currentVersion,
+        'new_version': newVersion,
+        'force_update': isForced.toString(),
+        'action': 'update_app',
+        'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+      };
+      
+      return await sendNotificationToTopic(
+        topic: 'all_users',
+        title: title,
+        body: body,
+        data: data,
+      );
+    } catch (e) {
+      _logger.e('Toplu güncelleme bildirimi gönderilirken hata: $e');
+      return false;
+    }
+  }
+
+  /// Belirli bir kullanıcıya topic üzerinden bildirim gönder
+  Future<bool> sendNotificationToUserTopic({
+    required int userId,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      final userTopic = "user_$userId";
+      return await sendPushNotificationLegacy(
+        topic: userTopic,
+        title: title,
+        body: body,
+        data: data,
+      );
+    } catch (e) {
+      _logger.e('Kullanıcı topic bildirimi gönderilirken hata: $e');
+      return false;
+    }
+  }
+
+  /// Genel topic'e bildirim gönder
+  Future<bool> sendNotificationToTopic({
+    required String topic,
+    required String title,
+    required String body,
+    Map<String, dynamic>? data,
+  }) async {
+    try {
+      return await sendPushNotificationLegacy(
+        topic: topic,
+        title: title,
+        body: body,
+        data: data,
+      );
+    } catch (e) {
+      _logger.e('Topic bildirimi gönderilirken hata: $e');
+      return false;
+    }
   }
 } 

@@ -243,15 +243,15 @@ class ForgotPasswordResponse {
 }
 
 class ForgotPasswordData {
-  final String token;
+  final String? token;
 
   ForgotPasswordData({
-    required this.token,
+    this.token,
   });
 
   factory ForgotPasswordData.fromJson(Map<String, dynamic> json) {
     return ForgotPasswordData(
-      token: json['token'],
+      token: json['token'] as String?,
     );
   }
 }
@@ -314,15 +314,15 @@ class CodeCheckResponse {
 }
 
 class CodeCheckData {
-  final String passToken;
+  final String? passToken;
 
   CodeCheckData({
-    required this.passToken,
+    this.passToken,
   });
 
   factory CodeCheckData.fromJson(Map<String, dynamic> json) {
     return CodeCheckData(
-      passToken: json['passToken'],
+      passToken: json['passToken'] as String?,
     );
   }
 }

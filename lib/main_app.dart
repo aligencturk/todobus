@@ -42,21 +42,25 @@ class MainAppState extends State<MainApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => GroupViewModel()),
-        ChangeNotifierProvider(create: (_) => DashboardViewModel()),
-        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
-        ChangeNotifierProvider(create: (_) => EventViewModel()),
-        ChangeNotifierProvider(create: (_) => ReportViewModel()),
+        ChangeNotifierProvider(create: (_) => GroupViewModel(), lazy: true),
+        ChangeNotifierProvider(create: (_) => DashboardViewModel(), lazy: true),
+        ChangeNotifierProvider(create: (_) => ProfileViewModel(), lazy: true),
+        ChangeNotifierProvider(create: (_) => EventViewModel(), lazy: true),
+        ChangeNotifierProvider(create: (_) => ReportViewModel(), lazy: true),
         ChangeNotifierProxyProvider<FirebaseMessagingService, NotificationViewModel>(
           create: (context) => NotificationViewModel(
             Provider.of<FirebaseMessagingService>(context, listen: false),
           ),
           update: (context, messaging, previous) => 
             previous ?? NotificationViewModel(messaging),
+          lazy: true,
         ),
       ],
       child: PlatformScaffold(
-        body: _pages[_currentIndex],
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _pages,
+        ),
         bottomNavBar: PlatformNavBar(
           currentIndex: _currentIndex,
           itemChanged: (int index) {

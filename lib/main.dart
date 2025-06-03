@@ -18,17 +18,14 @@ import 'services/device_info_service.dart';
 import 'services/firebase_messaging_service.dart';
 import 'services/notification_viewmodel.dart';
 import 'services/base_api_service.dart';
-import 'services/onboarding_service.dart';
 import 'services/spelling_correction_service.dart';
 import 'views/login_view.dart';
 import 'views/splash_screen.dart';
 import 'views/onboarding_view.dart';
 import 'main_app.dart';
 import 'services/snackbar_service.dart';
-// Batarya optimizasyonu için gerekli paket
-import 'package:disable_battery_optimization/disable_battery_optimization.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:path/path.dart';
+import '../services/version_check_service.dart';
 
 void main() async {
   // Native splash screen için gerekli
@@ -39,9 +36,66 @@ void main() async {
   final logger = LoggerService();
   logger.i('Uygulama başlatıldı');
   
-  // .env dosyasını yükle
   try {
-    // Önce projenin kök dizinindeki .env'yi dene
+    // Kritik servisleri paralel olarak başlat
+    await _initializeCriticalServices(logger);
+    
+    // Non-kritik servisleri arka planda başlat (uygulamayı bloklamaz)
+    _initializeNonCriticalServices(logger);
+    
+  } catch (e) {
+    logger.e('Servisler başlatılırken hata: $e');
+  }
+  
+  runApp(const MyApp());
+}
+
+// Kritik servisleri paralel olarak başlat
+Future<void> _initializeCriticalServices(LoggerService logger) async {
+  await Future.wait([
+    // .env dosyasını yükle
+    _loadEnvironmentFile(logger),
+    
+    // Firebase başlatma
+    _initializeFirebase(logger),
+    
+    // Storage servisi başlatma
+    _initializeStorage(),
+    
+    // Device info servisi başlatma
+    _initializeDeviceInfo(),
+  ]);
+}
+
+// Non-kritik servisleri arka planda başlat
+void _initializeNonCriticalServices(LoggerService logger) {
+  // Bu servisler uygulamanın açılmasını bloklamaz
+  Future.microtask(() async {
+    try {
+      await Future.wait([
+        // Firebase Messaging Servisi
+        _initializeMessaging(logger),
+        
+        // Yazım düzeltme servisini başlat
+        _initializeSpellingCorrection(logger),
+        
+        // Version check servisini başlat
+        _initializeVersionCheck(logger),
+      ]);
+      
+      // Tüm non-kritik servisler başlatıldıktan sonra native splash'i kaldır  
+      FlutterNativeSplash.remove();
+      
+    } catch (e) {
+      logger.e('Non-kritik servisler başlatılırken hata: $e');
+      // Hata olsa bile native splash'i kaldır
+      FlutterNativeSplash.remove();
+    }
+  });
+}
+
+Future<void> _loadEnvironmentFile(LoggerService logger) async { 
+  try {
     await dotenv.load(fileName: ".env");
     logger.i('.env dosyası başarıyla yüklendi');
   } catch (e) {
@@ -67,8 +121,9 @@ void main() async {
       logger.e('.env dosyası bulunamadı: ${envFile.absolute.path}');
     }
   }
-  
-  // Firebase başlatma
+}
+
+Future<void> _initializeFirebase(LoggerService logger) async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -87,35 +142,42 @@ void main() async {
   } catch (e) {
     logger.e('Firebase başlatılırken hata: $e');
   }
-  
-  // Servislerin başlatılması
+}
+
+Future<void> _initializeStorage() async {
   final storageService = StorageService();
   await storageService.init();
-  
+}
+
+Future<void> _initializeDeviceInfo() async {
   final deviceInfoService = DeviceInfoService();
   await deviceInfoService.init();
-  
-  // Bildirim servisini başlat
+}
+
+Future<void> _initializeMessaging(LoggerService logger) async {
   try {
-    // Firebase Messaging Servisi başlatılıyor
     await FirebaseMessagingService.instance.initialize();
     logger.i('Firebase Messaging servisi başarıyla başlatıldı');
   } catch (e) {
     logger.e('Bildirim servisi başlatılırken hata: $e');
   }
+}
 
-  // Yazım düzeltme servisini başlat
+Future<void> _initializeSpellingCorrection(LoggerService logger) async {
   try {
     await SpellingCorrectionService.instance.initialize();
     logger.i('Yazım düzeltme servisi başarıyla başlatıldı');
   } catch (e) {
     logger.e('Yazım düzeltme servisi başlatılırken hata: $e');
   }
-  
-  // Native splash screen'i kaldır, kendi özel splash screen'imize geçiş yapacağız
-  FlutterNativeSplash.remove();
-  
-  runApp(const MyApp());
+}
+
+Future<void> _initializeVersionCheck(LoggerService logger) async {
+  final versionCheckService = VersionCheckService();
+  await versionCheckService.initialize();
+  // Remote Config'i sıfırla ve varsayılan değerleri yükle
+  await versionCheckService.resetToDefaults();
+  logger.i('Version check servisi başlatıldı ve sıfırlandı');
 }
 
 class MyApp extends StatefulWidget {
@@ -153,78 +215,43 @@ class _MyAppState extends State<MyApp> {
       
       _logger.i('Bildirim izin durumu: ${settings.authorizationStatus}');
       
-      // Batarya optimizasyonu kontrolü ve istemi
-      await _checkBatteryOptimization();
-      
     } catch (e) {
       _logger.e('Bildirim ayarları yapılandırılırken hata: $e');
     }
   }
 
-  Future<void> _checkBatteryOptimization() async {
-    try {
-      // Sadece Android platformunda batarya optimizasyonu kontrolü yap
-      if (Platform.isAndroid) {
-        _logger.i('Android cihazında batarya optimizasyonu kontrolü başlatılıyor...');
-        
-        // Önce plugin'in kullanılabilir olup olmadığını kontrol et
-        bool? isAutoStartEnabled;
-        try {
-          isAutoStartEnabled = await DisableBatteryOptimization.isAutoStartEnabled;
-          _logger.i('Plugin erişimi başarılı, devam ediliyor...');
-        } catch (pluginError) {
-          _logger.e('Plugin erişiminde hata: $pluginError');
-          return; // Plugin çalışmıyorsa fonksiyondan çık
-        }
-        
-        // Tüm batarya optimizasyonları devre dışı bırakılmış mı kontrol et
-        final isAllOptimizationsDisabled = 
-            await DisableBatteryOptimization.isAllBatteryOptimizationDisabled;
-        
-        _logger.i('Batarya optimizasyonu durumu: $isAllOptimizationsDisabled');
-        
-        if (isAllOptimizationsDisabled != null && !isAllOptimizationsDisabled) {
-          _logger.i('Batarya optimizasyonu ayarları penceresi gösteriliyor...');
-          // Kullanıcıya batarya optimizasyonlarını devre dışı bırakması için bilgi ver
-          DisableBatteryOptimization.showDisableAllOptimizationsSettings(
-            "Otomatik Başlatmayı Etkinleştir",
-            "Bildirimleri düzgün alabilmek için otomatik başlatmayı etkinleştirin",
-            "Cihazınızda ek batarya optimizasyonları var",
-            "Bildirimleri arka planda alabilmek için batarya optimizasyonlarını devre dışı bırakın"
-          );
-        } else {
-          _logger.i('Batarya optimizasyonları zaten devre dışı veya desteklenmiyor.');
-        }
-      } else {
-        _logger.i('iOS cihazında batarya optimizasyonu kontrolü gerekli değil.');
-      }
-    } catch (e) {
-      _logger.e('Batarya optimizasyonu kontrolü sırasında hata: $e');
-      // Hata durumunda uygulamanın çalışmaya devam etmesini sağla
-    }
-  }
-
   Future<void> _checkAppStatus() async {
-    final isLoggedIn = await _storageService.isLoggedIn();
-    final isOnboardingCompleted = await OnboardingService.isOnboardingCompleted();
-    
-    setState(() {
-      _isLoggedIn = isLoggedIn;
-      _isOnboardingCompleted = isOnboardingCompleted;
-      _isLoading = false;
-    });
+    try {
+      final isOnboardingCompleted = _storageService.isOnboardingCompleted();
+      final token = _storageService.getToken();
+      
+      setState(() {
+        _isOnboardingCompleted = isOnboardingCompleted;
+        _isLoggedIn = token != null;
+        _isLoading = false;
+      });
+      
+      _logger.i('App durumu kontrol edildi: Onboarding: $isOnboardingCompleted, Giriş: $_isLoggedIn');
+      
+    } catch (e) {
+      _logger.e('Uygulama durumu kontrol edilirken hata: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ProfileViewModel()),
-        ChangeNotifierProvider(create: (_) => DashboardViewModel()),
-        ChangeNotifierProvider(create: (_) => GroupViewModel()),
-        ChangeNotifierProvider(create: (_) => EventViewModel()),
+        ChangeNotifierProvider(create: (_) => ProfileViewModel(), lazy: true),
+        ChangeNotifierProvider(create: (_) => DashboardViewModel(), lazy: true),
+        ChangeNotifierProvider(create: (_) => GroupViewModel(), lazy: true),
+        ChangeNotifierProvider(create: (_) => EventViewModel(), lazy: true),
         ChangeNotifierProvider(
           create: (_) => NotificationViewModel(FirebaseMessagingService.instance),
+          lazy: true,
         ),
       ],
       child: PlatformProvider(
@@ -259,7 +286,7 @@ class _MyAppState extends State<MyApp> {
               '/onboarding': (context) => const OnboardingView(),
             },
             home: SplashScreen(
-              duration: const Duration(seconds: 3),
+              duration: const Duration(seconds: 1), // Splash süresini kısaltıyoruz
               child: _isLoading
                 ? PlatformScaffold(
                     body: Center(

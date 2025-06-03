@@ -16,6 +16,9 @@ import '../services/logger_service.dart';
 import '../services/auth_service.dart';
 import 'login_view.dart';
 import 'account_activation_view.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import '../services/version_check_service.dart';
 
 
 class ProfileView extends StatefulWidget {
@@ -553,6 +556,73 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
+  // Sürüm debug kontrolü
+  Future<void> _debugVersionCheck() async {
+    try {
+      final versionService = VersionCheckService();
+      await versionService.debugVersionCheck();
+      
+      if (mounted) {
+        showPlatformDialog(
+          context: context,
+          builder: (context) => PlatformAlertDialog(
+            title: const Text('Debug Bilgileri'),
+            content: const Text('Debug bilgileri konsola yazdırıldı. Detaylar için logları kontrol edin.'),
+            actions: <Widget>[
+              PlatformDialogAction(
+                child: const Text('Tamam'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showPlatformDialog(
+          context: context,
+          builder: (context) => PlatformAlertDialog(
+            title: const Text('Hata'),
+            content: Text('Debug kontrolü yapılırken hata oluştu: $e'),
+            actions: <Widget>[
+              PlatformDialogAction(
+                child: const Text('Tamam'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  // Remote Config Sıfırlama butonu
+  Future<void> _resetRemoteConfig() async {
+    try {
+      final versionService = VersionCheckService();
+      await versionService.resetToDefaults();
+      
+      if (mounted) {
+        showPlatformDialog(
+          context: context,
+          builder: (context) => PlatformAlertDialog(
+            title: const Text('Başarılı'),
+            content: const Text('Remote Config başarıyla sıfırlandı ve varsayılan değerler yüklendi'),
+            actions: <Widget>[
+              PlatformDialogAction(
+                child: const Text('Tamam'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.e('Remote Config sıfırlama hatası: $e');
+      _showErrorMessage('Remote Config sıfırlama işlemi sırasında bir hata oluştu: ${e.toString()}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ProfileViewModel>(
@@ -752,6 +822,44 @@ class _ProfileViewState extends State<ProfileView> {
               _buildListItem(context, 'Web Sitesi', 'todobus.tr', 
                 onTap: _launchWebsite,
                 isLink: true
+              ),
+              // Debug butonu - sadece development modunda göster
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                child: PlatformElevatedButton(
+                  onPressed: _debugVersionCheck,
+                  child: const Text('Sürüm Kontrolü Debug'),
+                  material: (_, __) => MaterialElevatedButtonData(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                  cupertino: (_, __) => CupertinoElevatedButtonData(
+                    color: CupertinoColors.systemOrange,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+              // Remote Config Sıfırlama butonu
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                child: PlatformElevatedButton(
+                  onPressed: _resetRemoteConfig,
+                  child: const Text('Remote Config Sıfırla'),
+                  material: (_, __) => MaterialElevatedButtonData(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ),
+                  cupertino: (_, __) => CupertinoElevatedButtonData(
+                    color: CupertinoColors.systemRed,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,6 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/logger_service.dart';
-import '../models/user_model.dart';
 import '../views/dashboard_view.dart';
 
 class StorageService {
@@ -14,6 +13,7 @@ class StorageService {
   static const String keyUserId = 'user_id';
   static const String keyIsLoggedIn = 'is_logged_in';
   static const String keyDashboardWidgetOrder = 'dashboard_widget_order';
+  static const String keyOnboardingCompleted = 'onboarding_completed';
 
   factory StorageService() {
     return _instance;
@@ -27,6 +27,34 @@ class StorageService {
       _initialized = true;
       _logger.i('StorageService başlatıldı');
     }
+  }
+
+  // Genel veri kaydetme
+  Future<bool> saveData(String key, String value) async {
+    await _ensureInitialized();
+    final result = await _prefs.setString(key, value);
+    _logger.d('Veri kaydedildi: $key = $value');
+    return result;
+  }
+
+  // Genel veri getirme
+  String? getData(String key) {
+    _ensureInitializedSync();
+    return _prefs.getString(key);
+  }
+
+  // Onboarding tamamlanma durumu
+  bool isOnboardingCompleted() {
+    _ensureInitializedSync();
+    return _prefs.getBool(keyOnboardingCompleted) ?? false;
+  }
+
+  // Onboarding tamamlandı olarak işaretle
+  Future<bool> setOnboardingCompleted() async {
+    await _ensureInitialized();
+    final result = await _prefs.setBool(keyOnboardingCompleted, true);
+    _logger.d('Onboarding tamamlandı olarak işaretlendi');
+    return result;
   }
 
   // Token işlemleri

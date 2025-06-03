@@ -10,6 +10,7 @@ import '../services/logger_service.dart';
 import '../services/snackbar_service.dart';
 import '../services/user_service.dart';
 import '../services/notification_service.dart';
+import '../services/version_check_service.dart';
 import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import '../viewmodels/event_viewmodel.dart';
@@ -56,6 +57,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   final SnackBarService _snackBarService = SnackBarService();
   final UserService _userService = UserService();
   final NotificationService _notificationService = NotificationService.instance;
+  final VersionCheckService _versionCheckService = VersionCheckService();
   
   List<GroupLog> _recentLogs = [];
   bool _isLoadingLogs = false;
@@ -103,7 +105,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
         
         // Kullanıcı arayüzünü hızlıca render etmek için boş durumla güncelle
-        setState(() {});
+        if (mounted) {
+          setState(() {});
+        }
 
         // Widget sırasını yükle
         await _loadWidgetOrder();
@@ -126,11 +130,28 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         ]);
         
         // Kullanıcı verilerine bağlı işlemler
-        if (profileViewModel.user != null) {
+        if (mounted && profileViewModel.user != null) {
           // FCM topic'leri için işlemi arka planda yap, UI'ı bloklama
           _notificationService.subscribeToUserTopic(profileViewModel.user!.userID)
-            .then((_) => _logger.i('Kullanıcı FCM topic\'ine abone edildi: ${profileViewModel.user!.userID}'))
-            .catchError((e) => _logger.e('FCM topic abone işleminde hata: $e'));
+            .then((_) {
+              if (mounted) {
+                _logger.i('Kullanıcı FCM topic\'ine abone edildi: ${profileViewModel.user!.userID}');
+              }
+            })
+            .catchError((e) {
+              if (mounted) {
+                _logger.e('FCM topic abone işleminde hata: $e');
+              }
+            });
+        }
+        
+        // Version check'i arka planda çalıştır - mounted kontrolü ile
+        if (mounted) {
+          _versionCheckService.checkForUpdates(context).catchError((e) {
+            if (mounted) {
+              _logger.e('Version check hatası: $e');
+            }
+          });
         }
         
         // Grup verilerini bekle
@@ -148,8 +169,15 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             _notificationService.subscribeUserToRequiredTopics(
               profileViewModel.user!.userID, 
               groupIds
-            ).then((_) => _logger.i('Kullanıcı FCM topics\'lerine abone edildi: ${groupIds.join(", ")}'))
-              .catchError((e) => _logger.e('FCM topics aboneliğinde hata: $e'));
+            ).then((_) {
+              if (mounted) {
+                _logger.i('Kullanıcı FCM topics\'lerine abone edildi: ${groupIds.join(", ")}');
+              }
+            }).catchError((e) {
+              if (mounted) {
+                _logger.e('FCM topics aboneliğinde hata: $e');
+              }
+            });
           }
           
           // Tüm veriler yüklendikten sonra tek bir kez UI güncelle
@@ -158,6 +186,16 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    // Tüm aktif animasyonları temizle
+    for (final animState in _completingTasksMap.values) {
+      animState.dispose();
+    }
+    _completingTasksMap.clear();
+    super.dispose();
   }
   
   // Widget sırasını yükleme
@@ -239,7 +277,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                     padding: EdgeInsets.zero,
                     onPressed: () {
                       _resetWidgetOrder();
-                      Navigator.pop(context);
+                      if (mounted) {
+                        Navigator.pop(context);
+                      }
                     },
                     child: Text(
                       'Sıfırla',
@@ -310,7 +350,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
               padding: const EdgeInsets.all(16.0),
               child: PlatformElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context);
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
                 },
                 child: const Text('Tamam'),
               ),
@@ -346,14 +388,16 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     try {
       _logger.i('Kullanıcı bilgileri yükleniyor...');
       final userResponse = await _userService.getUser();
-      if (userResponse.success && userResponse.data != null) {
+      if (mounted && userResponse.success && userResponse.data != null) {
         profileViewModel.setUser(userResponse.data!.user);
         _logger.i('Kullanıcı bilgileri başarıyla yüklendi');
-      } else {
+      } else if (mounted) {
         _logger.e('Kullanıcı bilgileri yüklenemedi: ${userResponse.errorMessage}');
       }
     } catch (e) {
-      _logger.e('Kullanıcı bilgileri alınırken hata: $e');
+      if (mounted) {
+        _logger.e('Kullanıcı bilgileri alınırken hata: $e');
+      }
     }
   }
   
@@ -367,7 +411,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         });
       }
     } catch (e) {
-      _logger.e('Bildirimler yüklenirken hata: $e');
+      if (mounted) {
+        _logger.e('Bildirimler yüklenirken hata: $e');
+      }
     }
   }
 
@@ -387,11 +433,13 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   }
 
   void _goToProfile() {
-    Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (context) => const ProfileView(),
-      ),
-    );
+    if (mounted) {
+      Navigator.of(context).push(
+        CupertinoPageRoute(
+          builder: (context) => const ProfileView(),
+        ),
+      );
+    }
   }
 
   @override
@@ -463,11 +511,17 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                 ],
               ),
               onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const NotificationsView(),
-                  ),
-                ).then((_) => _checkNotifications());
+                if (mounted) {
+                  Navigator.of(context).push(
+                    CupertinoPageRoute(
+                      builder: (context) => const NotificationsView(),
+                    ),
+                  ).then((_) {
+                    if (mounted) {
+                      _checkNotifications();
+                    }
+                  });
+                }
               },
             ),
             IconButton(
@@ -539,11 +593,17 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
                   ],
                 ),
                 onPressed: () {
-                  Navigator.of(context).push(
-                    CupertinoPageRoute(
-                      builder: (context) => const NotificationsView(),
-                    ),
-                  ).then((_) => _checkNotifications());
+                  if (mounted) {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (context) => const NotificationsView(),
+                      ),
+                    ).then((_) {
+                      if (mounted) {
+                        _checkNotifications();
+                      }
+                    });
+                  }
                 },
               ),
               const SizedBox(width: 8),
@@ -688,10 +748,10 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
           widgets.add(_buildSectionHeader('Yaklaşan Etkinlikler', onViewAll: () {
             final parentContext = context;
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (Navigator.of(parentContext).canPop()) {
+              if (mounted && Navigator.of(parentContext).canPop()) {
                 Navigator.of(parentContext).pop();
               }
-              if (parentContext.findAncestorStateOfType<MainAppState>() != null) {
+              if (mounted && parentContext.findAncestorStateOfType<MainAppState>() != null) {
                 parentContext.findAncestorStateOfType<MainAppState>()!.setCurrentIndex(2);
               }
             });
@@ -867,9 +927,11 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(builder: (context) => GroupDetailView(groupId: group.groupID)),
-        );
+        if (mounted) {
+          Navigator.of(context).push(
+            CupertinoPageRoute(builder: (context) => GroupDetailView(groupId: group.groupID)),
+          );
+        }
       },
       child: Container(
         width: 110,
@@ -948,9 +1010,11 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(builder: (context) => GroupDetailView(groupId: log.groupID)),
-        );
+        if (mounted) {
+          Navigator.of(context).push(
+            CupertinoPageRoute(builder: (context) => GroupDetailView(groupId: log.groupID)),
+          );
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -1206,14 +1270,16 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(
-            builder: (context) => ProjectDetailView(
-              projectId: project.projectID,
-              groupId: project.groupID,
+        if (mounted) {
+          Navigator.of(context).push(
+            CupertinoPageRoute(
+              builder: (context) => ProjectDetailView(
+                projectId: project.projectID,
+                groupId: project.groupID,
+              ),
             ),
-          ),
-        );
+          );
+        }
       },
       child: Container(
         width: 110,
@@ -1349,15 +1415,17 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     // Normal görünüm
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(
-            builder: (context) => WorkDetailView(
-              projectId: task.projectID,
-              groupId: 0, // Burada grup ID'si yok, arayüzde işlevsiz kalabilir
-              workId: task.workID,
+        if (mounted) {
+          Navigator.of(context).push(
+            CupertinoPageRoute(
+              builder: (context) => WorkDetailView(
+                projectId: task.projectID,
+                groupId: 0, // Burada grup ID'si yok, arayüzde işlevsiz kalabilir
+                workId: task.workID,
+              ),
             ),
-          ),
-        );
+          );
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 10.0),
@@ -1392,15 +1460,17 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
               turns: animationState.rotateAnimation,
               child: GestureDetector(
                 onTap: () {
-                  Navigator.of(context).push(
-                    CupertinoPageRoute(
-                      builder: (context) => WorkDetailView(
-                        projectId: task.projectID,
-                        groupId: 0,
-                        workId: task.workID,
+                  if (mounted) {
+                    Navigator.of(context).push(
+                      CupertinoPageRoute(
+                        builder: (context) => WorkDetailView(
+                          projectId: task.projectID,
+                          groupId: 0,
+                          workId: task.workID,
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  }
                 },
                 child: Container(
                   margin: const EdgeInsets.only(bottom: 10.0),
@@ -1549,6 +1619,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   }
 
   Future<void> _toggleTaskCompletion(UserProjectWork task) async {
+    if (!mounted) return;
+    
     _logger.i("Görev tamamlama durumu değiştiriliyor: ${task.workName}");
     
     // Eğer görev tamamlanıyorsa ve henüz animasyon listesinde değilse, animasyon listesine ekle
@@ -1561,6 +1633,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       // Animasyonları başlat
       animState.startAnimations();
     }
+    
+    if (!mounted) return;
     
     final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
     final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
@@ -1578,7 +1652,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
           await Future.delayed(_taskCompletionAnimationDuration);
           
           // Animasyon durumunu temizle ve kaynakları serbest bırak
-          if (_completingTasksMap.containsKey(task.workID)) {
+          if (mounted && _completingTasksMap.containsKey(task.workID)) {
             _completingTasksMap[task.workID]?.dispose();
             setState(() {
               _completingTasksMap.remove(task.workID);
@@ -1586,12 +1660,14 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
           }
           
           // Dashboard verilerini yenile
-          await dashboardViewModel.loadUserTasks();
-          
-          _showTaskStatusMessage(
-            !task.workCompleted ? 'Görev tamamlandı olarak işaretlendi' : 'Görev tamamlanmadı olarak işaretlendi',
-            isError: false
-          );
+          if (mounted) {
+            await dashboardViewModel.loadUserTasks();
+            
+            _showTaskStatusMessage(
+              !task.workCompleted ? 'Görev tamamlandı olarak işaretlendi' : 'Görev tamamlanmadı olarak işaretlendi',
+              isError: false
+            );
+          }
         } else {
           // Eğer başarısız olursa, animasyon durumunu temizle
           if (_completingTasksMap.containsKey(task.workID)) {
@@ -1604,15 +1680,15 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         }
       }
     } catch (e) {
-      _logger.e('Görev durumu değiştirilirken hata: $e');
-      // Hata durumunda animasyon durumunu temizle
-      if (_completingTasksMap.containsKey(task.workID)) {
-        _completingTasksMap[task.workID]?.dispose();
-        setState(() {
-          _completingTasksMap.remove(task.workID);
-        });
-      }
       if (mounted) {
+        _logger.e('Görev durumu değiştirilirken hata: $e');
+        // Hata durumunda animasyon durumunu temizle
+        if (_completingTasksMap.containsKey(task.workID)) {
+          _completingTasksMap[task.workID]?.dispose();
+          setState(() {
+            _completingTasksMap.remove(task.workID);
+          });
+        }
         _showTaskStatusMessage('Hata: ${e.toString()}', isError: true);
       }
     }
@@ -1625,22 +1701,28 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     
     if (isIOS) {
       // iOS için CupertinoDialog kullanımı - Scaffold bağımlılığını ortadan kaldırır
-      showCupertinoDialog(
-        context: context,
-        barrierDismissible: true,
-        builder: (BuildContext context) {
-          return CupertinoAlertDialog(
-            content: Text(message),
-            actions: [
-              CupertinoDialogAction(
-                onPressed: () => Navigator.of(context).pop(),
-                isDefaultAction: true,
-                child: const Text('Tamam'),
-              ),
-            ],
-          );
-        },
-      );
+      if (mounted) {
+        showCupertinoDialog(
+          context: context,
+          barrierDismissible: true,
+          builder: (BuildContext context) {
+            return CupertinoAlertDialog(
+              content: Text(message),
+              actions: [
+                CupertinoDialogAction(
+                  onPressed: () {
+                    if (mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  isDefaultAction: true,
+                  child: const Text('Tamam'),
+                ),
+              ],
+            );
+          },
+        );
+      }
       
       // Otomatik kapanma için Timer kullanımı
       Future.delayed(const Duration(seconds: 2), () {
@@ -1659,21 +1741,27 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       } catch (e) {
         // Fallback olarak basit bir dialog gösterimi
         _logger.e('SnackBar gösterilirken hata: $e');
-        showDialog(
-          context: context,
-          barrierDismissible: true,
-          builder: (BuildContext dialogContext) {
-            return AlertDialog(
-              content: Text(message),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Tamam'),
-                ),
-              ],
-            );
-          },
-        );
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: true,
+            builder: (BuildContext dialogContext) {
+              return AlertDialog(
+                content: Text(message),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      if (mounted) {
+                        Navigator.of(dialogContext).pop();
+                      }
+                    },
+                    child: const Text('Tamam'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
       }
     }
   }
@@ -1706,9 +1794,11 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       }
     }
     
-    setState(() {
-      _userProjects = allProjects;
-    });
+    if (mounted) {
+      setState(() {
+        _userProjects = allProjects;
+      });
+    }
       
     // Log ekleyelim - hangi durumlara sahip projeler yüklendiğini görelim
     if (allProjects.isNotEmpty) {
@@ -1724,6 +1814,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
   // Verileri yenileme - optimize edilmiş
   Future<void> _refreshData() async {
+    if (!mounted) return;
+    
     _logger.i('Veriler yenileniyor...');
     
     // Önceden önbellekten yüklenen verileri koruruz, yenileyiciyi çekerken yenisini alırız
@@ -1742,12 +1834,11 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       if (mounted) {
         _loadUserProjects(groupViewModel);
         setState(() {}); // UI'ı güncelle
+        _logger.i('Dashboard verileri yenilendi');
       }
-      
-      _logger.i('Dashboard verileri yenilendi');
     } catch (e) {
-      _logger.e('Veriler yenilenirken hata: $e');
       if (mounted) {
+        _logger.e('Veriler yenilenirken hata: $e');
         _snackBarService.showError('Veriler yenilenirken hata oluştu');
       }
     }
@@ -1849,17 +1940,19 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
     return GestureDetector(
       onTap: () {
-        Navigator.of(context).push(
-          CupertinoPageRoute(
-            builder: (context) => EventDetailPage(
-              groupId: groupId,
-              eventTitle: title,
-              eventDescription: description,
-              eventDate: date,
-              eventUser: user,
+        if (mounted) {
+          Navigator.of(context).push(
+            CupertinoPageRoute(
+              builder: (context) => EventDetailPage(
+                groupId: groupId,
+                eventTitle: title,
+                eventDescription: description,
+                eventDate: date,
+                eventUser: user,
+              ),
             ),
-          ),
-        );
+          );
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 10.0),

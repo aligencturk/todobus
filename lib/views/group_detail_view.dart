@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../models/group_models.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
@@ -220,17 +221,55 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   
   // Hata mesajlarını temizleme
   String _formatErrorMessage(String error) {
-    // Uzun hata mesajlarını kısaltma
-    if (error.length > 100) {
-      error = '${error.substring(0, 100)}...';
+    // Özel hata durumları için kullanıcı dostu mesajlar
+    if (error.contains('Daha önceden bir davet bağlantısı gönderilmiştir')) {
+      return 'Bu kullanıcıya zaten davet gönderilmiş. Lütfen önceki davetin onaylanmasını veya süresinin dolmasını bekleyiniz.';
+    }
+    
+    if (error.contains('Invalid email format') || error.contains('geçersiz e-posta')) {
+      return 'Geçersiz e-posta adresi. Lütfen doğru bir e-posta adresi giriniz.';
+    }
+    
+    if (error.contains('User already exists in group') || error.contains('zaten grup üyesi')) {
+      return 'Bu kullanıcı zaten grup üyesidir.';
+    }
+    
+    if (error.contains('Group limit exceeded') || error.contains('grup limiti')) {
+      return 'Grup üye sınırına ulaşıldı. Daha fazla üye eklenemez.';
+    }
+    
+    if (error.contains('Network error') || error.contains('internet bağlantısı')) {
+      return 'İnternet bağlantısı problemi. Lütfen bağlantınızı kontrol edip tekrar deneyiniz.';
+    }
+    
+    if (error.contains('Permission denied') || error.contains('yetki')) {
+      return 'Bu işlemi gerçekleştirmek için yetkiniz bulunmuyor.';
+    }
+    
+    // Nested Exception'ları temizle
+    String cleanError = error;
+    
+    // "Exception: Exception: Exception:" gibi tekrarları temizle
+    while (cleanError.contains('Exception: Exception:')) {
+      cleanError = cleanError.replaceAll('Exception: Exception:', 'Exception:');
     }
     
     // "Exception: " text'ini kaldırma
-    if (error.startsWith('Exception: ')) {
-      error = error.substring('Exception: '.length);
+    if (cleanError.startsWith('Exception: ')) {
+      cleanError = cleanError.substring('Exception: '.length);
     }
     
-    return error;
+    // Uzun hata mesajlarını kısaltma
+    if (cleanError.length > 150) {
+      cleanError = '${cleanError.substring(0, 150)}...';
+    }
+    
+    // Son çare olarak genel bir mesaj
+    if (cleanError.trim().isEmpty) {
+      cleanError = 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.';
+    }
+    
+    return cleanError;
   }
 
   Widget _buildGroupHeader(BuildContext context) {
@@ -834,12 +873,16 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   onPressed: () async {
                     final email = emailController.text.trim();
                     
+                    Navigator.pop(context);
+                    
                     if (email.isEmpty) {
-                      _showErrorSnackbar('E-posta adresi boş bırakılamaz');
+                      // Dialog kapandıktan sonra kontrol et
+                      await Future.delayed(const Duration(milliseconds: 300));
+                      if (mounted && !_isDisposed) {
+                        _showSnackBar('E-posta adresi boş bırakılamaz', isError: true);
+                      }
                       return;
                     }
-                    
-                    Navigator.pop(context);
                     
                     if (selectedInviteType == 'qr') {
                       await _createQRInvite(email, selectedRole);
@@ -913,12 +956,16 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   onPressed: () async {
                     final email = emailController.text.trim();
                     
+                    Navigator.pop(context);
+                    
                     if (email.isEmpty) {
-                      _showErrorSnackbar('E-posta adresi boş bırakılamaz');
+                      // Dialog kapandıktan sonra kontrol et
+                      await Future.delayed(const Duration(milliseconds: 300));
+                      if (mounted && !_isDisposed) {
+                        _showSnackBar('E-posta adresi boş bırakılamaz', isError: true);
+                      }
                       return;
                     }
-                    
-                    Navigator.pop(context);
                     
                     if (selectedInviteType == 'qr') {
                       await _createQRInvite(email, selectedRole);
@@ -936,14 +983,264 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     }
   }
 
-  // QR davet placeholder
+  // QR davet işlemi
   Future<void> _createQRInvite(String email, int role) async {
-    _showSnackBar('QR davet özelliği geliştiriliyor', isError: true);
+    // Dialog kapandıktan sonra kısa bir gecikme ekle
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    if (!mounted || _isDisposed) return;
+    
+    // Email format kontrolü
+    if (!_isValidEmail(email)) {
+      _showSnackBar('Geçerli bir e-posta adresi giriniz', isError: true);
+      return;
+    }
+    
+    try {
+      _safeSetState(() => _isLoading = true);
+      
+      final result = await Provider.of<GroupViewModel>(context, listen: false)
+          .inviteUserToGroup(widget.groupId, email, role, 'qr');
+      
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() => _isLoading = false);
+      
+      if (result['success'] == true) {
+        final inviteUrl = result['inviteUrl'] ?? '';
+        if (inviteUrl.isNotEmpty) {
+          // QR kodu ile davet URL'ini göster
+          _showQRInviteDialog(inviteUrl);
+          _showSnackBar('QR davet kodu başarıyla oluşturuldu!');
+        } else {
+          _showSnackBar('QR davet oluşturuldu, ancak URL alınamadı', isError: true);
+        }
+      } else {
+        final errorMsg = _formatErrorMessage(result['error'] ?? 'QR davet oluşturulamadı');
+        _showSnackBar(errorMsg, isError: true);
+      }
+    } catch (e) {
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() => _isLoading = false);
+      final formattedError = _formatErrorMessage(e.toString());
+      _showSnackBar('QR davet oluşturulurken hata oluştu: $formattedError', isError: true);
+      _logger.e('QR davet hatası: $e');
+    }
   }
 
-  // Email davet placeholder  
+  // Email davet işlemi
   Future<void> _sendInvite(String email, int role, String inviteType) async {
-    _showSnackBar('Email davet özelliği geliştiriliyor', isError: true);
+    // Dialog kapandıktan sonra kısa bir gecikme ekle
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    if (!mounted || _isDisposed) return;
+    
+    // Email format kontrolü
+    if (!_isValidEmail(email)) {
+      _showSnackBar('Geçerli bir e-posta adresi giriniz', isError: true);
+      return;
+    }
+    
+    try {
+      _safeSetState(() => _isLoading = true);
+      
+      final result = await Provider.of<GroupViewModel>(context, listen: false)
+          .inviteUserToGroup(widget.groupId, email, role, 'email');
+      
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() => _isLoading = false);
+      
+      if (result['success'] == true) {
+        _showSnackBar('Davet başarıyla gönderildi!');
+        // Grup detaylarını yenile ki yeni kullanıcı eklenirse görünsün
+        await _loadGroupDetail();
+      } else {
+        final errorMsg = _formatErrorMessage(result['error'] ?? 'Davet gönderilemedi');
+        _showSnackBar(errorMsg, isError: true);
+      }
+    } catch (e) {
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() => _isLoading = false);
+      final formattedError = _formatErrorMessage(e.toString());
+      _showSnackBar('Davet gönderilirken hata oluştu: $formattedError', isError: true);
+      _logger.e('Email davet hatası: $e');
+    }
+  }
+
+  // Email format kontrolü
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(email);
+  }
+
+  // QR davet URL'ini göster
+  void _showQRInviteDialog(String inviteUrl) {
+    final isIOS = isCupertino(context);
+    
+    showPlatformDialog(
+      context: context,
+      builder: (context) => isIOS
+        ? CupertinoAlertDialog(
+            title: const Text('QR Davet Kodu'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                const Text('Bu QR kodu paylaşarak kullanıcıyı gruba davet edebilirsiniz:'),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: CupertinoColors.systemGrey4),
+                  ),
+                  child: QrImageView(
+                    data: inviteUrl,
+                    version: QrVersions.auto,
+                    size: 200.0,
+                    backgroundColor: CupertinoColors.white,
+                    foregroundColor: CupertinoColors.black,
+                    errorCorrectionLevel: QrErrorCorrectLevel.M,
+                    padding: const EdgeInsets.all(8),
+                    errorStateBuilder: (cxt, err) {
+                      return Container(
+                        child: Center(
+                          child: Text(
+                            "QR kod oluşturulamadı",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: CupertinoColors.systemRed,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 15),
+                const Text(
+                  'Veya aşağıdaki linki kopyalayabilirsiniz:',
+                  style: TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemGrey6,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    inviteUrl,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Kapat'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () {
+                  _copyToClipboard(inviteUrl);
+                  Navigator.pop(context);
+                },
+                child: const Text('Linki Kopyala'),
+              ),
+            ],
+          )
+        : AlertDialog(
+            title: const Text('QR Davet Kodu'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Bu QR kodu paylaşarak kullanıcıyı gruba davet edebilirsiniz:'),
+                  const SizedBox(height: 15),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: QrImageView(
+                      data: inviteUrl,
+                      version: QrVersions.auto,
+                      size: 200.0,
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      padding: const EdgeInsets.all(8),
+                      errorStateBuilder: (cxt, err) {
+                        return Container(
+                          child: Center(
+                            child: Text(
+                              "QR kod oluşturulamadı",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    'Veya aşağıdaki linki kopyalayabilirsiniz:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SelectableText(
+                      inviteUrl,
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Kapat'),
+              ),
+              TextButton(
+                onPressed: () {
+                  _copyToClipboard(inviteUrl);
+                  Navigator.pop(context);
+                },
+                child: const Text('Linki Kopyala'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // Panoya kopyala
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
   }
 
   Widget _buildProjectsTab(BuildContext context) {
@@ -1311,36 +1608,27 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       // Proje silme API çağrısı
       final result = await _apiService.project.deleteProject(projectID, widget.groupId);
       
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _isLoading = false;
-        });
-        
-        // Detayları yenile
-        await _loadGroupDetail();
-        
-        // SnackBar gösterimi için daha güvenli bir yaklaşım
-        if (!_isDisposed && mounted) {
-          // Ana sayfada bir Scaffold var ve onu kullanabiliriz
-          try {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Proje başarıyla silindi')),
-            );
-          } catch (e) {
-            _logger.w('SnackBar gösterilemiyor: $e');
-          }
-        }
-      }
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() {
+        _isLoading = false;
+      });
+      
+      // Detayları yenile
+      await _loadGroupDetail();
+      
+      // Başarılı silme mesajını göster
+      _showSnackBar('Proje başarıyla silindi');
     } catch (e) {
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _isLoading = false;
-          _errorMessage = _formatErrorMessage(e.toString());
-        });
-        
-        // Hata durumunu logla
-        _logger.e('Proje silme hatası: $_errorMessage');
-      }
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() {
+        _isLoading = false;
+        _errorMessage = _formatErrorMessage(e.toString());
+      });
+      
+      // Hata durumunu logla
+      _logger.e('Proje silme hatası: $_errorMessage');
     }
   }
 
@@ -1356,16 +1644,74 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     if (!mounted || _isDisposed) return;
     
     try {
-      ScaffoldMessenger.of(context).showSnackBar(
+      // Context'in geçerli olup olmadığını kontrol et
+      final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+      if (scaffoldMessenger == null) {
+        _logger.w('ScaffoldMessenger bulunamadı: $message');
+        // Platform-specific toast alternatifi
+        _showPlatformToast(message);
+        return;
+      }
+      
+      // Önceki SnackBar'ları temizle
+      scaffoldMessenger.clearSnackBars();
+      
+      scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(message),
           backgroundColor: isError 
               ? (isCupertino(context) ? CupertinoColors.systemRed : Colors.red)
               : null,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
         ),
       );
     } catch (e) {
-      _logger.e('ScaffoldMessenger hatası: $e');
+      _logger.e('ScaffoldMessenger hatası: $e - Mesaj: $message');
+      // Alternatif gösterim yöntemi
+      _showPlatformToast(message);
+    }
+  }
+
+  // Platform-specific toast alternativi
+  void _showPlatformToast(String message) {
+    if (!mounted || _isDisposed) return;
+    
+    try {
+      final isIOS = isCupertino(context);
+      
+      if (isIOS) {
+        // iOS için alternatif gösterim
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            content: Text(message),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tamam'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Android için alternatif gösterim
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tamam'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.e('Platform toast hatası: $e');
     }
   }
 
@@ -1445,27 +1791,27 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     _safeSetState(() => _isLoading = true);
     
     try {
-      // İşlemi başlatmadan önce sayfayı tamamen durdur
-      _isDisposed = true;
-      
       final success = await Provider.of<GroupViewModel>(context, listen: false)
           .removeUserFromGroup(widget.groupId, userId);
       
-      // mounted kontrolü gerekiyor ama isDisposed kontrolü yapmıyoruz
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         if (success) {
+          // SnackBar'ı navigation işleminden ÖNCE göster
           _showSnackBar('Gruptan başarıyla ayrıldınız');
           
+          // Kısa bir gecikme ekle ki SnackBar görülebilsin
+          await Future.delayed(const Duration(milliseconds: 500));
+          
           // Doğrudan ana sayfaya veya gruplar listesi sayfasına dön
-          Navigator.of(context).popUntil((route) {
-            final routeName = route.settings.name;
-            // Ana sayfayı veya gruplar listesi sayfasını bul
-            return route.isFirst || (routeName != null && routeName.contains('GroupsView'));
-          });
+          if (mounted && !_isDisposed) {
+            Navigator.of(context).popUntil((route) {
+              final routeName = route.settings.name;
+              // Ana sayfayı veya gruplar listesi sayfasını bul
+              return route.isFirst || (routeName != null && routeName.contains('GroupsView'));
+            });
+          }
         } else {
-          // Başarısız olursa sayfaya geri dönüş yap, _isDisposed'u sıfırla
           _safeSetState(() {
-            _isDisposed = false;
             _isLoading = false;
             _errorMessage = 'Gruptan ayrılma işlemi başarısız oldu.';
           });
@@ -1474,11 +1820,8 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         }
       }
     } catch (e) {
-      // Hata durumunda eğer hala mounted ise
-      if (mounted) {
-        // Başarısız olursa sayfaya geri dönüş yap, _isDisposed'u sıfırla
+      if (mounted && !_isDisposed) {
         _safeSetState(() {
-          _isDisposed = false;
           _isLoading = false;
           _errorMessage = e.toString();
         });
