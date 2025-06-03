@@ -4,14 +4,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:share_plus/share_plus.dart';
 import '../models/group_models.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../viewmodels/group_viewmodel.dart';
+import '../viewmodels/report_viewmodel.dart';
 import '../views/edit_group_view.dart';
 import '../views/project_detail_view.dart';
 import '../views/create_project_view.dart';
+import '../views/event_detail_view.dart';
+import '../views/create_event_view.dart';
+import '../views/report_detail_view.dart';
+import '../views/create_report_view.dart';
+import '../services/storage_service.dart';
 
 class GroupDetailView extends StatefulWidget {
   final int groupId;
@@ -31,7 +36,9 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   String _errorMessage = '';
   int _selectedSegment = 0; // 0: Bilgiler, 1: Kullanıcılar, 2: Projeler, 3: Etkinlikler, 4: Raporlar
   List<GroupLog> _groupLogs = [];
+  List<GroupReport> _groupReports = [];
   bool _isLoadingLogs = false;
+  bool _isLoadingReports = false;
   bool _isDisposed = false;
   
   @override
@@ -92,322 +99,52 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     
     if (result == true && mounted && !_isDisposed) {
       await _loadGroupDetail();
-      try {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Grup başarıyla güncellendi')),
-        );
-      } catch (e) {
-        _logger.e('ScaffoldMessenger hatası: $e');
-      }
+      _showSnackBar('Grup başarıyla güncellendi');
     }
   }
 
-  // Etkinlik oluşturma işlevi
-  void _createEvent() {
-    if (_groupDetail == null) return;
-    
-    final eventTitleController = TextEditingController();
-    final eventDescController = TextEditingController();
-    
-    final isIOS = isCupertino(context);
-    final now = DateTime.now();
-    DateTime selectedDate = now;
-    
-    if (isIOS) {
-      showCupertinoDialog(
+  // Etkinlik detayına gitme işlevi
+  void _navigateToEventDetail(GroupEvent event) {
+    Navigator.of(context).push(
+      platformPageRoute(
         context: context,
-        builder: (_) => CupertinoAlertDialog(
-          title: const Text('Yeni Etkinlik Oluştur'),
-          content: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Etkinlik Adı',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
-                    controller: eventTitleController,
-                    padding: const EdgeInsets.all(10),
-                    placeholder: 'Etkinlik Adı',
-                    style: const TextStyle(
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Etkinlik Açıklaması',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  CupertinoTextField(
-                    controller: eventDescController,
-                    padding: const EdgeInsets.all(10),
-                    placeholder: 'Etkinlik Açıklaması',
-                    minLines: 2,
-                    maxLines: 3,
-                    style: const TextStyle(
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Etkinlik Tarihi',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: CupertinoColors.secondaryLabel,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: () {
-                      showCupertinoModalPopup(
-                        context: context,
-                        builder: (_) => Container(
-                          height: 250,
-                          color: CupertinoColors.systemBackground,
-                          child: Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  CupertinoButton(
-                                    child: const Text('İptal'),
-                                    onPressed: () => Navigator.pop(context),
-                                  ),
-                                  CupertinoButton(
-                                    child: const Text('Tamam'),
-                                    onPressed: () {
-                                      _safeSetState(() {});
-                                      Navigator.pop(context);
-                                    },
-                                  ),
-                                ],
-                              ),
-                              Expanded(
-                                child: CupertinoDatePicker(
-                                  initialDateTime: selectedDate,
-                                  minimumDate: now,
-                                  mode: CupertinoDatePickerMode.date,
-                                  use24hFormat: true,
-                                  onDateTimeChanged: (date) {
-                                    selectedDate = date;
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: CupertinoColors.systemGrey4),
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${selectedDate.day}.${selectedDate.month}.${selectedDate.year}',
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          const Icon(
-                            CupertinoIcons.calendar,
-                            color: CupertinoColors.activeBlue,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
-            ),
-            CupertinoDialogAction(
-              onPressed: () async {
-                final title = eventTitleController.text.trim();
-                final desc = eventDescController.text.trim();
-                
-                if (title.isEmpty) {
-                  return;
-                }
-                
-                Navigator.pop(context);
-                
-                try {
-                  _safeSetState(() {
-                    _isLoading = true;
-                  });
-                  
-                  // Burada etkinlik oluşturma API çağrısı yapılacak
-                  _logger.i('Etkinlik oluşturuluyor: $title');
-                  
-                  // API çağrısı tamamlandığında
-                  await Future.delayed(const Duration(seconds: 1)); // API çağrısı simülasyonu
-                  
-                  // Başarılı ise
-                  if (!_isDisposed && mounted) {
-                    _loadGroupDetail(); // Grup detayını yeniden yükle
-                  }
-                  
-                  if (mounted && !_isDisposed) {
-                    final messenger = ScaffoldMessenger.of(context);
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Etkinlik başarıyla oluşturuldu')),
-                    );
-                  }
-                } catch (e) {
-                  _safeSetState(() {
-                    _isLoading = false;
-                    _errorMessage = 'Etkinlik oluşturulurken hata: $e';
-                  });
-                }
-              },
-              isDefaultAction: true,
-              child: const Text('Oluştur'),
-            ),
-          ],
+        builder: (context) => EventDetailPage(
+          groupId: widget.groupId,
+          eventTitle: event.eventTitle,
+          eventDescription: event.eventDesc,
+          eventDate: event.eventDate,
+          eventUser: event.userFullname,
         ),
-      );
-    } else {
-      // Material tasarım için diyalog
-      showDialog(
+      ),
+    );
+  }
+
+  // Etkinlik oluşturma sayfasına gitme işlevi
+  void _navigateToCreateEventView() {
+    Navigator.of(context).push(
+      platformPageRoute(
         context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Yeni Etkinlik Oluştur'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: eventTitleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Etkinlik Adı',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: eventDescController,
-                  decoration: const InputDecoration(
-                    labelText: 'Etkinlik Açıklaması',
-                    border: OutlineInputBorder(),
-                  ),
-                  minLines: 2,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: now,
-                      lastDate: DateTime(now.year + 5),
-                    );
-                    if (date != null) {
-                      setState(() {
-                        selectedDate = date;
-                      });
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Etkinlik Tarihi',
-                      border: OutlineInputBorder(),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('${selectedDate.day}.${selectedDate.month}.${selectedDate.year}'),
-                        const Icon(Icons.calendar_today),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('İptal'),
-            ),
-            TextButton(
-              onPressed: () async {
-                final title = eventTitleController.text.trim();
-                final desc = eventDescController.text.trim();
-                
-                if (title.isEmpty) {
-                  return;
-                }
-                
-                Navigator.pop(context);
-                
-                try {
-                  _safeSetState(() {
-                    _isLoading = true;
-                  });
-                  
-                  // Burada etkinlik oluşturma API çağrısı yapılacak
-                  _logger.i('Etkinlik oluşturuluyor: $title');
-                  
-                  // API çağrısı tamamlandığında
-                  await Future.delayed(const Duration(seconds: 1)); // API çağrısı simülasyonu
-                  
-                  // Başarılı ise
-                  if (!_isDisposed && mounted) {
-                    _loadGroupDetail(); // Grup detayını yeniden yükle
-                  }
-                  
-                  if (mounted && !_isDisposed) {
-                    final messenger = ScaffoldMessenger.of(context);
-                    messenger.showSnackBar(
-                      const SnackBar(content: Text('Etkinlik başarıyla oluşturuldu')),
-                    );
-                  }
-                } catch (e) {
-                  _safeSetState(() {
-                    _isLoading = false;
-                    _errorMessage = 'Etkinlik oluşturulurken hata: $e';
-                  });
-                }
-              },
-              child: const Text('Oluştur'),
-            ),
-          ],
+        builder: (context) => CreateEventView(
+          initialGroupID: widget.groupId,
+          initialDate: DateTime.now(),
         ),
-      );
-    }
+      ),
+    ).then((result) {
+      if (result == true && mounted) {
+        _loadGroupDetail(); // Grup detaylarını yenile
+        _showSnackBar('Etkinlik başarıyla oluşturuldu');
+      }
+    });
   }
   
   @override
   Widget build(BuildContext context) {
+    final bool hasAdminRights = _groupDetail?.users.any((user) => user.isAdmin) ?? false;
+    
     return PlatformScaffold(
       appBar: PlatformAppBar(
         title: Text(_groupDetail?.groupName ?? 'Grup Detayı'),
-        trailingActions: _groupDetail != null && _groupDetail!.users.any((user) => user.isAdmin)
+        trailingActions: hasAdminRights
             ? [
                 PlatformIconButton(
                   icon: Icon(
@@ -484,32 +221,77 @@ class _GroupDetailViewState extends State<GroupDetailView> {
   
   // Hata mesajlarını temizleme
   String _formatErrorMessage(String error) {
-    // Uzun hata mesajlarını kısaltma
-    if (error.length > 100) {
-      error = '${error.substring(0, 100)}...';
+    // Özel hata durumları için kullanıcı dostu mesajlar
+    if (error.contains('Daha önceden bir davet bağlantısı gönderilmiştir')) {
+      return 'Bu kullanıcıya zaten davet gönderilmiş. Lütfen önceki davetin onaylanmasını veya süresinin dolmasını bekleyiniz.';
+    }
+    
+    if (error.contains('Invalid email format') || error.contains('geçersiz e-posta')) {
+      return 'Geçersiz e-posta adresi. Lütfen doğru bir e-posta adresi giriniz.';
+    }
+    
+    if (error.contains('User already exists in group') || error.contains('zaten grup üyesi')) {
+      return 'Bu kullanıcı zaten grup üyesidir.';
+    }
+    
+    if (error.contains('Group limit exceeded') || error.contains('grup limiti')) {
+      return 'Grup üye sınırına ulaşıldı. Daha fazla üye eklenemez.';
+    }
+    
+    if (error.contains('Network error') || error.contains('internet bağlantısı')) {
+      return 'İnternet bağlantısı problemi. Lütfen bağlantınızı kontrol edip tekrar deneyiniz.';
+    }
+    
+    if (error.contains('Permission denied') || error.contains('yetki')) {
+      return 'Bu işlemi gerçekleştirmek için yetkiniz bulunmuyor.';
+    }
+    
+    // Nested Exception'ları temizle
+    String cleanError = error;
+    
+    // "Exception: Exception: Exception:" gibi tekrarları temizle
+    while (cleanError.contains('Exception: Exception:')) {
+      cleanError = cleanError.replaceAll('Exception: Exception:', 'Exception:');
     }
     
     // "Exception: " text'ini kaldırma
-    if (error.startsWith('Exception: ')) {
-      error = error.substring('Exception: '.length);
+    if (cleanError.startsWith('Exception: ')) {
+      cleanError = cleanError.substring('Exception: '.length);
     }
     
-    return error;
+    // Uzun hata mesajlarını kısaltma
+    if (cleanError.length > 150) {
+      cleanError = '${cleanError.substring(0, 150)}...';
+    }
+    
+    // Son çare olarak genel bir mesaj
+    if (cleanError.trim().isEmpty) {
+      cleanError = 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyiniz.';
+    }
+    
+    return cleanError;
   }
 
   Widget _buildGroupHeader(BuildContext context) {
+    if (_groupDetail == null) return const SizedBox();
+    
     final group = _groupDetail!;
     final isIOS = isCupertino(context);
+    final bool isAdmin = group.users.any((user) => user.isAdmin);
+    final Color headerColor = isIOS 
+        ? (isAdmin ? CupertinoColors.activeBlue.withOpacity(0.1) : CupertinoColors.systemBackground)
+        : (isAdmin ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surface);
+    final TextStyle labelStyle = platformThemeData(
+      context,
+      material: (data) => data.textTheme.bodySmall ?? const TextStyle(),
+      cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
+        color: CupertinoColors.secondaryLabel,
+      ),
+    );
     
     return Container(
       padding: const EdgeInsets.all(16.0),
-      color: isIOS 
-        ? (group.users.any((user) => user.isAdmin) 
-            ? CupertinoColors.activeBlue.withOpacity(0.1) 
-            : CupertinoColors.systemBackground)
-        : (group.users.any((user) => user.isAdmin) 
-            ? Theme.of(context).colorScheme.primaryContainer 
-            : Theme.of(context).colorScheme.surface),
+      color: headerColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -544,70 +326,24 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: group.isFree
-                    ? isIOS 
-                        ? CupertinoColors.activeGreen.withOpacity(0.1)
-                        : Colors.green.withOpacity(0.1)
-                    : isIOS 
-                        ? CupertinoColors.systemOrange.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  group.packageName,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: group.isFree
-                      ? isIOS 
-                          ? CupertinoColors.activeGreen
-                          : Colors.green
-                      : isIOS 
-                          ? CupertinoColors.systemOrange
-                          : Colors.orange,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+              _buildPackageIndicator(context, group.isFree, group.packageName),
             ],
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(
-                isIOS ? CupertinoIcons.person : Icons.person,
-                size: 14,
-                color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${group.totalUsers} Kullanıcı',
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall,
-                  cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
-                    color: CupertinoColors.secondaryLabel,
-                  ),
-                ),
+              _buildIconWithText(
+                context: context, 
+                icon: isIOS ? CupertinoIcons.person : Icons.person, 
+                text: '${group.totalUsers} Kullanıcı',
+                style: labelStyle
               ),
               const SizedBox(width: 16),
-              Icon(
-                isIOS ? CupertinoIcons.collections : Icons.collections_bookmark,
-                size: 14,
-                color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${group.projects.length} Proje',
-                style: platformThemeData(
-                  context,
-                  material: (data) => data.textTheme.bodySmall,
-                  cupertino: (data) => data.textTheme.tabLabelTextStyle.copyWith(
-                    color: CupertinoColors.secondaryLabel,
-                  ),
-                ),
+              _buildIconWithText(
+                context: context, 
+                icon: isIOS ? CupertinoIcons.collections : Icons.collections_bookmark, 
+                text: '${group.projects.length} Proje',
+                style: labelStyle
               ),
             ],
           ),
@@ -615,117 +351,145 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       ),
     );
   }
+
+  Widget _buildPackageIndicator(BuildContext context, bool isFree, String packageName) {
+    final isIOS = isCupertino(context);
+    final Color bgColor = isFree
+        ? isIOS ? CupertinoColors.activeGreen.withOpacity(0.1) : Colors.green.withOpacity(0.1)
+        : isIOS ? CupertinoColors.systemOrange.withOpacity(0.1) : Colors.orange.withOpacity(0.1);
+    final Color textColor = isFree
+        ? isIOS ? CupertinoColors.activeGreen : Colors.green
+        : isIOS ? CupertinoColors.systemOrange : Colors.orange;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        packageName,
+        style: TextStyle(
+          fontSize: 12,
+          color: textColor,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIconWithText({
+    required BuildContext context, 
+    required IconData icon, 
+    required String text,
+    TextStyle? style
+  }) {
+    final Color iconColor = isCupertino(context) 
+        ? CupertinoColors.secondaryLabel 
+        : Colors.grey[600] ?? Colors.grey;
+    final double iconSize = 16;
+    
+    return Row(
+      children: [
+        Icon(icon, size: iconSize, color: iconColor),
+        const SizedBox(width: 4),
+        Text(text, style: style),
+      ],
+    );
+  }
+ 
+
+
   
   Widget _buildSegmentedControl(BuildContext context) {
     final isIOS = isCupertino(context);
-    
+
     if (isIOS) {
-      final Map<int, Widget> segments = {
-        0: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 1),
-          child: Text('Bilgiler'),
-        ),
-        1: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 1),
-          child: Text('Üyeler'),
-        ),
-        2: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 1),
-          child: Text('Projeler'),
-        ),
-        3: const Padding(
-          padding: EdgeInsets.symmetric(horizontal:1),
-          child: Text('Etkinlikler'),
-        ),
-        4: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 1),
-          child: Text('Raporlar'),
-        ),
-      };
-      
       return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: CupertinoSlidingSegmentedControl<int>(
-          groupValue: _selectedSegment,
-          onValueChanged: (value) {
-            if (value != null) {
-              setState(() {
-                _selectedSegment = value;
-              });
-              
-              // Raporlar sekmesi seçildiğinde logları yükle
-              if (value == 4 && _groupLogs.isEmpty && !_isLoadingLogs) {
-                // Build bittikten sonra çağır
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _loadGroupLogs();
-                });
-              }
-            }
-          },
-          children: segments,
+        padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        child: SizedBox(
+          width: double.infinity,
+          child: CupertinoSlidingSegmentedControl<int>(
+            groupValue: _selectedSegment,
+            children: const {
+              0: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                child: Text(
+                  'Bilgiler',
+                  style: TextStyle(fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              1: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                child: Text(
+                  'Üyeler',
+                  style: TextStyle(fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              2: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                child: Text(
+                  'Projeler',
+                  style: TextStyle(fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              3: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                child: Text(
+                  'Etkinlikler',
+                  style: TextStyle(fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              4: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 4.0, vertical: 8.0),
+                child: Text(
+                  'Raporlar',
+                  style: TextStyle(fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            },
+            onValueChanged: _onSegmentChanged,
+          ),
         ),
       );
     } else {
-      // Material design için TabBar oluşturulabilir
-      return Container(
-        height: 50,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          border: Border(
-            bottom: BorderSide(
-              color: Theme.of(context).dividerColor,
-              width: 1,
-            ),
+      return Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment<int>(value: 0, label: Text('Bilgiler')),
+              ButtonSegment<int>(value: 1, label: Text('Üyeler')),
+              ButtonSegment<int>(value: 2, label: Text('Projeler')),
+              ButtonSegment<int>(value: 3, label: Text('Etkinlikler')),
+              ButtonSegment<int>(value: 4, label: Text('Raporlar')),
+            ],
+            selected: {_selectedSegment},
+            onSelectionChanged: (newSelection) => _onSegmentChanged(newSelection.first),
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildMaterialTab(context, 'Bilgiler', 0),
-            _buildMaterialTab(context, 'Üyeler', 1),
-            _buildMaterialTab(context, 'Projeler', 2),
-            _buildMaterialTab(context, 'Etkinlikler', 3),
-            _buildMaterialTab(context, 'Raporlar', 4),
-          ],
         ),
       );
     }
   }
-  
-  Widget _buildMaterialTab(BuildContext context, String title, int index) {
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedSegment = index;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: _selectedSegment == index 
-                ? Theme.of(context).colorScheme.primary 
-                : Colors.transparent,
-              width: 2,
-            ),
-          ),
-        ),
-        child: Center(
-          child: Text(
-            title,
-            style: TextStyle(
-              color: _selectedSegment == index 
-                ? Theme.of(context).colorScheme.primary 
-                : Theme.of(context).textTheme.bodyMedium?.color,
-              fontWeight: _selectedSegment == index 
-                ? FontWeight.bold 
-                : FontWeight.normal,
-            ),
-          ),
-        ),
-      ),
-    );
+
+  // Segment değişimi - optimize edilmiş
+  void _onSegmentChanged(int? value) {
+    if (value == null || value == _selectedSegment) return;
+    
+    _safeSetState(() {
+      _selectedSegment = value;
+    });
+    
+    // Sadece raporlar sekmesi seçildiğinde ve raporlar boşsa yükle
+    if (value == 4 && _groupReports.isEmpty && !_isLoadingReports) {
+      _loadReports();
+    }
   }
   
   Widget _buildSelectedContent(BuildContext context) {
@@ -744,152 +508,94 @@ class _GroupDetailViewState extends State<GroupDetailView> {
         return _buildInfoTab(context);
     }
   }
-  
+ 
   Widget _buildInfoTab(BuildContext context) {
+    if (_groupDetail == null) return const SizedBox();
+    
     final group = _groupDetail!;
+    final isIOS = isCupertino(context);
+    final isAdmin = group.users.any((user) => user.isAdmin);
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Grup Bilgileri',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              cupertino: (data) => data.textTheme.navTitleTextStyle,
-            ),
-          ),
+          _buildSectionHeader(context, 'Grup Bilgileri'),
           const SizedBox(height: 12),
-          ListTile(
-            leading: Icon(
-              isCupertino(context) ? CupertinoIcons.person_2 : Icons.people,
-              color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
-            ),
-            title: const Text('Üye Sayısı'),
-            trailing: Text(
-              '${group.totalUsers}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+          
+          // Bilgi kartları
+          _buildInfoCard(
+            context, 
+            'Üye Sayısı', 
+            '${group.totalUsers}', 
+            isIOS ? CupertinoIcons.person_2_fill : Icons.people,
+            isIOS ? CupertinoColors.activeBlue : Colors.blue
           ),
           const Divider(),
-          ListTile(
-            leading: Icon(
-              isCupertino(context) ? CupertinoIcons.folder : Icons.folder,
-              color: isCupertino(context) ? CupertinoColors.systemIndigo : Colors.indigo,
-            ),
-            title: const Text('Proje Sayısı'),
-            trailing: Text(
-              '${group.projects.length}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+          _buildInfoCard(
+            context, 
+            'Proje Sayısı', 
+            '${group.projects.length}', 
+            isIOS ? CupertinoIcons.folder_fill : Icons.folder,
+            isIOS ? CupertinoColors.systemIndigo : Colors.indigo
           ),
           const Divider(),
-          ListTile(
-            leading: Icon(
-              isCupertino(context) ? CupertinoIcons.calendar : Icons.event,
-              color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
-            ),
-            title: const Text('Etkinlik Sayısı'),
-            trailing: Text(
-              '${group.events.length}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+          _buildInfoCard(
+            context, 
+            'Etkinlik Sayısı', 
+            '${group.events.length}', 
+            isIOS ? CupertinoIcons.calendar : Icons.event_note,
+            isIOS ? CupertinoColors.systemOrange : Colors.orange
           ),
           const Divider(),
-          ListTile(
-            leading: Icon(
-              isCupertino(context) ? CupertinoIcons.tag : Icons.label,
-              color: isCupertino(context) ? CupertinoColors.systemGreen : Colors.green,
-            ),
-            title: const Text('Paket Türü'),
-            trailing: Text(
-              group.packageName,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: group.isFree 
-                  ? isCupertino(context) ? CupertinoColors.activeGreen : Colors.green
-                  : isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
-              ),
-            ),
+          _buildInfoCard(
+            context, 
+            'Paket Türü', 
+            group.packageName, 
+            isIOS ? CupertinoIcons.tag_fill : Icons.local_offer,
+            isIOS ? CupertinoColors.systemGreen : Colors.green,
+            valueColor: group.isFree 
+                ? (isIOS ? CupertinoColors.activeGreen : Colors.green)
+                : (isIOS ? CupertinoColors.systemOrange : Colors.orange)
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Hızlı İşlemler',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              cupertino: (data) => data.textTheme.navTitleTextStyle,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildQuickActionButton(
-                icon: isCupertino(context) ? CupertinoIcons.calendar_badge_plus : Icons.event_available,
-                color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
-                label: 'Etkinlik Ekle',
-                onTap: _createEvent,
-              ),
-              if (group.users.any((user) => user.isAdmin))
-                _buildQuickActionButton(
-                  icon: isCupertino(context) ? CupertinoIcons.person_badge_plus : Icons.person_add,
-                  color: isCupertino(context) ? CupertinoColors.systemGreen : Colors.green,
-                  label: 'Üye Ekle',
-                  onTap: () {
-                    // Üye ekleme işlevi eklenecek
-                  },
-                ),
-              _buildQuickActionButton(
-                icon: isCupertino(context) ? CupertinoIcons.chat_bubble_2 : Icons.chat,
-                color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
-                label: 'Grup Sohbeti',
-                onTap: () {
-                  // Grup sohbeti açma işlevi eklenecek
-                },
-              ),
-            ],
-          ),
+          
+         
         ],
       ),
     );
   }
   
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+  // Info kartı widget'ı
+  Widget _buildInfoCard(
+    BuildContext context, 
+    String title, 
+    String value, 
+    IconData iconData, 
+    Color iconColor,
+    {Color? valueColor}
+  ) {
+    final double iconSize = 24.0;
+    
+    return ListTile(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: iconColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Icon(iconData, color: iconColor, size: iconSize),
+        ),
+      ),
+      title: Text(title),
+      trailing: Text(
+        value,
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: valueColor,
+        ),
       ),
     );
   }
@@ -917,112 +623,151 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               ),
               if (group.isAddUser && hasAdminRights)
                 PlatformIconButton(
+                  padding: EdgeInsets.zero,
                   icon: Icon(
-                    isIOS ? CupertinoIcons.person_add : Icons.person_add,
+                    isIOS ? CupertinoIcons.person_badge_plus : Icons.person_add_alt,
                     color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                    size: 22,
                   ),
                   onPressed: _inviteUser,
                 ),
             ],
           ),
           const SizedBox(height: 16),
-          ...group.users.map((user) => Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: user.isAdmin 
-                    ? (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.2) 
-                    : (isIOS ? CupertinoColors.systemGrey : Colors.grey).withOpacity(0.2),
-                child: Text(
-                  user.userName.substring(0, 1).toUpperCase(),
-                  style: TextStyle(
-                    color: user.isAdmin 
-                        ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
-                        : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
+          // Optimized ListView instead of mapping
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: group.users.length,
+            itemBuilder: (context, index) {
+              final user = group.users[index];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: user.isAdmin 
+                        ? (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.2) 
+                        : (isIOS ? CupertinoColors.systemGrey : Colors.grey).withOpacity(0.2),
+                    backgroundImage: user.profilePhoto.isNotEmpty
+                        ? NetworkImage(user.profilePhoto)
+                        : null,
+                    child: user.profilePhoto.isEmpty
+                        ? Text(
+                            user.userName.isNotEmpty 
+                              ? user.userName.substring(0, 1).toUpperCase()
+                              : '?',
+                            style: TextStyle(
+                              color: user.isAdmin 
+                                  ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
+                                  : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
+                            ),
+                          )
+                        : null,
+                  ),
+                  title: Text(user.userName),
+                  subtitle: Text(user.isAdmin ? 'Yönetici' : 'Üye'),
+                  trailing: SizedBox(
+                    width: 40,
+                    child: hasAdminRights && !user.isAdmin 
+                      ? PlatformIconButton(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            isIOS ? CupertinoIcons.delete : Icons.delete_outline,
+                            color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
+                            size: 20,
+                          ),
+                          onPressed: () => _confirmRemoveUser(user),
+                        )
+                      : (user.isAdmin 
+                        ? Icon(
+                            isIOS ? CupertinoIcons.shield_fill : Icons.shield,
+                            color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                            size: 20,
+                          )
+                        : const SizedBox(width: 20)),
                   ),
                 ),
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          PlatformElevatedButton(
+            onPressed: _confirmLeaveGroup,
+            color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
+            material: (_, __) => MaterialElevatedButtonData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
               ),
-              title: Text(user.userName),
-              subtitle: Text(user.isAdmin ? 'Yönetici' : 'Üye'),
-              trailing: hasAdminRights && !user.isAdmin 
-                ? PlatformIconButton(
-                    padding: EdgeInsets.zero,
-                    icon: Icon(
-                      isIOS ? CupertinoIcons.trash : Icons.delete_outline,
-                      color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
-                      size: 20,
-                    ),
-                    onPressed: () => _confirmRemoveUser(user),
-                  )
-                : (user.isAdmin 
-                  ? Icon(
-                      isIOS ? CupertinoIcons.shield : Icons.shield,
-                      color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
-                    )
-                  : null),
             ),
-          )).toList(),
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                'Gruptan Ayrıl',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isIOS ? CupertinoColors.white : Colors.white,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
-  
+
+  // Kullanıcı çıkarma onayı
   void _confirmRemoveUser(GroupUser user) {
     final isIOS = isCupertino(context);
+    const String title = 'Kullanıcıyı Çıkar';
+    final String content = '${user.userName} kullanıcısını gruptan çıkarmak istediğinize emin misiniz?';
     
-    if (isIOS) {
-      showCupertinoDialog(
-        context: context,
-        builder: (dialogContext) => CupertinoAlertDialog(
-          title: const Text('Kullanıcıyı Çıkar'),
-          content: Text('${user.userName} kullanıcısını gruptan çıkarmak istediğinize emin misiniz?'),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('İptal'),
-            ),
-            CupertinoDialogAction(
-              isDestructiveAction: true,
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                _removeUser(user.userID);
-              },
-              child: const Text('Çıkar'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Kullanıcıyı Çıkar'),
-          content: Text('${user.userName} kullanıcısını gruptan çıkarmak istediğinize emin misiniz?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('İptal'),
-            ),
-            TextButton(
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
+    showPlatformDialog(
+      context: context,
+      builder: (dialogContext) => isIOS
+        ? CupertinoAlertDialog(
+            title: const Text(title),
+            content: Text(content),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
               ),
-              onPressed: () async {
-                Navigator.pop(dialogContext);
-                await _removeUser(user.userID);
-              },
-              child: const Text('Çıkar'),
-            ),
-          ],
-        ),
-      );
-    }
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _removeUser(user.userID);
+                },
+                child: const Text('Çıkar'),
+              ),
+            ],
+          )
+        : AlertDialog(
+            title: const Text(title),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red,
+                ),
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _removeUser(user.userID);
+                },
+                child: const Text('Çıkar'),
+              ),
+            ],
+          ),
+    );
   }
-  
+
   Future<void> _removeUser(int userID) async {
-    setState(() {
-      _isLoading = true;
-    });
+    _safeSetState(() => _isLoading = true);
     
     try {
       final success = await Provider.of<GroupViewModel>(context, listen: false)
@@ -1031,41 +776,32 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       if (mounted) {
         if (success) {
           await _loadGroupDetail();
-          try {
-            final messenger = ScaffoldMessenger.of(context);
-            messenger.showSnackBar(
-              const SnackBar(content: Text('Kullanıcı başarıyla çıkarıldı')),
-            );
-          } catch (e) {
-            _logger.e('ScaffoldMessenger hatası: $e');
-          }
+          _showSnackBar('Kullanıcı başarıyla çıkarıldı');
         } else {
-          setState(() {
+          _safeSetState(() {
             _isLoading = false;
             _errorMessage = 'Kullanıcı çıkarılamadı.';
           });
-          
           _showErrorSnackbar('Kullanıcı çıkarma işlemi başarısız oldu. Lütfen daha sonra tekrar deneyin.');
         }
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
+        _safeSetState(() {
           _isLoading = false;
           _errorMessage = e.toString();
         });
-        
         _showErrorSnackbar(_formatErrorMessage(e.toString()));
       }
     }
   }
-  
+
   // Kullanıcı davet et
   Future<void> _inviteUser() async {
     if (_groupDetail == null) return;
     
     final emailController = TextEditingController();
-    int selectedRole = 1; // 1 = Normal kullanıcı, 2 = Admin
+    int selectedRole = 1; // 1 = Admin, 2 = Normal kullanıcı
     String selectedInviteType = 'email'; // email veya qr
     
     final isIOS = isCupertino(context);
@@ -1097,13 +833,11 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   CupertinoSlidingSegmentedControl<int>(
                     groupValue: selectedRole,
                     children: const {
-                      1: Text('Üye'),
-                      2: Text('Admin'),
+                      1: Text('Yönetici'),
+                      2: Text('Üye'),
                     },
                     onValueChanged: (value) {
                       if (value != null) {
-                        // Burada Stateful Builder'ın setState'ini kullanıyoruz
-                        // bu yüzden safe kontrolü yapmıyoruz
                         setState(() {
                           selectedRole = value;
                         });
@@ -1139,20 +873,20 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   onPressed: () async {
                     final email = emailController.text.trim();
                     
-                    // Her iki davet türü için de e-posta alanı zorunlu
+                    Navigator.pop(context);
+                    
                     if (email.isEmpty) {
-                      // E-posta adresi boş ise uyarı göster
-                      _showErrorSnackbar('E-posta adresi boş bırakılamaz');
+                      // Dialog kapandıktan sonra kontrol et
+                      await Future.delayed(const Duration(milliseconds: 300));
+                      if (mounted && !_isDisposed) {
+                        _showSnackBar('E-posta adresi boş bırakılamaz', isError: true);
+                      }
                       return;
                     }
                     
-                    Navigator.pop(context);
-                    
                     if (selectedInviteType == 'qr') {
-                      // QR kod davetini başlat
                       await _createQRInvite(email, selectedRole);
                     } else {
-                      // Email davetini başlat
                       await _sendInvite(email, selectedRole, 'email');
                     }
                   },
@@ -1186,12 +920,11 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   const SizedBox(height: 8),
                   SegmentedButton<int>(
                     segments: const [
-                      ButtonSegment<int>(value: 1, label: Text('Üye')),
-                      ButtonSegment<int>(value: 2, label: Text('Admin')),
+                      ButtonSegment<int>(value: 1, label: Text('Yönetici')),
+                      ButtonSegment<int>(value: 2, label: Text('Üye')),
                     ],
                     selected: {selectedRole},
                     onSelectionChanged: (newSelection) {
-                      // Burada Stateful Builder'ın setState'ini kullanıyoruz
                       setState(() {
                         selectedRole = newSelection.first;
                       });
@@ -1223,20 +956,20 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                   onPressed: () async {
                     final email = emailController.text.trim();
                     
-                    // Her iki davet türü için de e-posta alanı zorunlu
+                    Navigator.pop(context);
+                    
                     if (email.isEmpty) {
-                      // E-posta adresi boş ise uyarı göster
-                      _showErrorSnackbar('E-posta adresi boş bırakılamaz');
+                      // Dialog kapandıktan sonra kontrol et
+                      await Future.delayed(const Duration(milliseconds: 300));
+                      if (mounted && !_isDisposed) {
+                        _showSnackBar('E-posta adresi boş bırakılamaz', isError: true);
+                      }
                       return;
                     }
                     
-                    Navigator.pop(context);
-                    
                     if (selectedInviteType == 'qr') {
-                      // QR kod davetini başlat
                       await _createQRInvite(email, selectedRole);
                     } else {
-                      // Email davetini başlat 
                       await _sendInvite(email, selectedRole, 'email');
                     }
                   },
@@ -1249,517 +982,271 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       );
     }
   }
-  
+
+  // QR davet işlemi
   Future<void> _createQRInvite(String email, int role) async {
-    if (_groupDetail == null) return;
+    // Dialog kapandıktan sonra kısa bir gecikme ekle
+    await Future.delayed(const Duration(milliseconds: 300));
     
-    _safeSetState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      final viewModel = Provider.of<GroupViewModel>(context, listen: false);
-      // QR kod için de geçerli bir email adresi gönderiyoruz
-      final result = await viewModel.inviteUserToGroup(
-        widget.groupId, 
-        email, // API zorunlu kıldığı için email parametresini gönderiyoruz
-        role, 
-        'qr' // davet tipi: qr
-      );
-      
-      _safeSetState(() {
-        _isLoading = false;
-      });
-      
-      if (!_isDisposed && mounted) {
-        // Davet başarılı ise
-        if (result['success'] == true && result['inviteUrl'].isNotEmpty) {
-          // QR kod diyalogunu göster
-          _showQRInviteDialog(result['inviteUrl'], role);
-        } else {
-          _safeSetState(() {
-            _errorMessage = 'QR kodu oluşturulamadı';
-          });
-          
-          _showErrorSnackbar('QR kodu oluşturma işlemi başarısız oldu. Lütfen daha sonra tekrar deneyin.');
-        }
-      }
-    } catch (e) {
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _isLoading = false;
-          _errorMessage = 'QR kod oluşturulurken hata: $e';
-        });
-        
-        _showErrorSnackbar(_formatErrorMessage(e.toString()));
-      }
-    }
-  }
-  
-  void _showQRInviteDialog(String inviteUrl, int role) {
     if (!mounted || _isDisposed) return;
     
-    final isIOS = isCupertino(context);
-    final roleText = role == 2 ? 'Üye' : 'Yönetici';
+    // Email format kontrolü
+    if (!_isValidEmail(email)) {
+      _showSnackBar('Geçerli bir e-posta adresi giriniz', isError: true);
+      return;
+    }
     
-    if (isIOS) {
-      showCupertinoModalPopup(
-        context: context,
-        builder: (context) => CupertinoPageScaffold(
-          navigationBar: CupertinoNavigationBar(
-            middle: const Text('Davet QR Kodu'),
-            leading: CupertinoButton(
-              padding: EdgeInsets.zero,
-              child: const Text('Kapat'),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 10),
-                  Text(
-                    'Bu QR kodu kullanarak gruba davet edebilirsiniz',
-                    style: CupertinoTheme.of(context).textTheme.textStyle.copyWith(
-                      fontSize: 16,
-                    ),
-                    textAlign: TextAlign.center,
+    try {
+      _safeSetState(() => _isLoading = true);
+      
+      final result = await Provider.of<GroupViewModel>(context, listen: false)
+          .inviteUserToGroup(widget.groupId, email, role, 'qr');
+      
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() => _isLoading = false);
+      
+      if (result['success'] == true) {
+        final inviteUrl = result['inviteUrl'] ?? '';
+        if (inviteUrl.isNotEmpty) {
+          // QR kodu ile davet URL'ini göster
+          _showQRInviteDialog(inviteUrl);
+          _showSnackBar('QR davet kodu başarıyla oluşturuldu!');
+        } else {
+          _showSnackBar('QR davet oluşturuldu, ancak URL alınamadı', isError: true);
+        }
+      } else {
+        final errorMsg = _formatErrorMessage(result['error'] ?? 'QR davet oluşturulamadı');
+        _showSnackBar(errorMsg, isError: true);
+      }
+    } catch (e) {
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() => _isLoading = false);
+      final formattedError = _formatErrorMessage(e.toString());
+      _showSnackBar('QR davet oluşturulurken hata oluştu: $formattedError', isError: true);
+      _logger.e('QR davet hatası: $e');
+    }
+  }
+
+  // Email davet işlemi
+  Future<void> _sendInvite(String email, int role, String inviteType) async {
+    // Dialog kapandıktan sonra kısa bir gecikme ekle
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    if (!mounted || _isDisposed) return;
+    
+    // Email format kontrolü
+    if (!_isValidEmail(email)) {
+      _showSnackBar('Geçerli bir e-posta adresi giriniz', isError: true);
+      return;
+    }
+    
+    try {
+      _safeSetState(() => _isLoading = true);
+      
+      final result = await Provider.of<GroupViewModel>(context, listen: false)
+          .inviteUserToGroup(widget.groupId, email, role, 'email');
+      
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() => _isLoading = false);
+      
+      if (result['success'] == true) {
+        _showSnackBar('Davet başarıyla gönderildi!');
+        // Grup detaylarını yenile ki yeni kullanıcı eklenirse görünsün
+        await _loadGroupDetail();
+      } else {
+        final errorMsg = _formatErrorMessage(result['error'] ?? 'Davet gönderilemedi');
+        _showSnackBar(errorMsg, isError: true);
+      }
+    } catch (e) {
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() => _isLoading = false);
+      final formattedError = _formatErrorMessage(e.toString());
+      _showSnackBar('Davet gönderilirken hata oluştu: $formattedError', isError: true);
+      _logger.e('Email davet hatası: $e');
+    }
+  }
+
+  // Email format kontrolü
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(email);
+  }
+
+  // QR davet URL'ini göster
+  void _showQRInviteDialog(String inviteUrl) {
+    final isIOS = isCupertino(context);
+    
+    showPlatformDialog(
+      context: context,
+      builder: (context) => isIOS
+        ? CupertinoAlertDialog(
+            title: const Text('QR Davet Kodu'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                const Text('Bu QR kodu paylaşarak kullanıcıyı gruba davet edebilirsiniz:'),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: CupertinoColors.systemGrey4),
                   ),
-                  const SizedBox(height: 10),
+                  child: QrImageView(
+                    data: inviteUrl,
+                    version: QrVersions.auto,
+                    size: 200.0,
+                    backgroundColor: CupertinoColors.white,
+                    foregroundColor: CupertinoColors.black,
+                    errorCorrectionLevel: QrErrorCorrectLevel.M,
+                    padding: const EdgeInsets.all(8),
+                    errorStateBuilder: (cxt, err) {
+                      return Container(
+                        child: Center(
+                          child: Text(
+                            "QR kod oluşturulamadı",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: CupertinoColors.systemRed,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 15),
+                const Text(
+                  'Veya aşağıdaki linki kopyalayabilirsiniz:',
+                  style: TextStyle(fontSize: 12, color: CupertinoColors.secondaryLabel),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: CupertinoColors.systemGrey6,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    inviteUrl,
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Kapat'),
+              ),
+              CupertinoDialogAction(
+                onPressed: () {
+                  _copyToClipboard(inviteUrl);
+                  Navigator.pop(context);
+                },
+                child: const Text('Linki Kopyala'),
+              ),
+            ],
+          )
+        : AlertDialog(
+            title: const Text('QR Davet Kodu'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Bu QR kodu paylaşarak kullanıcıyı gruba davet edebilirsiniz:'),
+                  const SizedBox(height: 15),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.white,
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.shade300),
                       boxShadow: [
                         BoxShadow(
-                          color: CupertinoColors.systemGrey.withOpacity(0.2),
-                          blurRadius: 10,
+                          color: Colors.grey.withOpacity(0.1),
                           spreadRadius: 1,
+                          blurRadius: 3,
+                          offset: const Offset(0, 1),
                         ),
                       ],
                     ),
                     child: QrImageView(
                       data: inviteUrl,
                       version: QrVersions.auto,
-                      size: 250,
+                      size: 200.0,
                       backgroundColor: Colors.white,
-                      foregroundColor: CupertinoColors.black,
-                      errorCorrectionLevel: QrErrorCorrectLevel.H,
-                      // Embedded image'i geçici olarak kaldıralım, assets sorunu çözülene kadar
-                      // embeddedImage: const AssetImage('assets/app_icon.png'),
-                      // embeddedImageStyle: const QrEmbeddedImageStyle(
-                      //   size: Size(40, 40),
-                      // ),
+                      foregroundColor: Colors.black,
+                      errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      padding: const EdgeInsets.all(8),
+                      errorStateBuilder: (cxt, err) {
+                        return Container(
+                          child: Center(
+                            child: Text(
+                              "QR kod oluşturulamadı",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 15),
+                  Text(
+                    'Veya aşağıdaki linki kopyalayabilirsiniz:',
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 8),
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: CupertinoColors.systemBlue.withOpacity(0.1),
+                      color: Colors.grey[100],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          CupertinoIcons.info,
-                          color: CupertinoColors.systemBlue,
-                          size: 20,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Kullanıcı rolü: $roleText\nBu QR kod ile katılan kullanıcılar $roleText olarak eklenecektir.',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: CupertinoColors.systemBlue,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                    child: SelectableText(
+                      inviteUrl,
+                      style: const TextStyle(fontSize: 10),
                     ),
-                  ),
-                  const SizedBox(height: 30),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        color: CupertinoColors.activeBlue,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(CupertinoIcons.doc_on_doc, size: 18),
-                            SizedBox(width: 8),
-                            Text('Kopyala', style: TextStyle(color: CupertinoColors.white)),
-                          ],
-                        ),
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: inviteUrl)).then((_) {
-                            if (!_isDisposed && mounted) {
-                              _safeSetState(() {});
-                              final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
-                              if (scaffoldMessengerState != null) {
-                                scaffoldMessengerState.showSnackBar(
-                                  const SnackBar(content: Text('QR verisi panoya kopyalandı')),
-                                );
-                              }
-                              Navigator.pop(context);
-                            }
-                          });
-                        },
-                      ),
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        color: CupertinoColors.activeGreen,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(CupertinoIcons.share, size: 18),
-                            SizedBox(width: 8),
-                            Text('Paylaş', style: TextStyle(color: CupertinoColors.white)),
-                          ],
-                        ),
-                        onPressed: () {
-                          // Share_plus paketi ile paylaşım işlevi
-                          Share.share(
-                            '${_groupDetail!.groupName} grubuna bu davet bağlantısı ile katılabilirsiniz: $inviteUrl',
-                            subject: '${_groupDetail!.groupName} Grup Daveti'
-                          );
-                        },
-                      ),
-                    ],
                   ),
                 ],
               ),
             ),
-          ),
-        ),
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: const Text('Davet QR Kodu'),
-            leading: IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SizedBox(height: 10),
-                    Text(
-                      'Bu QR kodu kullanarak gruba davet edebilirsiniz',
-                      style: Theme.of(context).textTheme.titleMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: QrImageView(
-                        data: inviteUrl,
-                        version: QrVersions.auto,
-                        size: 250,
-                        backgroundColor: Colors.white,
-                        errorCorrectionLevel: QrErrorCorrectLevel.H,
-                        // Embedded image'i geçici olarak kaldıralım, assets sorunu çözülene kadar
-                        // embeddedImage: const AssetImage('assets/app_icon.png'),
-                        // embeddedImageStyle: const QrEmbeddedImageStyle(
-                        //   size: Size(40, 40),
-                        // ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.info_outline,
-                            color: Colors.blue,
-                            size: 20,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Kullanıcı rolü: $roleText\nBu QR kod ile katılan kullanıcılar $roleText olarak eklenecektir.',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.blue,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          icon: const Icon(Icons.copy, size: 18),
-                          label: const Text('Kopyala', style: TextStyle(color: Colors.white)),
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: inviteUrl)).then((_) {
-                              if (!_isDisposed && mounted) {
-                                _safeSetState(() {});
-                                final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
-                                if (scaffoldMessengerState != null) {
-                                  scaffoldMessengerState.showSnackBar(
-                                    const SnackBar(content: Text('QR verisi panoya kopyalandı')),
-                                  );
-                                }
-                                Navigator.pop(context);
-                              }
-                            });
-                          },
-                        ),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                          ),
-                          icon: const Icon(Icons.share, size: 18),
-                          label: const Text('Paylaş', style: TextStyle(color: Colors.white)),
-                          onPressed: () {
-                            // Share_plus paketi ile paylaşım işlevi
-                            Share.share(
-                              '${_groupDetail!.groupName} grubuna bu davet bağlantısı ile katılabilirsiniz: $inviteUrl',
-                              subject: '${_groupDetail!.groupName} Grup Daveti'
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Kapat'),
               ),
-            ),
-          ),
-        ),
-      );
-    }
-  }
-  
-  // Davet gönder
-  Future<void> _sendInvite(String email, int role, String inviteType) async {
-    if (_groupDetail == null) return;
-    
-    _safeSetState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      final viewModel = Provider.of<GroupViewModel>(context, listen: false);
-      final result = await viewModel.inviteUserToGroup(
-        widget.groupId, 
-        email, 
-        role, 
-        inviteType // davet tipi: email veya qr
-      );
-      
-      if (!_isDisposed && mounted) {
-        // Davet başarılı ise
-        if (result['success'] == true) {
-          // Grup verilerini güncelle
-          await _loadGroupDetail();
-          
-          // Davet URL'ini göster (QR kodu için)
-          if (result['inviteUrl'] != null && result['inviteUrl'].isNotEmpty) {
-            _showInviteUrlDialog(result['inviteUrl']);
-          } else {
-            final messenger = ScaffoldMessenger.of(context);
-            messenger.showSnackBar(
-              SnackBar(content: Text('Davet başarıyla gönderildi: $email')),
-            );
-          }
-        } else {
-          _safeSetState(() {
-            _isLoading = false;
-            _errorMessage = 'Davet gönderilemedi: ${result['error']}';
-          });
-          
-          _showErrorSnackbar(_errorMessage);
-        }
-      }
-    } catch (e) {
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _isLoading = false;
-          _errorMessage = 'Davet gönderilirken hata: $e';
-        });
-        
-        _showErrorSnackbar(_formatErrorMessage(e.toString()));
-      }
-    }
-  }
-  
-  // Hata mesajı snackbar göster
-  void _showErrorSnackbar(String message) {
-    if (!mounted || _isDisposed) return;
-    
-    final isIOS = isCupertino(context);
-    final errorColor = isIOS ? CupertinoColors.systemRed : Colors.red;
-    
-    try {
-      // ScaffoldMessenger.of çağrılmadan önce geçerli bir Scaffold olduğundan emin olalım
-      final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
-      if (scaffoldMessengerState == null) {
-        _logger.w('ScaffoldMessenger bulunamadı, SnackBar gösterilemiyor');
-        return;
-      }
-      
-      scaffoldMessengerState.showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: errorColor,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    } catch (e) {
-      _logger.e('SnackBar gösterirken hata: $e');
-    }
-  }
-  
-  // Davet URL'ini dialog ile göster
-  void _showInviteUrlDialog(String inviteUrl) {
-    if (!mounted || _isDisposed) return;
-    
-    final isIOS = isCupertino(context);
-    
-    if (isIOS) {
-      showCupertinoDialog(
-        context: context,
-        builder: (context) => CupertinoAlertDialog(
-          title: const Text('Davet URL\'i'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 10),
-              const Text('Bu URL\'i paylaşarak kullanıcıları davet edebilirsiniz'),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemGrey6,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  inviteUrl,
-                  style: const TextStyle(fontSize: 12),
-                ),
+              TextButton(
+                onPressed: () {
+                  _copyToClipboard(inviteUrl);
+                  Navigator.pop(context);
+                },
+                child: const Text('Linki Kopyala'),
               ),
             ],
           ),
-          actions: [
-            CupertinoDialogAction(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: inviteUrl)).then((_) {
-                  if (!_isDisposed && mounted) {
-                    _safeSetState(() {});
-                    final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
-                    if (scaffoldMessengerState != null) {
-                      scaffoldMessengerState.showSnackBar(
-                        const SnackBar(content: Text('URL panoya kopyalandı')),
-                      );
-                    }
-                    Navigator.pop(context);
-                  }
-                });
-              },
-              child: const Text('Kopyala', style: TextStyle(color: CupertinoColors.white)),
-            ),
-            CupertinoDialogAction(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Kapat'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Davet URL\'i'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Bu URL\'i paylaşarak kullanıcıları davet edebilirsiniz'),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  inviteUrl,
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: inviteUrl)).then((_) {
-                  if (!_isDisposed && mounted) {
-                    _safeSetState(() {});
-                    final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
-                    if (scaffoldMessengerState != null) {
-                      scaffoldMessengerState.showSnackBar(
-                        const SnackBar(content: Text('URL panoya kopyalandı')),
-                      );
-                    }
-                    Navigator.pop(context);
-                  }
-                });
-              },
-              child: const Text('Kopyala', style: TextStyle(color: Colors.white)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Kapat'),
-            ),
-          ],
-        ),
-      );
-    }
+    );
   }
-  
+
+  // Panoya kopyala
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+  }
+
   Widget _buildProjectsTab(BuildContext context) {
     final group = _groupDetail!;
     final hasAdminRights = group.users.any((user) => user.isAdmin);
+    final isIOS = isCupertino(context);
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -1781,8 +1268,9 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 PlatformIconButton(
                   padding: EdgeInsets.zero,
                   icon: Icon(
-                    isCupertino(context) ? CupertinoIcons.add : Icons.add,
-                    color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
+                    isIOS ? CupertinoIcons.add_circled : Icons.add_circle_outline,
+                    color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                    size: 22,
                   ),
                   onPressed: _createProject,
                 ),
@@ -1796,15 +1284,15 @@ class _GroupDetailViewState extends State<GroupDetailView> {
                 child: Column(
                   children: [
                     Icon(
-                      isCupertino(context) ? CupertinoIcons.folder : Icons.folder_outlined,
+                      isIOS ? CupertinoIcons.folder : Icons.folder_outlined,
                       size: 48,
-                      color: isCupertino(context) ? CupertinoColors.systemGrey : Colors.grey,
+                      color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'Henüz proje bulunmuyor',
                       style: TextStyle(
-                        color: isCupertino(context) ? CupertinoColors.systemGrey : Colors.grey,
+                        color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
                       ),
                     ),
                   ],
@@ -1814,33 +1302,49 @@ class _GroupDetailViewState extends State<GroupDetailView> {
           ...group.projects.map((project) => Padding(
             padding: const EdgeInsets.only(bottom: 8.0),
             child: ListTile(
-              leading: Icon(
-                isCupertino(context) ? CupertinoIcons.folder_fill : Icons.folder,
-                color: isCupertino(context) ? CupertinoColors.activeBlue : Colors.blue,
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Center(
+                  child: Icon(
+                    isIOS ? CupertinoIcons.folder_fill : Icons.folder,
+                    color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                    size: 20,
+                  ),
+                ),
               ),
               title: Text(project.projectName),
-              subtitle: Text('${project.projectStatusID} görev'),
-              trailing: hasAdminRights 
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      PlatformIconButton(
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          isCupertino(context) ? CupertinoIcons.delete : Icons.delete_outline,
-                          color: isCupertino(context) ? CupertinoColors.systemRed : Colors.red,
-                          size: 20,
+              trailing: Container(
+                width: 60,
+                alignment: Alignment.centerRight,
+                child: hasAdminRights 
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        PlatformIconButton(
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            isIOS ? CupertinoIcons.delete : Icons.delete_outline,
+                            color: isIOS ? CupertinoColors.systemRed : Colors.red,
+                            size: 20,
+                          ),
+                          onPressed: () => _confirmDeleteProject(project.projectID),
                         ),
-                        onPressed: () => _confirmDeleteProject(project.projectID),
-                      ),
-                      Icon(
-                        isCupertino(context) ? CupertinoIcons.chevron_right : Icons.chevron_right,
-                      ),
-                    ],
-                  )
-                : Icon(
-                    isCupertino(context) ? CupertinoIcons.chevron_right : Icons.chevron_right,
-                  ),
+                        Icon(
+                          isIOS ? CupertinoIcons.chevron_right : Icons.chevron_right,
+                          size: 16,
+                        ),
+                      ],
+                    )
+                  : Icon(
+                      isIOS ? CupertinoIcons.chevron_right : Icons.chevron_right,
+                      size: 16,
+                    ),
+              ),
               onTap: () {
                 // Proje detayına gitme işlevi
                 Navigator.of(context).push(
@@ -1876,192 +1380,13 @@ class _GroupDetailViewState extends State<GroupDetailView> {
     
     if (result == true && mounted) {
       await _loadGroupDetail();
-      try {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Proje başarıyla oluşturuldu')),
-        );
-      } catch (e) {
-        _logger.e('ScaffoldMessenger hatası: $e');
-      }
+      _showSnackBar('Proje başarıyla oluşturuldu');
     }
   }
   
   Widget _buildEventsTab(BuildContext context) {
     final group = _groupDetail!;
-    
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Etkinlikler (${group.events.length})',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              cupertino: (data) => data.textTheme.navTitleTextStyle,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (group.events.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 32.0),
-                child: Column(
-                  children: [
-                    Icon(
-                      isCupertino(context) ? CupertinoIcons.calendar : Icons.event_note_outlined,
-                      size: 48,
-                      color: isCupertino(context) ? CupertinoColors.systemGrey : Colors.grey,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Henüz etkinlik bulunmuyor',
-                      style: TextStyle(
-                        color: isCupertino(context) ? CupertinoColors.systemGrey : Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ...group.events.map((event) => Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: Card(
-              elevation: isCupertino(context) ? 0 : 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: isCupertino(context) 
-                  ? BorderSide(color: CupertinoColors.systemGrey5) 
-                  : BorderSide.none,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          isCupertino(context) ? CupertinoIcons.calendar : Icons.event,
-                          color: isCupertino(context) ? CupertinoColors.systemOrange : Colors.orange,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          event.eventTitle,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (event.eventDesc.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        event.eventDesc,
-                        style: TextStyle(
-                          color: isCupertino(context) ? CupertinoColors.secondaryLabel : Colors.grey[700],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          isCupertino(context) ? CupertinoIcons.time : Icons.access_time,
-                          size: 14,
-                          color: isCupertino(context) ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Tarih: ${event.eventDate}', // Tarih formatı düzenlenebilir
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isCupertino(context) ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          )).toList(),
-        ],
-      ),
-    );
-  }
-  
-  // Grup loglarını (raporlarını) yükle
-  Future<void> _loadGroupLogs() async {
-    if (_isLoadingLogs || _groupDetail == null) return;
-    
-    _safeSetState(() {
-      _isLoadingLogs = true;
-    });
-    
-    try {
-      final viewModel = Provider.of<GroupViewModel>(context, listen: false);
-      final logs = await viewModel.getGroupReports(
-        widget.groupId, 
-        _groupDetail!.users.any((user) => user.isAdmin),
-      );
-      
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _groupLogs = logs;
-          _isLoadingLogs = false;
-        });
-      }
-    } catch (e) {
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _errorMessage = 'Grup etkinlikleri yüklenemedi: $e';
-          _isLoadingLogs = false;
-        });
-      }
-    }
-  }
-
-  // Raporlar tab'i
-  Widget _buildReportsTab(BuildContext context) {
     final isIOS = isCupertino(context);
-    
-    if (_isLoadingLogs) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_groupLogs.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 32.0),
-          child: Column(
-            children: [
-              Icon(
-                isIOS ? CupertinoIcons.doc_text_search : Icons.assignment_late,
-                size: 48,
-                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Henüz log kaydı bulunmuyor',
-                style: TextStyle(
-                  color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 24),
-              PlatformElevatedButton(
-                onPressed: _loadGroupLogs,
-                child: const Text('Yenile'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -2072,7 +1397,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Grup Raporları (${_groupLogs.length})',
+                'Etkinlikler (${group.events.length})',
                 style: platformThemeData(
                   context,
                   material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -2082,133 +1407,127 @@ class _GroupDetailViewState extends State<GroupDetailView> {
               PlatformIconButton(
                 padding: EdgeInsets.zero,
                 icon: Icon(
-                  isIOS ? CupertinoIcons.refresh : Icons.refresh,
-                  size: 20,
+                  isIOS ? CupertinoIcons.add_circled : Icons.add_circle_outline,
+                  color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                  size: 22,
                 ),
-                onPressed: _loadGroupLogs,
+                onPressed: _navigateToCreateEventView,
               ),
             ],
           ),
           const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _groupLogs.length,
-            itemBuilder: (context, index) {
-              final log = _groupLogs[index];
-              return _buildLogItem(context, log);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // Log öğesi
-  Widget _buildLogItem(BuildContext context, GroupLog log) {
-    final isIOS = isCupertino(context);
-    
-    // Log tipine göre ikon ve renk belirle
-    IconData logIcon;
-    Color logColor;
-    
-    if (log.logName.contains('Tamamlandı')) {
-      logIcon = isIOS ? CupertinoIcons.checkmark_circle : Icons.check_circle;
-      logColor = isIOS ? CupertinoColors.activeGreen : Colors.green;
-    } else if (log.logName.contains('Tamamlanmadı')) {
-      logIcon = isIOS ? CupertinoIcons.xmark_circle : Icons.cancel;
-      logColor = isIOS ? CupertinoColors.systemRed : Colors.red;
-    } else if (log.logName.contains('Açıldı')) {
-      logIcon = isIOS ? CupertinoIcons.add_circled : Icons.add_circle;
-      logColor = isIOS ? CupertinoColors.activeBlue : Colors.blue;
-    } else {
-      logIcon = isIOS ? CupertinoIcons.doc_text : Icons.article;
-      logColor = isIOS ? CupertinoColors.systemGrey : Colors.grey;
-    }
-    
-    return Card(
-      elevation: isIOS ? 0 : 1,
-      margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isIOS 
-          ? BorderSide(color: CupertinoColors.systemGrey5) 
-          : BorderSide.none,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  logIcon,
-                  color: logColor,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    log.logName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: logColor,
+          if (group.events.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 32.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      isIOS ? CupertinoIcons.calendar : Icons.event_note_outlined,
+                      size: 48,
+                      color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Henüz etkinlik bulunmuyor',
+                      style: TextStyle(
+                        color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    PlatformElevatedButton(
+                      onPressed: _navigateToCreateEventView,
+                      child: const Text('Etkinlik Ekle'),
+                    ),
+                  ],
                 ),
-                Text(
-                  log.createDate,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              log.logDesc,
-              style: TextStyle(
-                fontSize: 13,
-                color: isIOS ? CupertinoColors.label : Colors.black87,
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  isIOS ? CupertinoIcons.folder : Icons.folder,
-                  size: 12,
-                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+          ...group.events.map((event) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: GestureDetector(
+              onTap: () => _navigateToEventDetail(event),
+              child: Card(
+                elevation: isIOS ? 0 : 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: isIOS 
+                    ? BorderSide(color: CupertinoColors.systemGrey5) 
+                    : BorderSide.none,
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  'Proje ID: ${log.projectID}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: (isIOS ? CupertinoColors.systemOrange : Colors.orange).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isIOS ? CupertinoIcons.calendar : Icons.event_note,
+                              color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
+                              size: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            event.eventTitle,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (event.eventDesc.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          event.eventDesc,
+                          style: TextStyle(
+                            color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                isIOS ? CupertinoIcons.time : Icons.access_time,
+                                size: 14,
+                                color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Tarih: ${event.eventDate}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                          Icon(
+                            isIOS ? CupertinoIcons.chevron_right : Icons.arrow_forward_ios,
+                            size: 16,
+                            color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  isIOS ? CupertinoIcons.doc_text : Icons.assignment,
-                  size: 12,
-                  color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Görev ID: ${log.workID}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                  ),
-                ),
-              ],
+              ),
             ),
-          ],
-        ),
+          )).toList(),
+        ],
       ),
     );
   }
@@ -2289,165 +1608,496 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       // Proje silme API çağrısı
       final result = await _apiService.project.deleteProject(projectID, widget.groupId);
       
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _isLoading = false;
-        });
-        
-        // Detayları yenile
-        await _loadGroupDetail();
-        
-        // SnackBar gösterimi için daha güvenli bir yaklaşım
-        if (!_isDisposed && mounted) {
-          // Ana sayfada bir Scaffold var ve onu kullanabiliriz
-          try {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Proje başarıyla silindi')),
-            );
-          } catch (e) {
-            _logger.w('SnackBar gösterilemiyor: $e');
-          }
-        }
-      }
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() {
+        _isLoading = false;
+      });
+      
+      // Detayları yenile
+      await _loadGroupDetail();
+      
+      // Başarılı silme mesajını göster
+      _showSnackBar('Proje başarıyla silindi');
     } catch (e) {
-      if (!_isDisposed && mounted) {
-        _safeSetState(() {
-          _isLoading = false;
-          _errorMessage = _formatErrorMessage(e.toString());
-        });
-        
-        // Hata durumunu logla
-        _logger.e('Proje silme hatası: $_errorMessage');
-      }
+      if (!mounted || _isDisposed) return;
+      
+      _safeSetState(() {
+        _isLoading = false;
+        _errorMessage = _formatErrorMessage(e.toString());
+      });
+      
+      // Hata durumunu logla
+      _logger.e('Proje silme hatası: $_errorMessage');
     }
   }
 
-  // Güvenli hata mesajı göster
-  void _showSafeErrorMessage(String message) {
-    if (!mounted || _isDisposed) return;
-    
-    _logger.w('Hata mesajı: $message');
-    
-    // Toast mesajı göstermeyi deneyebiliriz, ya da UI'da bir banner/text gösterebiliriz
-    // Şimdilik sadece log ile yetinelim ve kullanıcıya görsel feedback verelim
-    
-    // Toast mesajı için fluttertoast paketini kullanabilirsiniz
-    
-    // Alternatif olarak, ana sayfaya bir hata banner'ı ekleyebiliriz
-    _safeSetState(() {
-      _errorMessage = message;
-    });
+
+
+  // Hata mesajı snackbar göster
+  void _showErrorSnackbar(String message) {
+    _showSnackBar(message, isError: true);
   }
 
-  // QR kodunu göster
-  void _showQrCode() {
-    if (_groupDetail == null) return;
+  // SnackBar gösterim yardımcı metodu
+  void _showSnackBar(String message, {bool isError = false}) {
+    if (!mounted || _isDisposed) return;
     
-    final isIOS = isCupertino(context);
+    try {
+      // Context'in geçerli olup olmadığını kontrol et
+      final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+      if (scaffoldMessenger == null) {
+        _logger.w('ScaffoldMessenger bulunamadı: $message');
+        // Platform-specific toast alternatifi
+        _showPlatformToast(message);
+        return;
+      }
+      
+      // Önceki SnackBar'ları temizle
+      scaffoldMessenger.clearSnackBars();
+      
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError 
+              ? (isCupertino(context) ? CupertinoColors.systemRed : Colors.red)
+              : null,
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+    } catch (e) {
+      _logger.e('ScaffoldMessenger hatası: $e - Mesaj: $message');
+      // Alternatif gösterim yöntemi
+      _showPlatformToast(message);
+    }
+  }
+
+  // Platform-specific toast alternativi
+  void _showPlatformToast(String message) {
+    if (!mounted || _isDisposed) return;
     
-    // QR kodu oluştur
-    final qrData = 'group:${widget.groupId}';
-    
-    if (isIOS) {
-      showCupertinoModalPopup(
-        context: context,
-        builder: (context) => CupertinoActionSheet(
-          title: const Text('Grup QR Kodu'),
-          message: Column(
-            children: [
-              const Text('Başkalarının bu grubu taramasına izin verecek QR kodu:'),
-              const SizedBox(height: 20),
-              Container(
-                color: CupertinoColors.white,
-                padding: const EdgeInsets.all(16),
-                child: QrImageView(
-                  data: qrData,
-                  version: QrVersions.auto,
-                  size: 200,
-                  backgroundColor: Colors.white,
-                ),
+    try {
+      final isIOS = isCupertino(context);
+      
+      if (isIOS) {
+        // iOS için alternatif gösterim
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            content: Text(message),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tamam'),
               ),
             ],
           ),
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: qrData)).then((_) {
-                  if (!_isDisposed && mounted) {
-                    _safeSetState(() {});
-                    final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
-                    if (scaffoldMessengerState != null) {
-                      scaffoldMessengerState.showSnackBar(
-                        const SnackBar(content: Text('QR verisi panoya kopyalandı')),
-                      );
-                    }
-                    Navigator.pop(context);
-                  }
-                });
-              },
-              child: const Text('QR Verisini Kopyala'),
+        );
+      } else {
+        // Android için alternatif gösterim
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tamam'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      _logger.e('Platform toast hatası: $e');
+    }
+  }
+
+  // Bölüm başlığı widget'ı
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Text(
+      title,
+      style: platformThemeData(
+        context,
+        material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        cupertino: (data) => data.textTheme.navTitleTextStyle,
+      ),
+    );
+  }
+
+  // Gruptan ayrılma onayı
+  void _confirmLeaveGroup() {
+    final isIOS = isCupertino(context);
+    final String title = 'Gruptan Ayrıl';
+    final String content = 'Bu gruptan ayrılmak istediğinize emin misiniz?';
+    
+    showPlatformDialog(
+      context: context,
+      builder: (dialogContext) => isIOS
+        ? CupertinoAlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              CupertinoDialogAction(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
+              ),
+              CupertinoDialogAction(
+                isDestructiveAction: true,
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _leaveGroup();
+                },
+                child: const Text('Ayrıl'),
+              ),
+            ],
+          )
+        : AlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('İptal'),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.red,
+                ),
+                onPressed: () {
+                  Navigator.pop(dialogContext);
+                  _leaveGroup();
+                },
+                child: const Text('Ayrıl'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // Gruptan ayrılma işlemi
+  Future<void> _leaveGroup() async {
+    // StorageService'den kullanıcı ID'sini al
+    final storageService = StorageService();
+    final userId = storageService.getUserId();
+    
+    if (userId == null) {
+      _showErrorSnackbar('Kullanıcı bilgileriniz alınamadı. Lütfen tekrar giriş yapın.');
+      return;
+    }
+    
+    _safeSetState(() => _isLoading = true);
+    
+    try {
+      final success = await Provider.of<GroupViewModel>(context, listen: false)
+          .removeUserFromGroup(widget.groupId, userId);
+      
+      if (mounted && !_isDisposed) {
+        if (success) {
+          // SnackBar'ı navigation işleminden ÖNCE göster
+          _showSnackBar('Gruptan başarıyla ayrıldınız');
+          
+          // Kısa bir gecikme ekle ki SnackBar görülebilsin
+          await Future.delayed(const Duration(milliseconds: 500));
+          
+          // Doğrudan ana sayfaya veya gruplar listesi sayfasına dön
+          if (mounted && !_isDisposed) {
+            Navigator.of(context).popUntil((route) {
+              final routeName = route.settings.name;
+              // Ana sayfayı veya gruplar listesi sayfasını bul
+              return route.isFirst || (routeName != null && routeName.contains('GroupsView'));
+            });
+          }
+        } else {
+          _safeSetState(() {
+            _isLoading = false;
+            _errorMessage = 'Gruptan ayrılma işlemi başarısız oldu.';
+          });
+          
+          _showErrorSnackbar('Gruptan ayrılma işlemi başarısız oldu. Lütfen daha sonra tekrar deneyin.');
+        }
+      }
+    } catch (e) {
+      if (mounted && !_isDisposed) {
+        _safeSetState(() {
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+        
+        _showErrorSnackbar(_formatErrorMessage(e.toString()));
+      }
+    }
+  }
+
+  // Grup raporlarını yükle
+  Future<void> _loadReports() async {
+    _safeSetState(() {
+      _isLoadingReports = true;
+    });
+    
+    try {
+      final reports = await _apiService.report.getGroupReports(widget.groupId);
+      _safeSetState(() {
+        _groupReports = reports;
+        _isLoadingReports = false;
+      });
+      _logger.i('Grup raporları yüklendi: ${reports.length} adet');
+    } catch (e) {
+      _safeSetState(() {
+        _isLoadingReports = false;
+        _errorMessage = 'Raporlar yüklenemedi: $e';
+      });
+      _logger.e('Raporlar yüklenirken hata: $e');
+    }
+  }
+
+  // Raporlar sekmesi
+  Widget _buildReportsTab(BuildContext context) {
+    final isIOS = isCupertino(context);
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Raporlar (${_groupReports.length})',
+                style: platformThemeData(
+                  context,
+                  material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  cupertino: (data) => data.textTheme.navTitleTextStyle,
+                ),
+              ),
+              PlatformIconButton(
+                padding: EdgeInsets.zero,
+                icon: Icon(
+                  isIOS ? CupertinoIcons.add_circled : Icons.add_circle_outline,
+                  color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
+                  size: 22,
+                ),
+                onPressed: _createReport,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          if (_isLoadingReports)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: PlatformCircularProgressIndicator(),
+              ),
+            )
+          else if (_groupReports.isEmpty)
+            _buildEmptyReportsState(isIOS)
+          else
+            _buildReportsList(isIOS),
+        ],
+      ),
+    );
+  }
+
+  // Boş rapor durumu widget'ı - ayrı metod olarak optimize edildi
+  Widget _buildEmptyReportsState(bool isIOS) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32.0),
+        child: Column(
+          children: [
+            Icon(
+              isIOS ? CupertinoIcons.doc_text : Icons.description_outlined,
+              size: 48,
+              color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Henüz rapor bulunmuyor',
+              style: TextStyle(
+                color: isIOS ? CupertinoColors.systemGrey : Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
+            PlatformElevatedButton(
+              onPressed: _createReport,
+              child: const Text('Rapor Ekle'),
             ),
           ],
-          cancelButton: CupertinoActionSheetAction(
-            isDefaultAction: true,
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Kapat'),
-          ),
         ),
-      );
-    } else {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Grup QR Kodu'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Başkalarının bu grubu taramasına izin verecek QR kodu:'),
-                const SizedBox(height: 20),
-                Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: QrImageView(
-                    data: qrData,
-                    version: QrVersions.auto,
-                    size: 200,
-                    backgroundColor: Colors.white,
+      ),
+    );
+  }
+
+  // Raporlar listesi - optimize edilmiş
+  Widget _buildReportsList(bool isIOS) {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _groupReports.length,
+      itemBuilder: (context, index) => _buildReportCard(_groupReports[index], isIOS),
+    );
+  }
+
+  // Rapor kartı - ayrı widget olarak optimize edildi
+  Widget _buildReportCard(GroupReport report, bool isIOS) {
+    return Card(
+      elevation: isIOS ? 0 : 1,
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isIOS 
+          ? const BorderSide(color: CupertinoColors.systemGrey5) 
+          : BorderSide.none,
+      ),
+      child: InkWell(
+        onTap: () => _navigateToReportDetail(report),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildUserAvatar(report, isIOS),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          report.reportTitle,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          report.userFullname,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (report.reportDesc.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  report.reportDesc,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isIOS ? CupertinoColors.label : Colors.black87,
                   ),
                 ),
               ],
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Rapor Tarihi: ${report.reportDate}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                    ),
+                  ),
+                  Icon(
+                    isIOS ? CupertinoIcons.chevron_right : Icons.arrow_forward_ios,
+                    size: 16,
+                    color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Kullanıcı avatarı - optimize edilmiş
+  Widget _buildUserAvatar(GroupReport report, bool isIOS) {
+    const double avatarSize = 40;
+    final bool hasPhoto = report.userProfilePhoto.isNotEmpty;
+    
+    return Container(
+      width: avatarSize,
+      height: avatarSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        image: hasPhoto
+          ? DecorationImage(
+              image: NetworkImage(report.userProfilePhoto),
+              fit: BoxFit.cover,
+            )
+          : null,
+        color: hasPhoto
+          ? null
+          : (isIOS ? CupertinoColors.systemIndigo : Colors.indigo).withOpacity(0.1),
+      ),
+      child: hasPhoto
+        ? null
+        : Center(
+            child: Text(
+              report.userFullname.isNotEmpty 
+                ? report.userFullname.substring(0, 1).toUpperCase()
+                : '?',
+              style: TextStyle(
+                color: isIOS ? CupertinoColors.systemIndigo : Colors.indigo,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: qrData)).then((_) {
-                  if (!_isDisposed && mounted) {
-                    _safeSetState(() {});
-                    final scaffoldMessengerState = ScaffoldMessenger.maybeOf(context);
-                    if (scaffoldMessengerState != null) {
-                      scaffoldMessengerState.showSnackBar(
-                        const SnackBar(content: Text('QR verisi panoya kopyalandı')),
-                      );
-                    }
-                    Navigator.pop(context);
-                  }
-                });
-              },
-              child: const Text('Kopyala', style: TextStyle(color: Colors.white)),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-              },
-              child: const Text('Kapat'),
-            ),
-          ],
+    );
+  }
+
+  // Rapor detayına gitme
+  void _navigateToReportDetail(GroupReport report) {
+    Navigator.of(context).push(
+      platformPageRoute(
+        context: context,
+        builder: (context) => ChangeNotifierProvider(
+          create: (context) => ReportViewModel(),
+          child: ReportDetailView(
+            reportId: report.reportID,
+            groupId: widget.groupId,
+          ),
         ),
-      );
-    }
+      ),
+    ).then((result) {
+      if (result == true && mounted) {
+        _loadReports(); // Raporları yenile
+      }
+    });
+  }
+
+  // Rapor oluşturma
+  void _createReport() {
+    if (_groupDetail == null) return;
+    
+    Navigator.of(context).push(
+      platformPageRoute(
+        context: context,
+        builder: (context) => CreateReportView(
+          groupId: widget.groupId,
+          projects: _groupDetail!.projects,
+        ),
+      ),
+    ).then((result) {
+      if (result == true && mounted) {
+        _loadReports(); // Raporları yenile
+        _showSnackBar('Rapor başarıyla oluşturuldu');
+      }
+    });
   }
 } 

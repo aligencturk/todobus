@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
-import '../services/snackbar_service.dart';
 
 enum ForgotPasswordStatus { initial, loading, success, error, codeVerification, resetPassword }
 
@@ -55,14 +54,20 @@ class ForgotPasswordViewModel with ChangeNotifier {
 
       if (response.success) {
         _logger.i('Şifre sıfırlama isteği başarılı: ${response.message}');
-        if (response.data != null) {
-          _verificationToken = response.data!.token;
+        if (response.data != null && response.data!.token != null) {
+          _verificationToken = response.data!.token!;
+          _status = ForgotPasswordStatus.codeVerification;
+          notifyListeners();
+          return true;
+        } else {
+          _errorMessage = 'Doğrulama token bilgisi alınamadı';
+          _status = ForgotPasswordStatus.error;
+          notifyListeners();
+          return false;
         }
-        _status = ForgotPasswordStatus.codeVerification;
-        notifyListeners();
-        return true;
       } else {
-        _errorMessage = response.message ?? 'Şifre sıfırlama isteği başarısız';
+        // Kullanıcı dostu hata mesajını kullan
+        _errorMessage = response.userFriendlyMessage ?? response.message ?? 'Şifre sıfırlama isteği başarısız';
         _logger.w('Şifre sıfırlama başarısız: $_errorMessage');
         _status = ForgotPasswordStatus.error;
         notifyListeners();
@@ -109,14 +114,20 @@ class ForgotPasswordViewModel with ChangeNotifier {
 
       if (response.success) {
         _logger.i('Doğrulama kodu kontrolü başarılı');
-        if (response.data != null) {
-          _passToken = response.data!.passToken;
+        if (response.data != null && response.data!.passToken != null) {
+          _passToken = response.data!.passToken!;
+          _status = ForgotPasswordStatus.resetPassword;
+          notifyListeners();
+          return true;
+        } else {
+          _errorMessage = 'Şifre sıfırlama token bilgisi alınamadı';
+          _status = ForgotPasswordStatus.error;
+          notifyListeners();
+          return false;
         }
-        _status = ForgotPasswordStatus.resetPassword;
-        notifyListeners();
-        return true;
       } else {
-        _errorMessage = response.message ?? 'Doğrulama kodu kontrolü başarısız';
+        // Kullanıcı dostu hata mesajını kullan
+        _errorMessage = response.userFriendlyMessage ?? response.message ?? 'Doğrulama kodu kontrolü başarısız';
         _logger.w('Doğrulama kodu kontrolü başarısız: $_errorMessage');
         _status = ForgotPasswordStatus.error;
         notifyListeners();
@@ -174,7 +185,8 @@ class ForgotPasswordViewModel with ChangeNotifier {
         notifyListeners();
         return true;
       } else {
-        _errorMessage = response.message ?? 'Şifre sıfırlama başarısız';
+        // Kullanıcı dostu hata mesajını kullan
+        _errorMessage = response.userFriendlyMessage ?? response.message ?? 'Şifre sıfırlama başarısız';
         _logger.w('Şifre sıfırlama başarısız: $_errorMessage');
         _status = ForgotPasswordStatus.error;
         notifyListeners();

@@ -32,7 +32,7 @@ class LoggerService {
     _logger.w(message);
   }
 
-  void e(String message, [dynamic error, StackTrace? stackTrace]) {
+  void e(String message, [Object? error, StackTrace? stackTrace]) {
     _logger.e(message, error: error, stackTrace: stackTrace);
   }
 } 

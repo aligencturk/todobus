@@ -14,12 +14,13 @@ class QuickEventTemplate {
   final String title;
   final String description;
   final Color color;
-
+  final TextDecoration decoration;
   const QuickEventTemplate({
     required this.icon,
     required this.title,
     required this.description,
     required this.color,
+    this.decoration = TextDecoration.none,
   });
 }
 
@@ -178,6 +179,7 @@ class _CreateEventViewState extends State<CreateEventView> {
       title: 'İş Seyahati',
       description: 'İş için şehir dışı seyahat',
       color: Colors.grey,
+      decoration: TextDecoration.none,
     ),
     QuickEventTemplate(
       icon: '🏆',
@@ -259,6 +261,19 @@ class _CreateEventViewState extends State<CreateEventView> {
       
       setState(() {
         _groups = groupViewModel.groups;
+        // Kendime seçeneğini ekle
+        _groups.insert(0, Group(
+          groupID: 0,
+          groupName: 'Kendime',
+          groupDesc: '',
+          createdBy: '', 
+          packageName: '',
+          packageExpires: '',
+          createDate: '',
+          isFree: true,
+          isAdmin: true,
+          projects: [],
+        ));
         _isGroupLoading = false;
       });
       
@@ -287,6 +302,11 @@ class _CreateEventViewState extends State<CreateEventView> {
       setState(() {
         _selectedGroup = initialGroup;
       });
+    } else if (_groups.isNotEmpty) {
+      // Eğer başlangıç grup ID'si verilmemişse, "Kendime" seçeneğini seç
+      setState(() {
+        _selectedGroup = _groups.first; // Kendime seçeneği
+      });
     }
   }
   
@@ -304,8 +324,12 @@ class _CreateEventViewState extends State<CreateEventView> {
         int.parse(parts[1]), // Ay
         int.parse(parts[0]), // Gün
       );
+      // Eğer seçilen tarih bugünden önceyse, bugünü kullan
+      if (initialDate.isBefore(DateTime(now.year, now.month, now.day))) {
+        initialDate = DateTime(now.year, now.month, now.day);
+      }
     } catch (e) {
-      initialDate = now;
+      initialDate = DateTime(now.year, now.month, now.day);
     }
     
     if (isIOS) {
@@ -321,7 +345,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                   height: 240,
                   child: CupertinoDatePicker(
                     initialDateTime: initialDate,
-                    minimumDate: now,
+                    minimumDate: DateTime(now.year, now.month, now.day),
                     maximumDate: DateTime(now.year + 2, now.month, now.day),
                     mode: CupertinoDatePickerMode.date,
                     onDateTimeChanged: (DateTime dateTime) {
@@ -330,7 +354,8 @@ class _CreateEventViewState extends State<CreateEventView> {
                   ),
                 ),
                 CupertinoButton(
-                  child: const Text('Tamam'),
+                  child: const Text('Tamam', 
+                    style: TextStyle(decoration: TextDecoration.none)),
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
@@ -377,6 +402,16 @@ class _CreateEventViewState extends State<CreateEventView> {
       showCupertinoModalPopup(
         context: context,
         builder: (context) {
+          // Zaman seçici için bugün tarihi olarak kullan
+          final today = DateTime.now();
+          final initialDateTime = DateTime(
+            today.year,
+            today.month,
+            today.day,
+            initialTime.hour,
+            initialTime.minute,
+          );
+          
           return Container(
             height: 300,
             color: CupertinoColors.systemBackground,
@@ -385,13 +420,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                 SizedBox(
                   height: 240,
                   child: CupertinoDatePicker(
-                    initialDateTime: DateTime(
-                      DateTime.now().year,
-                      DateTime.now().month,
-                      DateTime.now().day,
-                      initialTime.hour,
-                      initialTime.minute,
-                    ),
+                    initialDateTime: initialDateTime,
                     mode: CupertinoDatePickerMode.time,
                     use24hFormat: true,
                     onDateTimeChanged: (DateTime dateTime) {
@@ -402,7 +431,8 @@ class _CreateEventViewState extends State<CreateEventView> {
                   ),
                 ),
                 CupertinoButton(
-                  child: const Text('Tamam'),
+                  child: const Text('Tamam', 
+                    style: TextStyle(decoration: TextDecoration.none)),
                   onPressed: () {
                     Navigator.of(context).pop();
                   },
@@ -451,6 +481,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                           style: TextStyle(
                             fontSize: 14,
                             color: Theme.of(context).primaryColor,
+                            decoration: TextDecoration.none,
                           ),
                         ),
                       ),
@@ -562,7 +593,7 @@ class _CreateEventViewState extends State<CreateEventView> {
               child: Center(
                 child: Text(
                   template.icon,
-                  style: const TextStyle(fontSize: 30),
+                  style: const TextStyle(fontSize: 30, decoration: TextDecoration.none),
                 ),
               ),
             ),
@@ -575,6 +606,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).colorScheme.onSurface,
+                  decoration: TextDecoration.none,
                 ),
               ),
             ),
@@ -608,7 +640,7 @@ class _CreateEventViewState extends State<CreateEventView> {
               child: Center(
                 child: Text(
                   template.icon,
-                  style: const TextStyle(fontSize: 28),
+                  style: const TextStyle(fontSize: 28, decoration: TextDecoration.none),
                 ),
               ),
             ),
@@ -620,6 +652,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                 style: TextStyle(
                   fontSize: 12,
                   color: Theme.of(context).colorScheme.onSurface,
+                  decoration: TextDecoration.none,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -697,14 +730,17 @@ class _CreateEventViewState extends State<CreateEventView> {
             showCupertinoDialog(
               context: context,
               builder: (BuildContext context) => CupertinoAlertDialog(
-                title: const Text('Başarılı'),
+                title: const Text('Başarılı', 
+                  style: TextStyle(decoration: TextDecoration.none)),
                 content: Text(widget.isEditing 
                   ? 'Etkinlik başarıyla güncellendi' 
-                  : 'Etkinlik başarıyla oluşturuldu'),
+                  : 'Etkinlik başarıyla oluşturuldu',
+                  style: const TextStyle(decoration: TextDecoration.none)),
                 actions: <CupertinoDialogAction>[
                   CupertinoDialogAction(
                     isDefaultAction: true,
-                    child: const Text('Tamam'),
+                    child: const Text('Tamam', 
+                      style: TextStyle(decoration: TextDecoration.none)),
                     onPressed: () {
                       Navigator.pop(context);
                       // Etkinlik işlemi başarılı olduğunda önceki sayfaya başarı bilgisi ile dön
@@ -715,12 +751,7 @@ class _CreateEventViewState extends State<CreateEventView> {
               ),
             );
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(widget.isEditing 
-                ? 'Etkinlik başarıyla güncellendi' 
-                : 'Etkinlik başarıyla oluşturuldu')),
-            );
-            // İşlem başarılı olduğunda geri dön
+            // İşlem başarılı mesajını göster ve sonra geri dön
             Navigator.of(context).pop(true);
           }
         }
@@ -730,11 +761,38 @@ class _CreateEventViewState extends State<CreateEventView> {
           : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}');
         
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(widget.isEditing 
-              ? 'Etkinlik güncellenemedi: ${eventViewModel.errorMessage}'
-              : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}')),
-          );
+          // Scaffold hatasını önlemek için sadece iOS için 
+          // CupertinoAlertDialog gösterelim, diğer platformlar için de uyarlayalım
+          if (isCupertino(context)) {
+            showCupertinoDialog(
+              context: context,
+              builder: (BuildContext context) => CupertinoAlertDialog(
+                title: const Text('Hata', 
+                  style: TextStyle(decoration: TextDecoration.none)),
+                content: Text(widget.isEditing 
+                  ? 'Etkinlik güncellenemedi: ${eventViewModel.errorMessage}'
+                  : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}',
+                  style: const TextStyle(decoration: TextDecoration.none)),
+                actions: <CupertinoDialogAction>[
+                  CupertinoDialogAction(
+                    isDefaultAction: true,
+                    child: const Text('Tamam', 
+                      style: TextStyle(decoration: TextDecoration.none)),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            );
+          } else {
+            // Android için SnackBar kullanmaya devam edelim
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(widget.isEditing 
+                ? 'Etkinlik güncellenemedi: ${eventViewModel.errorMessage}'
+                : 'Etkinlik oluşturulamadı: ${eventViewModel.errorMessage}')),
+            );
+          }
         }
       }
     } catch (e) {
@@ -743,11 +801,36 @@ class _CreateEventViewState extends State<CreateEventView> {
         : 'Etkinlik oluşturulurken hata: $e');
       
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.isEditing 
-            ? 'Etkinlik güncellenirken hata: $e'
-            : 'Etkinlik oluşturulurken hata: $e')),
-        );
+        // Aynı şekilde hata mesajlarını da hem iOS hem Android için uygun şekilde gösterelim
+        if (isCupertino(context)) {
+          showCupertinoDialog(
+            context: context,
+            builder: (BuildContext context) => CupertinoAlertDialog(
+              title: const Text('Hata', 
+                style: TextStyle(decoration: TextDecoration.none)),
+              content: Text(widget.isEditing 
+                ? 'Etkinlik güncellenirken hata: $e'
+                : 'Etkinlik oluşturulurken hata: $e',
+                style: const TextStyle(decoration: TextDecoration.none)),
+              actions: <CupertinoDialogAction>[
+                CupertinoDialogAction(
+                  isDefaultAction: true,
+                  child: const Text('Tamam', 
+                    style: TextStyle(decoration: TextDecoration.none)),
+                  onPressed: () {
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(widget.isEditing 
+              ? 'Etkinlik güncellenirken hata: $e'
+              : 'Etkinlik oluşturulurken hata: $e')),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -764,7 +847,8 @@ class _CreateEventViewState extends State<CreateEventView> {
     
     return PlatformScaffold(
       appBar: PlatformAppBar(
-        title: Text(widget.isEditing ? 'Etkinlik Düzenle' : 'Yeni Etkinlik'),
+        title: Text(widget.isEditing ? 'Etkinlik Düzenle' : 'Yeni Etkinlik', 
+              style: TextStyle(decoration: TextDecoration.none)),
         trailingActions: [
           PlatformIconButton(
             icon: Icon(isIOS ? CupertinoIcons.check_mark : Icons.check),
@@ -955,6 +1039,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                       style: TextStyle(
                         fontSize: 14,
                         color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[700],
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -982,6 +1067,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                           'Kaydet',
                           style: TextStyle(
                             fontSize: 15,
+                            decoration: TextDecoration.none,
                           ),
                         ),
                       ),
@@ -1016,12 +1102,14 @@ class _CreateEventViewState extends State<CreateEventView> {
               'Henüz hiç grubunuz yok.',
               style: TextStyle(
                 color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[700],
+                decoration: TextDecoration.none,
               ),
             ),
             const SizedBox(height: 8),
             PlatformTextButton(
               onPressed: _loadGroups,
-              child: const Text('Yenile'),
+              child: const Text('Yenile', 
+                  style: TextStyle(decoration: TextDecoration.none)),
             ),
           ],
         ),
@@ -1056,13 +1144,15 @@ class _CreateEventViewState extends State<CreateEventView> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             CupertinoButton(
-                              child: const Text('İptal'),
+                              child: const Text('İptal',
+                                style: TextStyle(decoration: TextDecoration.none)),
                               onPressed: () {
                                 Navigator.of(context).pop();
                               },
                             ),
                             CupertinoButton(
-                              child: const Text('Tamam'),
+                              child: const Text('Tamam',
+                                style: TextStyle(decoration: TextDecoration.none)),
                               onPressed: () {
                                 Navigator.of(context).pop();
                               },
@@ -1088,8 +1178,8 @@ class _CreateEventViewState extends State<CreateEventView> {
                             children: _groups.map((Group group) {
                               return Center(
                                 child: Text(
-                                  group.groupName,
-                                  style: const TextStyle(fontSize: 16),
+                                  group.groupName.isNotEmpty ? group.groupName : 'Kendime',
+                                  style: const TextStyle(fontSize: 16, decoration: TextDecoration.none),
                                 ),
                               );
                             }).toList(),
@@ -1119,6 +1209,7 @@ class _CreateEventViewState extends State<CreateEventView> {
                       color: _selectedGroup != null
                         ? CupertinoColors.label.resolveFrom(context)
                         : CupertinoColors.placeholderText.resolveFrom(context),
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ],
@@ -1140,7 +1231,7 @@ class _CreateEventViewState extends State<CreateEventView> {
           border: OutlineInputBorder(),
         ),
         value: _selectedGroup,
-        hint: const Text('Grup Seçin'),
+        hint: const Text('Grup Seçin', style: TextStyle(decoration: TextDecoration.none)),
         onChanged: (Group? newValue) {
           setState(() {
             _selectedGroup = newValue;
@@ -1149,7 +1240,7 @@ class _CreateEventViewState extends State<CreateEventView> {
         items: _groups.map<DropdownMenuItem<Group>>((Group group) {
           return DropdownMenuItem<Group>(
             value: group,
-            child: Text(group.groupName),
+            child: Text(group.groupName, style: const TextStyle(decoration: TextDecoration.none)),
           );
         }).toList(),
       );

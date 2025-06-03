@@ -1,8 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/logger_service.dart';
-import 'dart:convert';
-import '../models/user_model.dart';
-import '../models/group_models.dart';
+import '../views/dashboard_view.dart';
 
 class StorageService {
   static final StorageService _instance = StorageService._internal();
@@ -14,13 +12,8 @@ class StorageService {
   static const String keyUserToken = 'user_token';
   static const String keyUserId = 'user_id';
   static const String keyIsLoggedIn = 'is_logged_in';
-  
-  // Önbellek anahtarları
-  static const String keyUserData = 'user_data';
-  static const String keyUserTasks = 'user_tasks';
-  static const String keyUpcomingEvents = 'upcoming_events';
-  static const String keyGroupList = 'group_list';
-  static const String keyLastUpdated = 'last_updated';
+  static const String keyDashboardWidgetOrder = 'dashboard_widget_order';
+  static const String keyOnboardingCompleted = 'onboarding_completed';
 
   factory StorageService() {
     return _instance;
@@ -34,6 +27,34 @@ class StorageService {
       _initialized = true;
       _logger.i('StorageService başlatıldı');
     }
+  }
+
+  // Genel veri kaydetme
+  Future<bool> saveData(String key, String value) async {
+    await _ensureInitialized();
+    final result = await _prefs.setString(key, value);
+    _logger.d('Veri kaydedildi: $key = $value');
+    return result;
+  }
+
+  // Genel veri getirme
+  String? getData(String key) {
+    _ensureInitializedSync();
+    return _prefs.getString(key);
+  }
+
+  // Onboarding tamamlanma durumu
+  bool isOnboardingCompleted() {
+    _ensureInitializedSync();
+    return _prefs.getBool(keyOnboardingCompleted) ?? false;
+  }
+
+  // Onboarding tamamlandı olarak işaretle
+  Future<bool> setOnboardingCompleted() async {
+    await _ensureInitialized();
+    final result = await _prefs.setBool(keyOnboardingCompleted, true);
+    _logger.d('Onboarding tamamlandı olarak işaretlendi');
+    return result;
   }
 
   // Token işlemleri
@@ -75,18 +96,58 @@ class StorageService {
     return _prefs.getBool(keyIsLoggedIn) ?? false;
   }
 
-  // Çıkış işlemi
+  // Dashboard widget sırasını kaydetme
+  Future<bool> saveDashboardWidgetOrder(List<DashboardWidgetType> order) async {
+    await _ensureInitialized();
+    
+    // Enum değerlerini int listesine dönüştür
+    final List<int> orderIndices = order.map((type) => type.index).toList();
+    
+    // Int listesini kaydet
+    final result = await _prefs.setStringList(
+      keyDashboardWidgetOrder, 
+      orderIndices.map((i) => i.toString()).toList()
+    );
+    
+    _logger.d('Dashboard widget sırası kaydedildi: ${orderIndices.join(", ")}');
+    return result;
+  }
+  
+  // Dashboard widget sırasını getirme
+  List<DashboardWidgetType> getDashboardWidgetOrder() {
+    _ensureInitializedSync();
+    
+    // Kaydedilen string listesini al
+    final List<String>? savedOrder = _prefs.getStringList(keyDashboardWidgetOrder);
+    
+    if (savedOrder == null || savedOrder.isEmpty) {
+      return [];
+    }
+    
+    try {
+      // String listesini int listesine dönüştür
+      final List<int> orderIndices = savedOrder.map((s) => int.parse(s)).toList();
+      
+      // Int listesini enum listesine dönüştür
+      final List<DashboardWidgetType> result = orderIndices
+          .map((i) => DashboardWidgetType.values[i])
+          .toList();
+      
+      _logger.d('Dashboard widget sırası alındı: ${orderIndices.join(", ")}');
+      return result;
+    } catch (e) {
+      _logger.e('Dashboard widget sırası alınırken hata: $e');
+      return [];
+    }
+  }
+
+  // Çıkış işlemi - sadece giriş bilgilerini temizle
   Future<bool> clearUserData() async {
     await _ensureInitialized();
     await _prefs.remove(keyUserToken);
     await _prefs.remove(keyUserId);
-    await _prefs.remove(keyUserData);
-    await _prefs.remove(keyUserTasks);
-    await _prefs.remove(keyUpcomingEvents);
-    await _prefs.remove(keyGroupList);
-    await _prefs.remove(keyLastUpdated);
     final result = await _prefs.setBool(keyIsLoggedIn, false);
-    _logger.i('Kullanıcı verileri temizlendi');
+    _logger.i('Kullanıcı giriş verileri temizlendi');
     return result;
   }
 
@@ -127,190 +188,5 @@ class StorageService {
     if (!_initialized) {
       _logger.w('StorageService henüz başlatılmadı');
     }
-  }
-  
-  // Kullanıcı görevlerini önbelleğe alma
-  Future<void> cacheUserTasks(List<UserProjectWork> tasks) async {
-    try {
-      await _ensureInitialized();
-      final tasksJson = tasks.map((task) => task.toJson()).toList();
-      final tasksString = jsonEncode(tasksJson);
-      await _prefs.setString(keyUserTasks, tasksString);
-      await _updateLastCacheTime();
-      _logger.d('${tasks.length} görev önbelleğe kaydedildi');
-    } catch (e) {
-      _logger.e('Görevler önbelleğe kaydedilemedi: $e');
-    }
-  }
-  
-  // Önbellekteki kullanıcı görevlerini getirme
-  List<UserProjectWork>? getCachedUserTasks() {
-    _ensureInitializedSync();
-    final tasksString = _prefs.getString(keyUserTasks);
-    if (tasksString == null) {
-      return null;
-    }
-    
-    try {
-      final List<dynamic> tasksList = jsonDecode(tasksString);
-      final tasks = tasksList.map((taskJson) => UserProjectWork.fromJson(taskJson)).toList();
-      _logger.d('${tasks.length} görev önbellekten alındı');
-      return tasks;
-    } catch (e) {
-      _logger.e('Görevler önbellekten alınamadı: $e');
-      return null;
-    }
-  }
-  
-  // Kullanıcı bilgisini önbelleğe alma
-  Future<void> cacheUserData(User user) async {
-    try {
-      await _ensureInitialized();
-      final userJson = user.toJson();
-      final userString = jsonEncode(userJson);
-      await _prefs.setString(keyUserData, userString);
-      await _updateLastCacheTime();
-      _logger.d('Kullanıcı bilgileri önbelleğe kaydedildi');
-    } catch (e) {
-      _logger.e('Kullanıcı bilgileri önbelleğe kaydedilemedi: $e');
-    }
-  }
-  
-  // Önbellekteki kullanıcı bilgisini getirme
-  User? getCachedUserData() {
-    _ensureInitializedSync();
-    final userString = _prefs.getString(keyUserData);
-    if (userString == null) {
-      return null;
-    }
-    
-    try {
-      final userJson = jsonDecode(userString);
-      final user = User.fromJson(userJson);
-      _logger.d('Kullanıcı bilgileri önbellekten alındı');
-      return user;
-    } catch (e) {
-      _logger.e('Kullanıcı bilgileri önbellekten alınamadı: $e');
-      return null;
-    }
-  }
-  
-  // Etkinlikleri önbelleğe alma
-  Future<void> cacheUpcomingEvents(List<GroupEvent> events) async {
-    try {
-      await _ensureInitialized();
-      final eventsJson = events.map((event) => event.toJson()).toList();
-      final eventsString = jsonEncode(eventsJson);
-      await _prefs.setString(keyUpcomingEvents, eventsString);
-      await _updateLastCacheTime();
-      _logger.d('${events.length} etkinlik önbelleğe kaydedildi');
-    } catch (e) {
-      _logger.e('Etkinlikler önbelleğe kaydedilemedi: $e');
-    }
-  }
-  
-  // Önbellekteki etkinlikleri getirme
-  List<GroupEvent>? getCachedUpcomingEvents() {
-    _ensureInitializedSync();
-    final eventsString = _prefs.getString(keyUpcomingEvents);
-    if (eventsString == null) {
-      return null;
-    }
-    
-    try {
-      final List<dynamic> eventsList = jsonDecode(eventsString);
-      final events = eventsList.map((eventJson) => GroupEvent.fromJson(eventJson)).toList();
-      _logger.d('${events.length} etkinlik önbellekten alındı');
-      return events;
-    } catch (e) {
-      _logger.e('Etkinlikler önbellekten alınamadı: $e');
-      return null;
-    }
-  }
-  
-  // Grup listesini önbelleğe alma
-  Future<void> cacheGroups(List<Group> groups) async {
-    try {
-      await _ensureInitialized();
-      final groupsJson = groups.map((group) => group.toJson()).toList();
-      final groupsString = jsonEncode(groupsJson);
-      await _prefs.setString(keyGroupList, groupsString);
-      await _updateLastCacheTime();
-      _logger.d('${groups.length} grup önbelleğe kaydedildi');
-    } catch (e) {
-      _logger.e('Gruplar önbelleğe kaydedilemedi: $e');
-    }
-  }
-  
-  // Önbellekteki grup listesini getirme
-  List<Group>? getCachedGroups() {
-    _ensureInitializedSync();
-    
-    try {
-      final groupsString = _prefs.getString(keyGroupList);
-      if (groupsString == null) {
-        return null;
-      }
-      
-      final List<dynamic> groupsList = jsonDecode(groupsString);
-      final groups = groupsList.map((groupJson) => Group.fromJson(groupJson)).toList();
-      _logger.d('${groups.length} grup önbellekten alındı');
-      return groups;
-    } catch (e) {
-      _logger.e('Gruplar önbellekten alınamadı: $e');
-      // Önbellek hatalıysa onu temizle
-      _prefs.remove(keyGroupList);
-      return null;
-    }
-  }
-
-  // Son güncelleme zamanını kaydet
-  Future<void> _updateLastCacheTime() async {
-    await _ensureInitialized();
-    final now = DateTime.now().millisecondsSinceEpoch;
-    await _prefs.setInt(keyLastUpdated, now);
-  }
-  
-  // Son güncelleme zamanını al
-  DateTime? getLastCacheTime() {
-    _ensureInitializedSync();
-    
-    try {
-      final timestamp = _prefs.getInt(keyLastUpdated);
-      if (timestamp == null) {
-        return null;
-      }
-      return DateTime.fromMillisecondsSinceEpoch(timestamp);
-    } catch (e) {
-      _logger.e('Son güncelleme zamanı alınamadı: $e');
-      return null;
-    }
-  }
-  
-  // Önbellek güncel mi kontrol et (2 dakikadan eski ise güncel değil)
-  bool isCacheStale() {
-    try {
-      final lastUpdate = getLastCacheTime();
-      if (lastUpdate == null) {
-        return true;
-      }
-      
-      final now = DateTime.now();
-      final difference = now.difference(lastUpdate);
-      return difference.inMinutes > 2; // 2 dakikadan eski ise güncel değil
-    } catch (e) {
-      _logger.e('Önbellek güncelliği kontrol edilirken hata: $e');
-      return true; // Hata durumunda güncel değil kabul et
-    }
-  }
-  
-  // Önbelleği tamamen temizle
-  Future<void> clearCache() async {
-    await _ensureInitialized();
-    await _prefs.remove(keyUserTasks);
-    await _prefs.remove(keyUpcomingEvents);
-    await _prefs.remove(keyGroupList);
-    await _prefs.remove(keyLastUpdated);
-    _logger.i('Önbellek tamamen temizlendi');
   }
 } 

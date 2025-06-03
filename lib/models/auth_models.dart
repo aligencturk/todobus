@@ -20,20 +20,57 @@ class LoginResponse {
   final bool success;
   final LoginData? data;
   final String? errorMessage;
+  final int? statusCode;
+  final String? userFriendlyMessage;
 
   LoginResponse({
     required this.error,
     required this.success,
     this.data,
     this.errorMessage,
+    this.statusCode,
+    this.userFriendlyMessage,
   });
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    bool success = json['success'] ?? false;
+    String? errorMessage = json['errorMessage'] ?? json['error_message'];
+    String? userFriendlyMessage;
+
+    if (!success) {
+      String baseMessage = errorMessage ?? 'Giriş yapılırken bilinmeyen bir hata oluştu.';
+      if (json.containsKey('417')) {
+        baseMessage = 'E-posta adresi veya şifre hatalı.';
+        userFriendlyMessage = 'API Hatası: 417 - $baseMessage';
+      } else if (statusCode == 400) {
+        baseMessage = 'E-posta veya şifre hatalı.';
+        userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else if (statusCode == 401) {
+        baseMessage = 'Hesabınız aktif değil. Lütfen e-postanızı kontrol edin.';
+        userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else if (statusCode == 404) {
+        baseMessage = 'Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı.';
+        userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else {
+        if (statusCode != null) {
+          userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+        } else {
+          userFriendlyMessage = baseMessage;
+        }
+      }
+    }
+    
     return LoginResponse(
-      error: json['error'] ?? false,
-      success: json['success'] ?? false,
+      error: json['error'] ?? !success,
+      success: success,
       data: json['data'] != null ? LoginData.fromJson(json['data']) : null,
-      errorMessage: json['errorMessage'],
+      errorMessage: errorMessage,
+      statusCode: statusCode,
+      userFriendlyMessage: userFriendlyMessage,
     );
   }
 }
@@ -97,18 +134,46 @@ class RegisterResponse {
   final bool error;
   final bool success;
   final String? message;
+  final int? statusCode;
+  final String? userFriendlyMessage;
 
   RegisterResponse({
     required this.error,
     required this.success,
     this.message,
+    this.statusCode,
+    this.userFriendlyMessage,
   });
 
   factory RegisterResponse.fromJson(Map<String, dynamic> json) {
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    bool success = json['success'] ?? false;
+    String? message = json['message'];
+    String? userFriendlyMessage;
+
+    if (!success) {
+      String baseMessage = message ?? 'Kayıt işlemi sırasında bilinmeyen bir hata oluştu.';
+      if (json.containsKey('417') || statusCode == 417) {
+        baseMessage = 'Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın veya başka bir e-posta adresi kullanın.';
+        userFriendlyMessage = 'API Hatası: 417 - $baseMessage';
+      } else {
+        if (statusCode != null) {
+          userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+        } else {
+          userFriendlyMessage = baseMessage;
+        }
+      }
+    }
+    
     return RegisterResponse(
-      error: json['error'] ?? false,
-      success: json['success'] ?? false,
-      message: json['message'],
+      error: json['error'] ?? !success,
+      success: success,
+      message: message,
+      statusCode: statusCode,
+      userFriendlyMessage: userFriendlyMessage,
     );
   }
 }
@@ -132,34 +197,61 @@ class ForgotPasswordResponse {
   final bool success;
   final String? message;
   final ForgotPasswordData? data;
+  final int? statusCode;
+  final String? userFriendlyMessage;
 
   ForgotPasswordResponse({
     required this.error,
     required this.success,
     this.message,
     this.data,
+    this.statusCode,
+    this.userFriendlyMessage,
   });
 
   factory ForgotPasswordResponse.fromJson(Map<String, dynamic> json) {
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    // Kullanıcı dostu mesaj oluştur
+    String? friendlyMessage;
+    if (!(json['success'] ?? false)) {
+      String baseMessage;
+      if (statusCode == 404) {
+        baseMessage = 'Bu e-posta adresiyle kayıtlı hesap bulunamadı.';
+      } else {
+        baseMessage = json['message'] ?? 'Şifre sıfırlama işlemi sırasında bir hata oluştu.';
+      }
+
+      if (statusCode != null) {
+        friendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else {
+        friendlyMessage = baseMessage;
+      }
+    }
+    
     return ForgotPasswordResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,
       message: json['message'],
       data: json['data'] != null ? ForgotPasswordData.fromJson(json['data']) : null,
+      statusCode: statusCode,
+      userFriendlyMessage: friendlyMessage,
     );
   }
 }
 
 class ForgotPasswordData {
-  final String token;
+  final String? token;
 
   ForgotPasswordData({
-    required this.token,
+    this.token,
   });
 
   factory ForgotPasswordData.fromJson(Map<String, dynamic> json) {
     return ForgotPasswordData(
-      token: json['token'],
+      token: json['token'] as String?,
     );
   }
 }
@@ -167,16 +259,16 @@ class ForgotPasswordData {
 // Doğrulama kodu kontrolü
 class CodeCheckRequest {
   final String code;
-  final String token;
+  final String codeToken;
 
   CodeCheckRequest({
     required this.code,
-    required this.token,
+    required this.codeToken,
   });
 
   Map<String, dynamic> toJson() => {
         'code': code,
-        'token': token,
+        'codeToken': codeToken,
       };
 }
 
@@ -185,34 +277,52 @@ class CodeCheckResponse {
   final bool success;
   final String? message;
   final CodeCheckData? data;
+  final String? userFriendlyMessage;
 
   CodeCheckResponse({
     required this.error,
     required this.success,
     this.message,
     this.data,
+    this.userFriendlyMessage,
   });
 
   factory CodeCheckResponse.fromJson(Map<String, dynamic> json) {
+    // Kullanıcı dostu mesaj oluştur
+    String? friendlyMessage;
+    if (!json['success']) {
+      final message = json['message'] as String?;
+      if (message != null) {
+        if (message.contains('hatalı')) {
+          friendlyMessage = 'Girdiğiniz kod hatalı. Lütfen tekrar kontrol edin.';
+        } else if (message.contains('süresi')) {
+          friendlyMessage = 'Doğrulama kodunun süresi dolmuş. Lütfen yeni kod talep edin.';
+        } else {
+          friendlyMessage = 'Doğrulama kodu kontrolü sırasında bir hata oluştu.';
+        }
+      }
+    }
+    
     return CodeCheckResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,
       message: json['message'],
       data: json['data'] != null ? CodeCheckData.fromJson(json['data']) : null,
+      userFriendlyMessage: friendlyMessage,
     );
   }
 }
 
 class CodeCheckData {
-  final String passToken;
+  final String? passToken;
 
   CodeCheckData({
-    required this.passToken,
+    this.passToken,
   });
 
   factory CodeCheckData.fromJson(Map<String, dynamic> json) {
     return CodeCheckData(
-      passToken: json['passToken'],
+      passToken: json['passToken'] as String?,
     );
   }
 }
@@ -240,18 +350,187 @@ class UpdatePasswordResponse {
   final bool error;
   final bool success;
   final String? message;
+  final String? userFriendlyMessage;
 
   UpdatePasswordResponse({
     required this.error,
     required this.success,
     this.message,
+    this.userFriendlyMessage,
   });
 
   factory UpdatePasswordResponse.fromJson(Map<String, dynamic> json) {
+    // Kullanıcı dostu mesaj oluştur
+    String? friendlyMessage;
+    if (!json['success']) {
+      final message = json['message'] as String?;
+      if (message != null) {
+        if (message.contains('eşleşmiyor')) {
+          friendlyMessage = 'Girdiğiniz şifreler birbiriyle eşleşmiyor. Lütfen tekrar deneyin.';
+        } else if (message.contains('token')) {
+          friendlyMessage = 'Şifre sıfırlama bağlantınızın süresi dolmuş. Lütfen yeni bir şifre sıfırlama işlemi başlatın.';
+        } else {
+          friendlyMessage = 'Şifre güncellenirken bir hata oluştu.';
+        }
+      }
+    }
+    
     return UpdatePasswordResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,
       message: json['message'],
+      userFriendlyMessage: friendlyMessage,
+    );
+  }
+}
+
+// Tekrar kod gönderme isteği
+class AgainSendCodeRequest {
+  final String userToken;
+
+  AgainSendCodeRequest({
+    required this.userToken,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'userToken': userToken,
+      };
+}
+
+// Tekrar kod gönderme yanıtı
+class AgainSendCodeResponse {
+  final bool error;
+  final bool success;
+  final String? message;
+  final int? statusCode;
+  final AgainSendCodeData? data;
+  final String? userFriendlyMessage;
+
+  AgainSendCodeResponse({
+    required this.error,
+    required this.success,
+    this.message,
+    this.statusCode,
+    this.data,
+    this.userFriendlyMessage,
+  });
+
+  factory AgainSendCodeResponse.fromJson(Map<String, dynamic> json) {
+    // error_message ve message field'larını kontrol et
+    String? message = json['message'] ?? json['error_message'];
+    
+    // Kullanıcı dostu mesaj oluştur
+    String? friendlyMessage;
+    if (!json['success']) {
+      friendlyMessage = message ?? 'Yeni doğrulama kodu gönderilirken bir hata oluştu.';
+    }
+    
+    return AgainSendCodeResponse(
+      error: json['error'] ?? false,
+      success: json['success'] ?? false,
+      message: message,
+      statusCode: json['status_code'] ?? json['statusCode'],
+      data: json['data'] != null ? AgainSendCodeData.fromJson(json['data']) : null,
+      userFriendlyMessage: friendlyMessage,
+    );
+  }
+  
+  AgainSendCodeResponse copyWith({
+    bool? error,
+    bool? success,
+    String? message,
+    int? statusCode,
+    AgainSendCodeData? data,
+    String? userFriendlyMessage,
+  }) {
+    return AgainSendCodeResponse(
+      error: error ?? this.error,
+      success: success ?? this.success,
+      message: message ?? this.message,
+      statusCode: statusCode ?? this.statusCode,
+      data: data ?? this.data,
+      userFriendlyMessage: userFriendlyMessage ?? this.userFriendlyMessage,
+    );
+  }
+}
+
+class AgainSendCodeData {
+  final String codeToken;
+
+  AgainSendCodeData({
+    required this.codeToken,
+  });
+
+  factory AgainSendCodeData.fromJson(Map<String, dynamic> json) {
+    return AgainSendCodeData(
+      codeToken: json['codeToken'],
+    );
+  }
+}
+
+// Kullanıcı hesap silme isteği
+class DeleteUserRequest {
+  final String userToken;
+
+  DeleteUserRequest({
+    required this.userToken,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'userToken': userToken,
+      };
+}
+
+// Kullanıcı hesap silme yanıtı
+class DeleteUserResponse {
+  final bool error;
+  final bool success;
+  final String? message;
+  final int? statusCode;
+  final String? userFriendlyMessage;
+
+  DeleteUserResponse({
+    required this.error,
+    required this.success,
+    this.message,
+    this.statusCode,
+    this.userFriendlyMessage,
+  });
+
+  factory DeleteUserResponse.fromJson(Map<String, dynamic> json) {
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    bool success = json['success'] ?? false;
+    String? message = json['message'];
+    String? userFriendlyMessage;
+
+    if (!success) {
+      String baseMessage = message ?? 'Hesap silme işlemi sırasında bilinmeyen bir hata oluştu.';
+      if (statusCode == 400) {
+        baseMessage = 'Geçersiz token veya kullanıcı bilgisi.';
+      } else if (statusCode == 401) {
+        baseMessage = 'Bu işlem için yetkiniz bulunmuyor.';
+      } else if (statusCode == 404) {
+        baseMessage = 'Kullanıcı hesabı bulunamadı.';
+      }
+      
+      if (statusCode != null) {
+        userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
+      } else {
+        userFriendlyMessage = baseMessage;
+      }
+    } else {
+      userFriendlyMessage = 'Hesabınız başarıyla silindi.';
+    }
+    
+    return DeleteUserResponse(
+      error: json['error'] ?? !success,
+      success: success,
+      message: message,
+      statusCode: statusCode,
+      userFriendlyMessage: userFriendlyMessage,
     );
   }
 } 

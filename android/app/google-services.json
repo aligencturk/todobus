@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "812571563857",
+    "project_id": "todobus-3fc9b",
+    "storage_bucket": "todobus-3fc9b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:812571563857:android:64967c9b7dcc45fc05a570",
+        "android_client_info": {
+          "package_name": "com.rivorya.todobus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHhKuIMgjCPYD37scHvbPZWKT-ayAJr8w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,20 +1,23 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import '../services/logger_service.dart';
 import '../services/storage_service.dart';
 import '../services/device_info_service.dart';
+import '../views/login_view.dart';
 
 class BaseApiService {
   static final BaseApiService _instance = BaseApiService._internal();
   final LoggerService _logger = LoggerService();
   final StorageService _storageService = StorageService();
   final DeviceInfoService _deviceInfoService = DeviceInfoService();
+  
+  // Global navigasyon için key
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   // API ayarları
-  static const String baseUrl = 'https://api.todobus.tr/';  // Gerçek URL eklenecek
+  static const String baseUrl = 'https://api.todobus.tr/v1.0.0/';  // Gerçek URL eklenecek
   static const String username = 'Tr2VAhW2ICWHJN2nlvp9T5ycBoyMJD';
   static const String password = 'vRP4rTBAqm1tm2I17I1EV3PH57Edl0';
 
@@ -40,6 +43,11 @@ class BaseApiService {
     return _deviceInfoService.getAppVersion();
   }
 
+  // Cihaz kimliğini al
+  Future<String> getDeviceId() async {
+    return await _deviceInfoService.getDeviceId();
+  }
+
   // HTTP başlıklarını oluştur
   Map<String, String> getHeaders({bool withToken = false}) {
     final headers = <String, String>{
@@ -58,7 +66,24 @@ class BaseApiService {
 
     return headers;
   }
-
+  
+  // 401 Hatasını Yönet ve Login sayfasına yönlendir
+  void _handle401Error() {
+    _logger.w('401 Yetkisiz erişim hatası - Oturum zaman aşımı');
+    
+    // Token temizle
+    
+    // Login sayfasına yönlendir
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (navigatorKey.currentState != null) {
+        navigatorKey.currentState!.pushAndRemoveUntil(
+          CupertinoPageRoute(builder: (context) => const LoginView()),
+          (route) => false, // Tüm sayfaları temizle
+        );
+      }
+    });
+  }
+ 
   // POST isteği yap
   Future<Map<String, dynamic>> post(
     String endpoint, {
@@ -78,10 +103,24 @@ class BaseApiService {
         body: body != null ? jsonEncode(body) : null,
       );
 
+      if (response.statusCode == 401) {
+        _handle401Error();
+        throw Exception('Oturum süreniz dolmuş, giriş sayfasına yönlendiriliyorsunuz.');
+      }
+      
       // 410 Gone, bu API'de başarı yanıtı temsil ediyor
       if (response.statusCode == 410) {
         _logger.i('Başarılı yanıt alındı (410 Gone)');
-        return jsonDecode(response.body);
+        try {
+          final result = jsonDecode(response.body);
+          // 410 başarı kodunu ekle, böylece istemci tarafında kontrol edilebilir
+          result['code'] = 410;
+          return result;
+        } catch (e) {
+          // JSON parse hatası durumunda basit bir başarı yanıtı döndür
+          _logger.w('410 yanıtı için JSON parse hatası: $e, varsayılan başarı yanıtı dönüyor');
+          return {'success': true, 'code': 410};
+        }
       } else {
         final responseBody = jsonDecode(response.body);
         final userMessage = _getUserFriendlyErrorMessage(response.statusCode, responseBody);
@@ -89,7 +128,7 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = _handleNetworkException(e);
+      final userMessage = (e);
       _logger.e('İstek hatası: $userMessage');
       throw Exception(userMessage);
     }
@@ -113,6 +152,11 @@ class BaseApiService {
         headers: headers,
         body: body != null ? jsonEncode(body) : null,
       );
+      
+      if (response.statusCode == 401) {
+        _handle401Error();
+        throw Exception('Oturum süreniz dolmuş, giriş sayfasına yönlendiriliyorsunuz.');
+      }
 
       _logger.d('DELETE yanıt: ${response.statusCode} ${response.reasonPhrase}');
       _logger.d('DELETE yanıt body: ${response.body}');
@@ -122,11 +166,13 @@ class BaseApiService {
         // Boş body kontrolü
         if (response.body.isEmpty) {
           _logger.w('Yanıt içeriği boş, varsayılan başarı yanıtı dönüyor');
-          return {'success': true};
+          return {'success': true, 'code': 410};
         }
         
         try {
           final decodedJson = jsonDecode(response.body) as Map<String, dynamic>;
+          // 410 kodunu ekle
+          decodedJson['code'] = 410;
           return decodedJson;
         } catch (e) {
           _logger.e('JSON parse hatası: $e, response.body: ${response.body}');
@@ -146,7 +192,7 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = _handleNetworkException(e);
+      final userMessage = (e);
       _logger.e('İstek hatası: $userMessage, Detay: $e');
       throw Exception(userMessage);
     }
@@ -175,11 +221,25 @@ class BaseApiService {
         url,
         headers: headers,
       );
+      
+      if (response.statusCode == 401) {
+        _handle401Error();
+        throw Exception('Oturum süreniz dolmuş, giriş sayfasına yönlendiriliyorsunuz.');
+      }
 
       // GET istekleri için 200 başarı durum kodudur
       if (response.statusCode == 200 || response.statusCode == 410) {
         _logger.i('Başarılı yanıt alındı (${response.statusCode})');
-        return jsonDecode(response.body);
+        try {
+          final result = jsonDecode(response.body);
+          // Yanıt kodunu ekle
+          result['code'] = response.statusCode;
+          return result;
+        } catch (e) {
+          // JSON parse hatası durumunda basit bir başarı yanıtı döndür
+          _logger.w('Yanıt için JSON parse hatası: $e, varsayılan başarı yanıtı dönüyor');
+          return {'success': true, 'code': response.statusCode};
+        }
       } else {
         final responseBody = jsonDecode(response.body);
         final userMessage = _getUserFriendlyErrorMessage(response.statusCode, responseBody);
@@ -187,7 +247,7 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = _handleNetworkException(e);
+      final userMessage = (e);
       _logger.e('İstek hatası: $userMessage');
       throw Exception(userMessage);
     }
@@ -198,7 +258,7 @@ class BaseApiService {
     String endpoint, {
     Map<String, dynamic>? body,
     bool requiresToken = false,
-  }) async {
+  }) async {  
     final url = Uri.parse('$baseUrl$endpoint');
     final headers = getHeaders(withToken: requiresToken);
     
@@ -211,11 +271,25 @@ class BaseApiService {
         headers: headers,
         body: body != null ? jsonEncode(body) : null,
       );
+      
+      if (response.statusCode == 401) {
+        _handle401Error();
+        throw Exception('Oturum süreniz dolmuş, giriş sayfasına yönlendiriliyorsunuz.');
+      }
 
-      // 410 Gone, bu API'de başarı yanıtı temsil ediyor
-      if (response.statusCode == 410) {
-        _logger.i('Başarılı yanıt alındı (410 Gone)');
-        return jsonDecode(response.body);
+      // 410 Gone ve 200 OK, bu API'de başarı yanıtı temsil ediyor
+      if (response.statusCode == 410 || response.statusCode == 200) {
+        _logger.i('Başarılı yanıt alındı (${response.statusCode})');
+        try {
+          final result = jsonDecode(response.body);
+          // Durum kodunu ekle, böylece istemci tarafında kontrol edilebilir
+          result['code'] = response.statusCode;
+          return result;
+        } catch (e) {
+          // JSON parse hatası durumunda basit bir başarı yanıtı döndür
+          _logger.w('${response.statusCode} yanıtı için JSON parse hatası: $e, varsayılan başarı yanıtı dönüyor');
+          return {'success': true, 'code': response.statusCode};
+        }
       } else {
         final responseBody = jsonDecode(response.body);
         final userMessage = _getUserFriendlyErrorMessage(response.statusCode, responseBody);
@@ -223,7 +297,7 @@ class BaseApiService {
         throw Exception(userMessage);
       }
     } catch (e) {
-      final userMessage = _handleNetworkException(e);
+      final userMessage = (e);
       _logger.e('İstek hatası: $userMessage');
       throw Exception(userMessage);
     }
@@ -255,7 +329,7 @@ class BaseApiService {
       case 404:
         return 'İstenen kaynak bulunamadı.';
       case 417:
-        return 'İşlem tamamlanamadı, lütfen tekrar deneyin.';
+        return 'Bu projeye ait henüz görev bulunmamaktadır.';
       case 429:
         return 'Çok fazla istek gönderdiniz, lütfen biraz bekleyin.';
       case 500:
@@ -268,17 +342,4 @@ class BaseApiService {
     }
   }
   
-  // Ağ hatalarını kullanıcı dostu mesajlara çevir
-  String _handleNetworkException(dynamic exception) {
-    if (exception is SocketException) {
-      return 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.';
-    } else if (exception is TimeoutException) {
-      return 'İşlem zaman aşımına uğradı, lütfen tekrar deneyin.';
-    } else if (exception is FormatException) {
-      return 'Sunucudan geçersiz veri alındı.';
-    } else {
-      // Diğer tüm hatalar
-      return 'Bir hata oluştu, lütfen tekrar deneyin.';
-    }
   }
-} 

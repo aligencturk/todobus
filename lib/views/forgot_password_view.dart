@@ -35,21 +35,23 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
       create: (_) => ForgotPasswordViewModel(),
       child: Consumer<ForgotPasswordViewModel>(
         builder: (context, viewModel, _) {
-          return CupertinoPageScaffold(
-            backgroundColor: CupertinoColors.systemBackground,
-            navigationBar: CupertinoNavigationBar(
-              middle: Text(_getScreenTitle(viewModel.status)),
-              backgroundColor: CupertinoColors.systemBackground,
-              border: null,
-              leading: CupertinoButton(
-                padding: EdgeInsets.zero,
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              
+              title: Text(_getScreenTitle(viewModel.status)),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              foregroundColor: const Color(0xFF2C3E50),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
                 onPressed: () => _handleBackButton(context, viewModel),
-                child: const Icon(CupertinoIcons.back),
               ),
             ),
-            child: SafeArea(
+            body: SafeArea(
               child: CustomScrollView(
                 slivers: [
+                  
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: Padding(
@@ -74,9 +76,9 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
                             // Açıklama
                             Text(
                               _getScreenDescription(viewModel.status),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 16,
-                                color: const Color(0xFF7F8C8D),
+                                color: Color(0xFF7F8C8D),
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -97,17 +99,17 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(
-                                        CupertinoIcons.exclamationmark_triangle,
-                                        color: const Color(0xFFE74C3C),
+                                      const Icon(
+                                        Icons.error_outline,
+                                        color: Color(0xFFE74C3C),
                                         size: 18,
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
                                         child: Text(
                                           viewModel.errorMessage,
-                                          style: TextStyle(
-                                            color: const Color(0xFFE74C3C),
+                                          style: const TextStyle(
+                                            color: Color(0xFFE74C3C),
                                             fontSize: 14,
                                           ),
                                         ),
@@ -122,32 +124,35 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
                             // Aksiyon butonu
                             Padding(
                               padding: const EdgeInsets.only(bottom: 20),
-                              child: CupertinoButton(
-                                padding: EdgeInsets.zero,
+                              child: ElevatedButton(
                                 onPressed: viewModel.status == ForgotPasswordStatus.loading
                                     ? null
                                     : () => _handlePrimaryAction(context, viewModel),
-                                child: Container(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF3498DB),
+                                  foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 16),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF3498DB),
+                                  shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(6),
                                   ),
-                                  child: Center(
-                                    child: viewModel.status == ForgotPasswordStatus.loading
-                                        ? const CupertinoActivityIndicator(
-                                            color: CupertinoColors.white,
-                                          )
-                                        : Text(
-                                            _getActionButtonText(viewModel.status),
-                                            style: const TextStyle(
-                                              color: CupertinoColors.white,
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                  ),
+                                  elevation: 0,
                                 ),
+                                child: viewModel.status == ForgotPasswordStatus.loading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        _getActionButtonText(viewModel.status),
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                               ),
                             ),
                           ],
@@ -244,35 +249,36 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'E-posta',
           style: TextStyle(
-            color: const Color(0xFF34495E),
+            color: Color(0xFF34495E),
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
-        CupertinoTextField(
+        TextFormField(
           controller: _emailController,
           keyboardType: TextInputType.emailAddress,
-          placeholder: 'E-posta adresinizi girin',
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          decoration: InputDecoration(
+            hintText: 'E-posta adresinizi girin',
+            prefixIcon: const Icon(
+              Icons.mail_outline,
+              color: Color(0xFF7F8C8D),
+              size: 20,
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF5F5F5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          ),
           style: const TextStyle(
             color: Color(0xFF2C3E50),
             fontSize: 16,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          prefix: Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Icon(
-              CupertinoIcons.mail,
-              color: const Color(0xFF7F8C8D),
-              size: 20,
-            ),
           ),
         ),
       ],
@@ -284,35 +290,36 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Doğrulama Kodu',
           style: TextStyle(
-            color: const Color(0xFF34495E),
+            color: Color(0xFF34495E),
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
-        CupertinoTextField(
+        TextFormField(
           controller: _codeController,
           keyboardType: TextInputType.number,
-          placeholder: '6 haneli doğrulama kodunu girin',
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          decoration: InputDecoration(
+            hintText: '6 haneli doğrulama kodunu girin',
+            prefixIcon: const Icon(
+              Icons.security,
+              color: Color(0xFF7F8C8D),
+              size: 20,
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF5F5F5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          ),
           style: const TextStyle(
             color: Color(0xFF2C3E50),
             fontSize: 16,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          prefix: Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Icon(
-              CupertinoIcons.lock_shield,
-              color: const Color(0xFF7F8C8D),
-              size: 20,
-            ),
           ),
         ),
       ],
@@ -324,93 +331,89 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Yeni Şifre',
           style: TextStyle(
-            color: const Color(0xFF34495E),
+            color: Color(0xFF34495E),
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
-        CupertinoTextField(
+        TextFormField(
           controller: _passwordController,
           obscureText: viewModel.obscurePassword,
-          placeholder: 'Yeni şifrenizi girin',
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-          style: const TextStyle(
-            color: Color(0xFF2C3E50),
-            fontSize: 16,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          prefix: Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Icon(
-              CupertinoIcons.lock,
-              color: const Color(0xFF7F8C8D),
+          decoration: InputDecoration(
+            hintText: 'Yeni şifrenizi girin',
+            prefixIcon: const Icon(
+              Icons.lock_outline,
+              color: Color(0xFF7F8C8D),
               size: 20,
             ),
-          ),
-          suffix: Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () => viewModel.togglePasswordVisibility(),
-              child: Icon(
+            suffixIcon: IconButton(
+              onPressed: () => viewModel.togglePasswordVisibility(),
+              icon: Icon(
                 viewModel.obscurePassword
-                    ? CupertinoIcons.eye
-                    : CupertinoIcons.eye_slash,
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 color: const Color(0xFF7F8C8D),
                 size: 20,
               ),
             ),
+            filled: true,
+            fillColor: const Color(0xFFF5F5F5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          ),
+          style: const TextStyle(
+            color: Color(0xFF2C3E50),
+            fontSize: 16,
           ),
         ),
         const SizedBox(height: 16),
-        Text(
+        const Text(
           'Şifre Tekrar',
           style: TextStyle(
-            color: const Color(0xFF34495E),
+            color: Color(0xFF34495E),
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 8),
-        CupertinoTextField(
+        TextFormField(
           controller: _passwordConfirmController,
           obscureText: viewModel.obscurePasswordConfirm,
-          placeholder: 'Yeni şifrenizi tekrar girin',
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-          style: const TextStyle(
-            color: Color(0xFF2C3E50),
-            fontSize: 16,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          prefix: Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Icon(
-              CupertinoIcons.lock,
-              color: const Color(0xFF7F8C8D),
+          decoration: InputDecoration(
+            hintText: 'Yeni şifrenizi tekrar girin',
+            prefixIcon: const Icon(
+              Icons.lock_outline,
+              color: Color(0xFF7F8C8D),
               size: 20,
             ),
-          ),
-          suffix: Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () => viewModel.togglePasswordConfirmVisibility(),
-              child: Icon(
+            suffixIcon: IconButton(
+              onPressed: () => viewModel.togglePasswordConfirmVisibility(),
+              icon: Icon(
                 viewModel.obscurePasswordConfirm
-                    ? CupertinoIcons.eye
-                    : CupertinoIcons.eye_slash,
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
                 color: const Color(0xFF7F8C8D),
                 size: 20,
               ),
             ),
+            filled: true,
+            fillColor: const Color(0xFFF5F5F5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          ),
+          style: const TextStyle(
+            color: Color(0xFF2C3E50),
+            fontSize: 16,
           ),
         ),
       ],
@@ -419,20 +422,20 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
 
   // Başarı adımı
   Widget _buildSuccessStep() {
-    return Center(
+    return const Center(
       child: Column(
         children: [
-          const Icon(
-            CupertinoIcons.checkmark_circle,
+          Icon(
+            Icons.check_circle,
             color: Color(0xFF27AE60),
             size: 60,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'Şifreniz başarıyla değiştirildi.',
             style: TextStyle(
               fontSize: 16,
-              color: const Color(0xFF34495E),
+              color: Color(0xFF34495E),
               fontWeight: FontWeight.w600,
             ),
             textAlign: TextAlign.center,
@@ -456,7 +459,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
         break;
       case ForgotPasswordStatus.success:
         Navigator.of(context).pushReplacement(
-          CupertinoPageRoute(builder: (context) => const LoginView()),
+          MaterialPageRoute(builder: (context) => const LoginView()),
         );
         break;
       default:
@@ -491,7 +494,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
         
       case ForgotPasswordStatus.success:
         Navigator.of(context).pushReplacement(
-          CupertinoPageRoute(builder: (context) => const LoginView()),
+          MaterialPageRoute(builder: (context) => const LoginView()),
         );
         break;
         

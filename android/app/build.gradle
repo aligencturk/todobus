@@ -1,0 +1,25 @@
+android {
+    // ... existing code ...
+    
+    buildTypes {
+        release {
+            // ... existing code ...
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    
+    // Build performansı için
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+        incremental = true
+    }
+    
+    // Dex optimizasyonu
+    dexOptions {
+        jumboMode = true
+        preDexLibraries = true
+    }
+} 

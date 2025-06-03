@@ -101,7 +101,8 @@ class ProjectService {
     String projectName, 
     String projectDesc, 
     String projectStartDate, 
-    String projectEndDate
+    String projectEndDate,
+    List<Map<String, dynamic>>? users
   ) async {
     try {
       final userToken = _storageService.getToken();
@@ -111,18 +112,25 @@ class ProjectService {
       
       _logger.i('Proje güncelleniyor: ID: $projectID, Name: $projectName (GroupID: $groupID)');
       
+      final Map<String, dynamic> body = {
+        'userToken': userToken,
+        'groupID': groupID,
+        'projectID': projectID,
+        'projectStatus': projectStatus,
+        'projectName': projectName,
+        'projectDesc': projectDesc,
+        'projectStartDate': projectStartDate,
+        'projectEndDate': projectEndDate,
+      };
+      
+      // Eğer users parametresi varsa body'ye ekle
+      if (users != null) {
+        body['users'] = users;
+      }
+      
       final response = await _apiService.put(
         'service/user/project/update',
-        body: {
-          'userToken': userToken,
-          'groupID': groupID,
-          'projectID': projectID,
-          'projectStatus': projectStatus,
-          'projectName': projectName,
-          'projectDesc': projectDesc,
-          'projectStartDate': projectStartDate,
-          'projectEndDate': projectEndDate,
-        },
+        body: body,
         requiresToken: true,
       );
       
@@ -210,40 +218,57 @@ class ProjectService {
   // Proje görevlerini getir
   Future<List<ProjectWork>> getProjectWorks(int projectID) async {
     try {
-      _logger.i('Proje görevleri getiriliyor... (ProjectID: $projectID)');
-      
+      // 1) Token al
       final token = await _storageService.getToken();
       if (token == null) {
-        throw Exception('Kullanıcı token bilgisi bulunamadı');
+        throw Exception('Oturum bilgisi bulunamadı');
       }
-      
+
+      // 2) Body hazırla
+      final body = {
+        'userToken': token,
+        'projectID': projectID,
+      };
+
+      _logger.i('Proje görevleri getiriliyor... ProjectID: $projectID');
+
+      // 3) API çağrısı yap
       final response = await _apiService.post(
         'service/user/project/workList',
-        body: {
-          'userToken': token,
-          'projectID': projectID,
-        },
-        requiresToken: true,
+        body: body,
       );
-      
+
+      // API yanıt yapısı değişti, yeni formatı işle
       if (response['success'] == true && response['data'] != null) {
-        final workListResponse = ProjectWorkListResponse.fromJson(response);
-        
-        if (workListResponse.data != null) {
-          final works = workListResponse.data!.works;
-          _logger.i('${works.length} görev alındı.');
+        if (response['data']['works'] != null) {
+          final worksList = response['data']['works'] as List<dynamic>;
+          
+          // Görev listesini dönüştür
+          final works = worksList
+            .map((item) => ProjectWork.fromJson(item as Map<String, dynamic>))
+            .toList();
+          
+          _logger.i('${works.length} proje görevi getirildi. ProjectID: $projectID');
           return works;
+        } else {
+          _logger.i('Projede görev bulunamadı (veri yapısı var ancak boş)');
+          return []; // Boş liste
         }
+      } else if (response['410'] == 'Gone') {
+        // 410 Gone durumu - API'nin özel davranışı
+        _logger.i('Proje için henüz görev bulunmuyor (410 Gone). ProjectID: $projectID');
+        return [];
       }
       
-      _logger.w('Proje görevleri alınamadı veya boş.');
+      // Herhangi bir veri bulunamazsa boş liste dön
+      _logger.i('API yanıtında geçerli veri bulunamadı. ProjectID: $projectID');
       return [];
     } catch (e) {
-      _logger.e('Proje görevleri yüklenirken hata: $e');
-      throw Exception('Proje görevleri yüklenemedi: $e');
+      _logger.e('Proje görevleri getirilirken hata oluştu. ProjectID: $projectID, Hata: $e');
+      return []; // Hata durumunda boş liste dön
     }
   }
-  
+
   // Görev detayını getir
   Future<ProjectWork> getWorkDetail(int projectID, int workID) async {
     try {
@@ -478,6 +503,47 @@ class ProjectService {
     } catch (e) {
       _logger.e('Proje silinirken hata: $e');
       throw Exception('Proje silinirken hata: $e');
+    }
+  }
+
+  // Kullanıcıyı projeye ekle (userID ve userRole ile)
+  Future<bool> addUserToProject({
+    required int groupID,
+    required int projectID,
+    required int userId,
+    required int userRole,
+  }) async {
+    try {
+      final userToken = await _storageService.getToken();
+      if (userToken == null) {
+        throw Exception('Oturum bilgisi bulunamadı');
+      }
+      
+      _logger.i('Kullanıcı projeye ekleniyor: ProjectID: $projectID, UserID: $userId, Role: $userRole (GroupID: $groupID)');
+      
+      final response = await _apiService.put(
+        'service/user/project/adduser',
+        body: {
+          'userToken': userToken,
+          'groupID': groupID,
+          'projectID': projectID,
+          'userID': userId,
+          'userRole': userRole,
+        },
+        requiresToken: true,
+      );
+      
+      if (response['success'] == true) {
+        _logger.i('Kullanıcı projeye başarıyla eklendi');
+        return true;
+      } else {
+        final errorMsg = response['message'] ?? response['errorMessage'] ?? 'Bilinmeyen hata';
+        _logger.e('Kullanıcı projeye eklenemedi: $errorMsg');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Kullanıcı projeye eklenirken hata: $e');
+      return false;
     }
   }
 } 

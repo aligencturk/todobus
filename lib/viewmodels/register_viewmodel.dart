@@ -99,7 +99,8 @@ class RegisterViewModel with ChangeNotifier {
         _safeNotifyListeners();
         return true;
       } else {
-        _errorMessage = response.message ?? 'Kayıt işlemi başarısız';
+        // Kullanıcı dostu hata mesajını kullan
+        _errorMessage = response.userFriendlyMessage ?? response.message ?? 'Kayıt işlemi başarısız';
         _logger.w('Kayıt başarısız: $_errorMessage');
         _status = RegisterStatus.error;
         _safeNotifyListeners();

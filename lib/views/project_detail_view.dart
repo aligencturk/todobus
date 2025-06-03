@@ -9,6 +9,8 @@ import '../viewmodels/group_viewmodel.dart';
 import '../views/edit_project_view.dart';
 import '../views/work_detail_view.dart';
 import '../views/add_work_view.dart';
+import '../views/project_report_view.dart';
+import '../services/storage_service.dart';
 
 class ProjectDetailView extends StatefulWidget {
   final int projectId;
@@ -37,6 +39,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
   List<ProjectWork>? _projectWorks;
   bool _isLoadingWorks = false;
   String _worksErrorMessage = '';
+  bool _isDisposed = false; // Widget dispose edildiğinde true olacak
   
   @override
   void initState() {
@@ -51,6 +54,19 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
         });
       }
     });
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true; // Widget dispose edildiğinde işaret koy
+    super.dispose();
+  }
+  
+  // Güvenli setState için yardımcı metot
+  void _safeSetState(VoidCallback fn) {
+    if (!_isDisposed && mounted) {
+      setState(fn);
+    }
   }
   
   Future<void> _loadProjectDetail() async {
@@ -85,29 +101,71 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
     }
   }
   
-  Future<void> _loadProjectWorks() async {
-    if (_projectWorks != null) return; // Daha önce yüklenmişse tekrar yükleme
+  void _onSegmentChanged(int value) {
+    if (_isDisposed) return; // Eğer sayfa dispose edildiyse hiçbir işlem yapmadan çık
     
     setState(() {
+      _selectedSegment = value;
+    });
+    
+    // Görevler sekmesi seçildiyse görevleri yükle
+    if (value == 2 && !_isDisposed) {
+      _loadProjectWorks();
+    }
+  }
+  
+  Future<void> _loadProjectWorks() async {
+    // 1. Sayfa dispose edildiyse veya görevler zaten yüklendiyse işlemi durdur
+    if (_projectWorks != null || _isDisposed) return;
+    
+    // 2. İşlem sürerken bir daha çağrılmayı engelle
+    if (_isLoadingWorks) return;
+    
+    _safeSetState(() {
       _isLoadingWorks = true;
       _worksErrorMessage = '';
     });
     
     try {
+      // Erken çıkış kontrolü - dispose edildiyse çık
+      if (_isDisposed) {
+        return;
+      }
+      
       final works = await Provider.of<GroupViewModel>(context, listen: false)
           .getProjectWorks(widget.projectId);
       
-      setState(() {
+      // Erken çıkış kontrolü - dispose edildiyse çık
+      if (_isDisposed || !mounted) {
+        return;
+      }
+      
+      _safeSetState(() {
         _projectWorks = works;
         _isLoadingWorks = false;
       });
       _logger.i('Proje görevleri yüklendi: ${works.length} görev');
     } catch (e) {
-      setState(() {
-        _worksErrorMessage = 'Görevler yüklenemedi: $e';
-        _isLoadingWorks = false;
-      });
-      _logger.e('Proje görevleri yüklenirken hata: $e');
+      // Erken çıkış kontrolü - dispose edildiyse çık
+      if (_isDisposed || !mounted) {
+        return;
+      }
+      
+      // 417 hata kodu veya "Bu projeye ait henüz görev bulunmamaktadır" hatası normal durum
+      if (e.toString().contains('417') || e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
+        _safeSetState(() {
+          _projectWorks = []; // Boş liste olarak ayarla
+          _isLoadingWorks = false;
+          // Hata mesajı gösterme, normal bir durum
+        });
+        _logger.i('Proje için henüz görev bulunmuyor (417)');
+      } else {
+        _safeSetState(() {
+          _worksErrorMessage = 'Görevler yüklenemedi: $e';
+          _isLoadingWorks = false;
+        });
+        _logger.e('Proje görevleri yüklenirken hata: $e');
+      }
     }
   }
   
@@ -118,6 +176,12 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
         title: Text(_projectDetail?.projectName ?? 'Proje Detayı'),
         trailingActions: _projectDetail != null
             ? [
+                PlatformIconButton(
+                  icon: Icon(
+                    isCupertino(context) ? CupertinoIcons.doc_text : Icons.description,
+                  ),
+                  onPressed: _showProjectReport,
+                ),
                 PlatformIconButton(
                   icon: Icon(
                     isCupertino(context) ? CupertinoIcons.pencil : Icons.edit,
@@ -537,17 +601,6 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
     );
   }
   
-  void _onSegmentChanged(int value) {
-    setState(() {
-      _selectedSegment = value;
-    });
-    
-    // Görevler sekmesi seçildiyse görevleri yükle
-    if (value == 2) {
-      _loadProjectWorks();
-    }
-  }
-  
   Widget _buildSelectedContent(BuildContext context) {
     switch (_selectedSegment) {
       case 0:
@@ -640,43 +693,6 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Hızlı İşlemler',
-            style: platformThemeData(
-              context,
-              material: (data) => data.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              cupertino: (data) => data.textTheme.navTitleTextStyle,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildQuickActionButton(
-                icon: isIOS ? CupertinoIcons.square_list : Icons.playlist_add_check,
-                color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
-                label: 'Görev Ekle',
-                onTap: _showAddWorkDialog,
-              ),
-              _buildQuickActionButton(
-                icon: isIOS ? CupertinoIcons.person_badge_plus : Icons.person_add,
-                color: isIOS ? CupertinoColors.systemGreen : Colors.green,
-                label: 'Üye Ekle',
-                onTap: () {
-                  // Üye ekleme işlevi eklenecek
-                },
-              ),
-              _buildQuickActionButton(
-                icon: isIOS ? CupertinoIcons.chart_bar : Icons.bar_chart,
-                color: isIOS ? CupertinoColors.systemOrange : Colors.orange,
-                label: 'Rapor',
-                onTap: () {
-                  // Rapor işlevi eklenecek
-                },
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -719,44 +735,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       ),
     );
   }
-  
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required Color color,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
+
   Widget _buildMembersTab(BuildContext context) {
     final project = _projectDetail!;
     final isIOS = isCupertino(context);
@@ -782,9 +761,7 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                   color: isIOS ? CupertinoColors.activeBlue : Colors.blue,
                   size: 20,
                 ),
-                onPressed: () {
-                  // Üye ekleme işlevi eklenecek
-                },
+                onPressed: _showAddUserDialog,
               ),
             ],
           ),
@@ -796,27 +773,25 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                 backgroundColor: user.userRoleID == 1 
                     ? (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.2) 
                     : (isIOS ? CupertinoColors.systemGrey : Colors.grey).withOpacity(0.2),
-                child: Text(
-                  user.userName.substring(0, 1).toUpperCase(),
-                  style: TextStyle(
-                    color: user.userRoleID == 1 
-                        ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
-                        : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
-                  ),
-                ),
+               backgroundImage: user.profilePhoto != null && user.profilePhoto.isNotEmpty
+                    ? NetworkImage(user.profilePhoto)
+                    : null,
+                child: user.profilePhoto == null || user.profilePhoto.isEmpty
+                    ? Text(
+                        user.userName.substring(0, 1).toUpperCase(),
+                        style: TextStyle(
+                          color: user.userRoleID == 1 
+                              ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
+                              : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
+                        ),
+                      )
+                    : null,
               ),
               title: Text(user.userName),
               subtitle: Text(user.userRole),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    user.assignedDate,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[600],
-                    ),
-                  ),
                   const SizedBox(width: 8),
                   PlatformIconButton(
                     padding: EdgeInsets.zero,
@@ -831,6 +806,27 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
               ),
             ),
           )).toList(),
+          const SizedBox(height: 20),
+          PlatformElevatedButton(
+            onPressed: _confirmLeaveProject,
+            color: isIOS ? CupertinoColors.destructiveRed : Colors.red,
+            material: (_, __) => MaterialElevatedButtonData(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: Text(
+                'Projeden Ayrıl',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: isIOS ? CupertinoColors.white : Colors.white,
+                ),
+              ),
+            ),
+          )
         ],
     );
   }
@@ -1169,6 +1165,22 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       await _loadProjectDetail();
       _snackBarService.showSuccess('Proje başarıyla güncellendi');
     }
+  }
+  
+  // Proje raporu gösterme işlevi
+  void _showProjectReport() async {
+    if (_projectDetail == null) return;
+    
+    Navigator.of(context).push(
+      platformPageRoute(
+        context: context,
+        builder: (context) => ProjectReportView(
+          projectId: widget.projectId,
+          groupId: widget.groupId,
+          projectDetail: _projectDetail,
+        ),
+      ),
+    );
   }
   
   // Kullanıcıyı projeden çıkarma doğrulama
@@ -1977,6 +1989,427 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
       _snackBarService.showError(_snackBarService.formatErrorMessage(errorMessage));
     } catch (e) {
       _logger.e('SnackBar gösterilirken hata: $e');
+    }
+  }
+  
+  // Projeden ayrılma onayı
+  void _confirmLeaveProject() {
+    final isIOS = isCupertino(context);
+    
+    if (isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('Projeden Ayrıl'),
+          content: const Text('Bu projeden ayrılmak istediğinize emin misiniz?'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _leaveProject();
+              },
+              child: const Text('Ayrıl'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Projeden Ayrıl'),
+          content: const Text('Bu projeden ayrılmak istediğinize emin misiniz?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _leaveProject();
+              },
+              child: const Text('Ayrıl'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  // Projeden ayrılma işlemi
+  Future<void> _leaveProject() async {
+    // StorageService'den kullanıcı ID'sini al
+    final storageService = StorageService();
+    final userId = storageService.getUserId();
+    
+    if (userId == null) {
+      _showErrorSnackbar('Kullanıcı bilgileriniz alınamadı. Lütfen tekrar giriş yapın.');
+      return;
+    }
+    
+    _safeSetState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // İşlemi başlatmadan önce sayfayı tamamen durdur
+      _isDisposed = true;
+      
+      final success = await Provider.of<GroupViewModel>(context, listen: false)
+          .removeUserFromProject(widget.groupId, widget.projectId, userId);
+      
+      // mounted kontrolü gerekiyor ama işlemi tamamen durdurmak için
+      // _isDisposed kontrolü yapmıyoruz
+      if (mounted) {
+        if (success) {
+          _snackBarService.showSuccess('Projeden başarıyla ayrıldınız');
+          
+          // Tüm proje ile ilgili sayfalardan çık ve direkt ana sayfaya dön
+          // Hiçbir şekilde proje detay sayfasında işlem yapılmamasını sağla
+          Navigator.of(context).popUntil((route) {
+            final routeName = route.settings.name;
+            // Group detay sayfasını veya ana sayfayı bul
+            return route.isFirst || 
+                  (routeName != null && 
+                  (routeName.contains('GroupDetailView') || 
+                   routeName.contains('GroupsView')));
+          });
+        } else {
+          _snackBarService.showError('Projeden ayrılma işlemi başarısız oldu');
+          
+          // Başarısız olursa sayfaya geri dönüş yap, _isDisposed'u sıfırla
+          _safeSetState(() {
+            _isDisposed = false;
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      // Hata durumunda eğer hala mounted ise
+      if (mounted) {
+        _snackBarService.showError(_formatErrorMessage(e.toString()));
+        
+        // Başarısız olursa sayfaya geri dönüş yap, _isDisposed'u sıfırla
+        _safeSetState(() {
+          _isDisposed = false;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  // Projeye üye ekleme dialogu
+  void _showAddUserDialog() async {
+    final isIOS = isCupertino(context);
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Gruptaki kullanıcıları getir
+      final groupUsers = await Provider.of<GroupViewModel>(context, listen: false)
+          .getGroupUsers(widget.groupId);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      // Projede olmayan kullanıcıları filtrele
+      final projectUserIds = _projectDetail!.users.map((u) => u.userID).toSet();
+      final availableUsers = groupUsers.where((u) => !projectUserIds.contains(u.userID)).toList();
+      
+      if (availableUsers.isEmpty) {
+        _snackBarService.showInfo('Gruptaki tüm kullanıcılar zaten bu projede');
+        return;
+      }
+      
+      // Seçilen kullanıcılar ve rolleri
+      Map<int, int> selectedUserRoles = {}; // userID -> userRole
+      
+      if (isIOS) {
+        showCupertinoDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return CupertinoAlertDialog(
+                  title: const Text('Projeye Üye Ekle'),
+                  content: Material(
+                    color: Colors.transparent,
+                    child: Container(
+                      width: double.maxFinite,
+                      height: 300,
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Eklemek istediğiniz kullanıcıları seçin:'),
+                          const SizedBox(height: 12),
+                          Expanded(
+                            child: ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: availableUsers.length,
+                              itemBuilder: (context, index) {
+                                final user = availableUsers[index];
+                                final isSelected = selectedUserRoles.containsKey(user.userID);
+                                
+                                return GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isSelected) {
+                                        selectedUserRoles.remove(user.userID);
+                                      } else {
+                                        // Varsayılan olarak normal üye (2) rolü ile ekle
+                                        selectedUserRoles[user.userID] = 2;
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                    decoration: BoxDecoration(
+                                      color: isSelected 
+                                          ? CupertinoColors.activeBlue.withOpacity(0.1)
+                                          : null,
+                                      border: index < availableUsers.length - 1
+                                          ? Border(
+                                              bottom: BorderSide(
+                                                color: CupertinoColors.systemGrey5,
+                                                width: 0.5,
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              isSelected
+                                                  ? CupertinoIcons.checkmark_circle_fill
+                                                  : CupertinoIcons.circle,
+                                              color: isSelected
+                                                  ? CupertinoColors.activeBlue
+                                                  : CupertinoColors.systemGrey,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(child: Text(user.userName)),
+                                          ],
+                                        ),
+                                        if (isSelected) ...[
+                                          const SizedBox(height: 8),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              CupertinoSegmentedControl<int>(
+                                                children: const {
+                                                  1: Padding(
+                                                    padding: EdgeInsets.symmetric(horizontal: 12),
+                                                    child: Text('Yönetici'),
+                                                  ),
+                                                  2: Padding(
+                                                    padding: EdgeInsets.symmetric(horizontal: 12),
+                                                    child: Text('Üye'),
+                                                  ),
+                                                },
+                                                groupValue: selectedUserRoles[user.userID] ?? 2,
+                                                onValueChanged: (value) {
+                                                  setState(() {
+                                                    selectedUserRoles[user.userID] = value;
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    CupertinoDialogAction(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('İptal'),
+                    ),
+                    CupertinoDialogAction(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        if (selectedUserRoles.isNotEmpty) {
+                          _addUsersToProject(selectedUserRoles);
+                        }
+                      },
+                      isDefaultAction: true,
+                      child: const Text('Ekle'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return AlertDialog(
+                  title: const Text('Projeye Üye Ekle'),
+                  content: Container(
+                    width: double.maxFinite,
+                    height: 300,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Eklemek istediğiniz kullanıcıları seçin:'),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: availableUsers.length,
+                            itemBuilder: (context, index) {
+                              final user = availableUsers[index];
+                              final isSelected = selectedUserRoles.containsKey(user.userID);
+                              
+                              return Column(
+                                children: [
+                                  CheckboxListTile(
+                                    title: Text(user.userName),
+                                    value: isSelected,
+                                    onChanged: (bool? value) {
+                                      setState(() {
+                                        if (value == true) {
+                                          // Varsayılan olarak normal üye (2) rolü ile ekle
+                                          selectedUserRoles[user.userID] = 2;
+                                        } else {
+                                          selectedUserRoles.remove(user.userID);
+                                        }
+                                      });
+                                    },
+                                  ),
+                                  if (isSelected) ...[
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 8.0),
+                                      child: Row(
+                                        children: [
+                                          const Text('Rol: '),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: SegmentedButton<int>(
+                                              segments: const [
+                                                ButtonSegment<int>(
+                                                  value: 1,
+                                                  label: Text('Yönetici'),
+                                                ),
+                                                ButtonSegment<int>(
+                                                  value: 2,
+                                                  label: Text('Üye'),
+                                                ),
+                                              ],
+                                              selected: {selectedUserRoles[user.userID] ?? 2},
+                                              onSelectionChanged: (Set<int> newSelection) {
+                                                setState(() {
+                                                  selectedUserRoles[user.userID] = newSelection.first;
+                                                });
+                                              },
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('İptal'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        if (selectedUserRoles.isNotEmpty) {
+                          _addUsersToProject(selectedUserRoles);
+                        }
+                      },
+                      child: const Text('Ekle'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showErrorSnackbar('Grup üyeleri yüklenemedi: ${_formatErrorMessage(e.toString())}');
+      }
+    }
+  }
+  
+  // Kullanıcıları projeye ekle
+  Future<void> _addUsersToProject(Map<int, int> userRoles) async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      // Kullanıcıları ve rollerini listeye dönüştür
+      List<Map<String, int>> usersToAdd = userRoles.entries.map((entry) => {
+        "userID": entry.key,
+        "userRole": entry.value
+      }).toList();
+      
+      final success = await Provider.of<GroupViewModel>(context, listen: false)
+          .addUsersToProject(widget.groupId, widget.projectId, usersToAdd);
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (success) {
+        // Başarıyla eklendiğinde proje detaylarını yeniden yükle
+        await _loadProjectDetail();
+        _snackBarService.showSuccess('Kullanıcılar projeye başarıyla eklendi');
+      } else {
+        _showErrorSnackbar('Kullanıcılar eklenemedi');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showErrorSnackbar('Kullanıcılar eklenirken hata oluştu: ${_formatErrorMessage(e.toString())}');
+      }
     }
   }
   

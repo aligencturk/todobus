@@ -12,6 +12,19 @@ class EventsResponse {
   });
 
   factory EventsResponse.fromJson(Map<String, dynamic> json) {
+    // 410 Gone özel durum kontrolü
+    if (json['410'] == 'Gone') {
+      // Eğer data ve events verileri varsa onları kullan
+      if (json.containsKey('data') && json['data'] != null) {
+        return EventsResponse(
+          error: false,
+          success: true,
+          data: EventsData.fromJson(json['data']),
+          errorMessage: null,
+        );
+      }
+    }
+
     return EventsResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,

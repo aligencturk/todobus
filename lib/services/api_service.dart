@@ -4,6 +4,7 @@ import 'user_service.dart';
 import 'group_service.dart';
 import 'project_service.dart';
 import 'event_service.dart';
+import 'report_service.dart';
 
 /// API servisi, tüm API servislerine tek bir yerden erişimi kolaylaştıran facade sınıfıdır.
 /// Bu servis, her servisi tek bir yerden sağlayarak kodun farklı yerlerinde tutarlı kullanımı garantiler.
@@ -17,6 +18,7 @@ class ApiService {
   final GroupService _groupService = GroupService();
   final ProjectService _projectService = ProjectService();
   final EventService _eventService = EventService();
+  final ReportService _reportService = ReportService();
 
   factory ApiService() {
     return _instance;
@@ -41,4 +43,7 @@ class ApiService {
   
   // Etkinlik servisi
   EventService get event => _eventService;
+  
+  // Rapor servisi
+  ReportService get report => _reportService;
 } 

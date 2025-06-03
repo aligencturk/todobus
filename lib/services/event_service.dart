@@ -29,6 +29,11 @@ class EventService {
       };
 
       final response = await _apiService.post('service/user/event/list', body: body);
+      
+      // 410 Gone içeren yanıtı doğrudan EventsResponse.fromJson ile işle
+      // Artık özel kontrol yapmamıza gerek yok, EventsResponse sınıfı bunu halledecek
+      _logger.i('Etkinlik verileri alındı: ${response.containsKey('data') ? 'Veri var' : 'Veri yok'}');
+      
       return EventsResponse.fromJson(response);
     } catch (e) {
       _logger.e('Etkinlikler yüklenirken hata: $e');

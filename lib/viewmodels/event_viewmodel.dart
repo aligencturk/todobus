@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/event_models.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
+import '../services/refresh_service.dart';
 
 enum EventLoadStatus { initial, loading, loaded, error }
 
 class EventViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LoggerService _logger = LoggerService();
+  final RefreshService _refreshService = RefreshService();
   
   EventLoadStatus _status = EventLoadStatus.initial;
   String _errorMessage = '';
@@ -15,6 +18,7 @@ class EventViewModel with ChangeNotifier {
   List<Event> _companyEvents = [];
   Event? _selectedEvent;
   bool _isDisposed = false;
+  StreamSubscription? _refreshSubscription;
   
   // Getters
   EventLoadStatus get status => _status;
@@ -24,6 +28,18 @@ class EventViewModel with ChangeNotifier {
   List<Event> get companyEvents => _companyEvents;
   Event? get selectedEvent => _selectedEvent;
   bool get isLoading => _status == EventLoadStatus.loading;
+  
+  EventViewModel() {
+    _initRefreshListener();
+  }
+  
+  void _initRefreshListener() {
+    _refreshSubscription = _refreshService.refreshStream.listen((refreshType) {
+      if (refreshType == 'events' || refreshType == 'all') {
+        loadEvents();
+      }
+    });
+  }
   
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
@@ -35,6 +51,7 @@ class EventViewModel with ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _refreshSubscription?.cancel();
     super.dispose();
   }
   
@@ -48,11 +65,23 @@ class EventViewModel with ChangeNotifier {
       _logger.i('Etkinlikler yükleniyor (Grup ID: $groupID)');
       final response = await _apiService.event.getEvents(groupID: groupID);
       
-      if (response.success && response.data != null) {
-        _events = response.data!.events;
-        _logger.i('${_events.length} etkinlik başarıyla yüklendi');
+      if (response.success) {
+        // Veri varsa işle, yoksa boş liste kullan
+        final allEvents = response.data?.events ?? [];
+        _logger.i('${allEvents.length} etkinlik API\'den başarıyla yüklendi');
         
+        // Şimdiki zaman
+        final now = DateTime.now();
         
+        // Tüm etkinlikleri doğrudan kullan, tarihi çok katı şekilde filtreleme
+        _events = allEvents;
+        
+        _logger.i('${_events.length} etkinlik listeye eklendi');
+        
+        // Test için ilk etkinliğin bilgilerini logla
+        if (_events.isNotEmpty) {
+          _logger.i('İlk etkinlik: ${_events.first.eventTitle}, tarih: ${_events.first.eventDate}');
+        }
         
         _status = EventLoadStatus.loaded;
       } else {
@@ -124,6 +153,8 @@ class EventViewModel with ChangeNotifier {
       if (response['success'] == true) {
         // Etkinlik oluşturulduktan sonra listeyi yenile
         await loadEvents(groupID: groupID);
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshEvents();
         _logger.i('Etkinlik başarıyla oluşturuldu');
         return true;
       } else {
@@ -167,6 +198,8 @@ class EventViewModel with ChangeNotifier {
       if (response['success'] == true) {
         // Etkinlik güncellendikten sonra listeyi yenile
         await loadEvents(groupID: groupID);
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshEvents();
         _logger.i('Etkinlik başarıyla güncellendi');
         return true;
       } else {
@@ -194,6 +227,8 @@ class EventViewModel with ChangeNotifier {
       if (response['success'] == true) {
         // Etkinlik silindikten sonra listeyi yenile
         await loadEvents(groupID: groupID);
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshEvents();
         _logger.i('Etkinlik başarıyla silindi');
         return true;
       } else {
@@ -224,5 +259,15 @@ class EventViewModel with ChangeNotifier {
     } catch (e) {
       return eventDate;
     }
+  }
+  
+  // ViewModel'i sıfırla
+  void reset() {
+    _status = EventLoadStatus.initial;
+    _errorMessage = '';
+    _events = [];
+    _companyEvents = [];
+    _selectedEvent = null;
+    _safeNotifyListeners();
   }
 } 

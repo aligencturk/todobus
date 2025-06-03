@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/group_models.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../services/storage_service.dart';
+import '../services/refresh_service.dart';
 
 enum GroupLoadStatus { initial, loading, loaded, error }
 
@@ -10,12 +12,14 @@ class GroupViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LoggerService _logger = LoggerService();
   final StorageService _storageService = StorageService();
+  final RefreshService _refreshService = RefreshService();
   
   GroupLoadStatus _status = GroupLoadStatus.initial;
   String _errorMessage = '';
   List<Group> _groups = [];
   bool _isDisposed = false;
   bool _isLoadingFromApi = false;
+  StreamSubscription? _refreshSubscription;
   
   // Proje durumları için önbellek
   List<ProjectStatus> _cachedProjectStatuses = [];
@@ -28,6 +32,18 @@ class GroupViewModel with ChangeNotifier {
   int get totalProjects => _groups.fold(0, (sum, group) => sum + group.projects.length);
   List<ProjectStatus> get cachedProjectStatuses => _cachedProjectStatuses;
   
+  GroupViewModel() {
+    _initRefreshListener();
+  }
+  
+  void _initRefreshListener() {
+    _refreshSubscription = _refreshService.refreshStream.listen((refreshType) {
+      if (refreshType == 'groups' || refreshType == 'all') {
+        loadGroups();
+      }
+    });
+  }
+  
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
     if (!_isDisposed) {
@@ -38,6 +54,7 @@ class GroupViewModel with ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _refreshSubscription?.cancel();
     super.dispose();
   }
   
@@ -50,31 +67,12 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      // Önbellekten grupları kontrol et ve göster
-      final cachedGroups = _storageService.getCachedGroups();
-      if (cachedGroups != null) {
-        _groups = cachedGroups;
-        _status = GroupLoadStatus.loaded;
-        _safeNotifyListeners();
-        
-        // Önbellek güncelliğini kontrol et
-        if (_storageService.isCacheStale()) {
-          // Arka planda güncel verileri yükle
-          _loadGroupsFromApi();
-        }
-      } else {
-        // Önbellekte grup yoksa API'den yükle
-        await _loadGroupsFromApi();
-      }
+      // Her zaman API'den yükle, önbellekten alma
+      await _loadGroupsFromApi();
     } catch (e) {
-      // Hata durumunda önbellekte veri varsa onları göster, yoksa hata göster
-      if (_groups.isNotEmpty) {
-        _status = GroupLoadStatus.loaded;
-      } else {
-        _status = GroupLoadStatus.error;
-        _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
-        _logger.e('Gruplar yüklenirken hata: $e');
-      }
+      _status = GroupLoadStatus.error;
+      _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
+      _logger.e('Gruplar yüklenirken hata: $e');
       _safeNotifyListeners();
     }
   }
@@ -91,19 +89,16 @@ class GroupViewModel with ChangeNotifier {
       _groups = groups;
       _status = GroupLoadStatus.loaded;
       
-      // Grupları önbelleğe kaydet
-      await _storageService.cacheGroups(_groups);
+      // Önbelleğe kaydetmeyi kaldırdık
       
-      _logger.i('${_groups.length} grup yüklendi ve önbelleğe kaydedildi');
+      _logger.i('${_groups.length} grup yüklendi');
       _safeNotifyListeners();
     } catch (e) {
-      // API'den yükleme sırasında hata oluşursa ve önbellekte veri yoksa hata göster
-      if (_groups.isEmpty) {
-        _status = GroupLoadStatus.error;
-        _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
-        _logger.e('Gruplar API\'den yüklenirken hata: $e');
-        _safeNotifyListeners();
-      }
+      // API'den yükleme sırasında hata
+      _status = GroupLoadStatus.error;
+      _errorMessage = "Gruplar yüklenirken bir hata oluştu: ${e.toString()}";
+      _logger.e('Gruplar API\'den yüklenirken hata: $e');
+      _safeNotifyListeners();
     } finally {
       _isLoadingFromApi = false;
     }
@@ -126,6 +121,8 @@ class GroupViewModel with ChangeNotifier {
       if (success) {
         // Grup başarıyla oluşturulduğunda grupları yeniden yükle
         await _loadGroupsFromApi();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshGroups();
         return true;
       } else {
         // Başarısız olursa önceki duruma geri dön
@@ -158,6 +155,8 @@ class GroupViewModel with ChangeNotifier {
       if (success) {
         // Grup başarıyla güncellendiğinde grupları yeniden yükle
         await _loadGroupsFromApi();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshGroups();
         return true;
       } else {
         // Başarısız olursa önceki duruma geri dön
@@ -205,6 +204,8 @@ class GroupViewModel with ChangeNotifier {
       if (success) {
         // Başarı durumunda grupları yeniden yükle
         await loadGroups();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshGroups();
         return true;
       }
       
@@ -265,6 +266,8 @@ class GroupViewModel with ChangeNotifier {
       if (success) {
         // Grup başarıyla silindiğinde grupları yeniden yükle
         await _loadGroupsFromApi();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshGroups();
         return true;
       } else {
         // Başarısız olursa önceki duruma geri dön
@@ -282,24 +285,24 @@ class GroupViewModel with ChangeNotifier {
     }
   }
   
-  // Grup raporları (logları) getir
-  Future<List<GroupLog>> getGroupReports(int groupID, bool isAdmin) async {
+  // Grup kullanıcılarını getir
+  Future<List<GroupUser>> getGroupUsers(int groupID) async {
     try {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final reports = await _apiService.group.getGroupReports(groupID, isAdmin);
+      final groupDetail = await _apiService.group.getGroupDetail(groupID);
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
       
-      return reports;
+      return groupDetail.users;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
-      _logger.e('Grup raporları yüklenirken hata: $e');
+      _logger.e('Grup kullanıcıları yüklenirken hata: $e');
       _safeNotifyListeners();
-      return [];
+      throw Exception('Grup kullanıcıları yüklenemedi: $e');
     }
   }
   
@@ -352,6 +355,14 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
       
+      if (success) {
+        // Başarılı olduğunda verileri yenile
+        await loadGroups();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshProjects();
+        _refreshService.refreshGroups();
+      }
+      
       return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
@@ -370,7 +381,8 @@ class GroupViewModel with ChangeNotifier {
     String projectName, 
     String projectDesc, 
     String projectStartDate, 
-    String projectEndDate
+    String projectEndDate,
+    List<Map<String, dynamic>>? users
   ) async {
     try {
       _status = GroupLoadStatus.loading;
@@ -384,11 +396,20 @@ class GroupViewModel with ChangeNotifier {
         projectName, 
         projectDesc, 
         projectStartDate, 
-        projectEndDate
+        projectEndDate,
+        users
       );
       
       _status = GroupLoadStatus.loaded;
       _safeNotifyListeners();
+      
+      if (success) {
+        // Başarılı olduğunda verileri yenile
+        await loadGroups();
+        // Tüm uygulamaya bildirim gönder
+        _refreshService.refreshProjects();
+        _refreshService.refreshGroups();
+      }
       
       return success;
     } catch (e) {
@@ -400,26 +421,71 @@ class GroupViewModel with ChangeNotifier {
     }
   }
   
-  // Projeden kullanıcı çıkar
-  Future<bool> removeUserFromProject(int groupID, int projectID, int userID) async {
+  // Projeye kullanıcıları ekle
+  Future<bool> addUsersToProject(int groupID, int projectID, List<Map<String, int>> users) async {
     try {
       _status = GroupLoadStatus.loading;
       _errorMessage = '';
       _safeNotifyListeners();
       
-      final success = await _apiService.project.removeUserFromProject(groupID, projectID, userID);
-      
-      if (success) {
-        _status = GroupLoadStatus.loaded;
+      // Önce proje detaylarını al
+      final projectDetail = await getProjectDetail(projectID, groupID);
+      if (projectDetail == null) {
+        _logger.e('Proje detayları alınamadı');
+        _status = GroupLoadStatus.error;
+        _errorMessage = 'Proje detayları alınamadı';
         _safeNotifyListeners();
-        return true;
+        return false;
       }
       
-      return false;
+      // Mevcut kullanıcıları yeni kullanıcılarla birleştir
+      List<Map<String, dynamic>> allUsers = [];
+      
+      // Mevcut kullanıcıları ekle
+      for (var user in projectDetail.users) {
+        allUsers.add({
+          'userID': user.userID,
+          'userRole': user.userRoleID
+        });
+      }
+      
+      // Yeni kullanıcıları ekle (eğer zaten yoksa)
+      for (var newUser in users) {
+        // Kullanıcı zaten projede mi kontrol et
+        bool userExists = false;
+        for (var existingUser in allUsers) {
+          if (existingUser['userID'] == newUser['userID']) {
+            userExists = true;
+            break;
+          }
+        }
+        
+        // Eğer kullanıcı zaten yoksa ekle
+        if (!userExists) {
+          allUsers.add(newUser);
+        }
+      }
+      
+      // Proje bilgilerini güncelleyerek tüm kullanıcıları gönder
+      final success = await _apiService.project.updateProject(
+        groupID,
+        projectID,
+        projectDetail.projectStatusID,
+        projectDetail.projectName,
+        projectDetail.projectDesc,
+        projectDetail.proStartDate,
+        projectDetail.proEndDate,
+        allUsers
+      );
+      
+      _status = GroupLoadStatus.loaded;
+      _safeNotifyListeners();
+      
+      return success;
     } catch (e) {
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
-      _logger.e('Kullanıcı projeden çıkarılırken hata: $e');
+      _logger.e('Kullanıcılar projeye eklenirken hata: $e');
       _safeNotifyListeners();
       return false;
     }
@@ -431,18 +497,59 @@ class GroupViewModel with ChangeNotifier {
       _status = GroupLoadStatus.loading;
       _safeNotifyListeners();
       
-      final works = await _apiService.project.getProjectWorks(projectID);
-      
-      _status = GroupLoadStatus.loaded;
-      _safeNotifyListeners();
-      
-      return works;
+      try {
+        final works = await _apiService.project.getProjectWorks(projectID);
+        
+        _status = GroupLoadStatus.loaded;
+        _safeNotifyListeners();
+        
+        return works;
+      } catch (e) {
+        // 417 kodunu içeren hatalar veya "Bu projeye ait henüz görev bulunmamaktadır" mesajı
+        // normal bir durum olarak değerlendirilir
+        if (e.toString().contains('417') || 
+            e.toString().contains('Bu projeye ait henüz görev bulunmamaktadır')) {
+          _status = GroupLoadStatus.loaded; // Hata değil, sadece veri yok
+          _safeNotifyListeners();
+          
+          // Sadece bilgi olarak logla, hata olarak değil
+          _logger.i('Proje için henüz görev bulunmuyor: ${e.toString()}');
+          
+          return []; // Boş liste dön
+        }
+        
+        // Diğer tip hatalar için kontrolcü ayarlama
+        if (_isDisposed) {
+          _logger.i('Proje görevleri yüklenirken iptal edildi: dispose edilmiş');
+          return []; // Sessizce boş liste dön
+        }
+        
+        // 'Bir hata oluştu, lütfen tekrar deneyin.' gibi genel hataları 
+        // da mümkün olduğunca sessizce ele al
+        if (e.toString().contains('Bir hata oluştu') || 
+            e.toString().contains('tekrar deneyin')) {
+          _status = GroupLoadStatus.loaded; // Hata olsa bile loaded olarak işaretle
+          _safeNotifyListeners();
+          
+          // Bilgi olarak logla
+          _logger.i('Proje görevleri yüklenirken genel hata: ${e.toString()}');
+          
+          return []; // Boş liste dön
+        }
+        
+        // Diğer tüm hatalar için rethrow
+        rethrow;
+      }
     } catch (e) {
+      // Tüm beklenmeyen hataları kontrol altına al
       _status = GroupLoadStatus.error;
       _errorMessage = e.toString();
-      _logger.e('Proje görevleri yüklenirken hata: $e');
+      
+      // Önemli: Burada sadece DEBUG modunda log'a yaz, kullanıcıya gösterme
+      _logger.d('Proje görevleri yüklenirken hata: $e');
+      
       _safeNotifyListeners();
-      return [];
+      return []; // Her durumda boş liste dön
     }
   }
   
@@ -640,5 +747,58 @@ class GroupViewModel with ChangeNotifier {
     _groups = [];
     _isLoadingFromApi = false;
     _safeNotifyListeners();
+  }
+  
+  // Projeden kullanıcı çıkar
+  Future<bool> removeUserFromProject(int groupID, int projectID, int userID) async {
+    try {
+      _status = GroupLoadStatus.loading;
+      _errorMessage = '';
+      _safeNotifyListeners();
+      
+      // Önce proje detaylarını al
+      final projectDetail = await getProjectDetail(projectID, groupID);
+      if (projectDetail == null) {
+        _logger.e('Proje detayları alınamadı');
+        _status = GroupLoadStatus.error;
+        _errorMessage = 'Proje detayları alınamadı';
+        _safeNotifyListeners();
+        return false;
+      }
+      
+      // Çıkarılacak kullanıcı hariç tüm kullanıcıları dahil et
+      List<Map<String, dynamic>> updatedUsers = [];
+      for (var user in projectDetail.users) {
+        if (user.userID != userID) {
+          updatedUsers.add({
+            'userID': user.userID,
+            'userRole': user.userRoleID
+          });
+        }
+      }
+      
+      // Proje bilgilerini güncelleyerek kullanıcıyı çıkar
+      final success = await _apiService.project.updateProject(
+        groupID,
+        projectID,
+        projectDetail.projectStatusID,
+        projectDetail.projectName,
+        projectDetail.projectDesc,
+        projectDetail.proStartDate,
+        projectDetail.proEndDate,
+        updatedUsers
+      );
+      
+      _status = GroupLoadStatus.loaded;
+      _safeNotifyListeners();
+      
+      return success;
+    } catch (e) {
+      _status = GroupLoadStatus.error;
+      _errorMessage = e.toString();
+      _logger.e('Kullanıcı projeden çıkarılırken hata: $e');
+      _safeNotifyListeners();
+      return false;
+    }
   }
 } 
