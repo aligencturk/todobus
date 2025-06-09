@@ -21,10 +21,6 @@ class _AIChatWidgetState extends State<AIChatWidget>
   final LoggerService _logger = LoggerService();
   final FocusNode _inputFocusNode = FocusNode();
   
-  late AnimationController _animationController;
-  late Animation<double> _slideAnimation;
-  late Animation<double> _fadeAnimation;
-  
   bool _isLoading = false;
   bool _isInitialized = false;
   bool _isTyping = false;
@@ -32,33 +28,7 @@ class _AIChatWidgetState extends State<AIChatWidget>
   @override
   void initState() {
     super.initState();
-    _setupAnimations();
     _initializeAI();
-  }
-
-  void _setupAnimations() {
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    
-    _slideAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutCubic,
-    ));
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _animationController.forward();
   }
 
   Future<void> _initializeAI() async {
@@ -86,7 +56,6 @@ class _AIChatWidgetState extends State<AIChatWidget>
     _messageController.dispose();
     _scrollController.dispose();
     _inputFocusNode.dispose();
-    _animationController.dispose();
     super.dispose();
   }
 
@@ -284,378 +253,166 @@ class _AIChatWidgetState extends State<AIChatWidget>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, 50 * _slideAnimation.value),
-          child: Opacity(
-            opacity: _fadeAnimation.value,
-            child: _buildChatInterface(),
+    return Scaffold(
+      backgroundColor: CupertinoColors.systemBackground,
+      resizeToAvoidBottomInset: true,
+      appBar: _buildAppBar(),
+      body: Column(
+        children: [
+          Expanded(child: _buildChatArea()),
+          if (_isInitialized) _buildInputArea(),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: CupertinoColors.systemBlue,
+      elevation: 0,
+      leading: Container(
+        margin: const EdgeInsets.only(left: 16),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            shape: BoxShape.circle,
           ),
-        );
+          child: const Icon(
+            CupertinoIcons.chat_bubble_2,
+            color: Colors.white,
+            size: 16,
+          ),
+        ),
+      ),
+      title: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'AI Asistan',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 8),
+              Text(
+                'BETA',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Icon(
+                Icons.circle,
+                color: CupertinoColors.systemGreen,
+                size: 8,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'Çevrimiçi',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        if (_isInitialized && _aiService.chatHistory.isNotEmpty)
+          IconButton(
+            icon: const Icon(CupertinoIcons.refresh, color: Colors.white),
+            onPressed: _startNewChat,
+          ),
+        IconButton(
+          icon: const Icon(CupertinoIcons.info_circle, color: Colors.white),
+          onPressed: _showBetaInfo,
+        ),
+        IconButton(
+          icon: const Icon(CupertinoIcons.xmark, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChatArea() {
+    final messages = _aiService.chatHistory;
+
+    if (!_isInitialized) {
+      return _buildLoadingState();
+    }
+
+    if (messages.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      itemCount: messages.length + (_isTyping ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == messages.length && _isTyping) {
+          return _buildTypingIndicator();
+        }
+        return _buildMessageBubble(messages[index]);
       },
     );
   }
 
-  Widget _buildChatInterface() {
-    final theme = Theme.of(context);
-    final isIOS = Platform.isIOS;
-    final mediaQuery = MediaQuery.of(context);
-    final keyboardHeight = mediaQuery.viewInsets.bottom;
-    final screenHeight = mediaQuery.size.height;
-    final availableHeight = screenHeight - keyboardHeight - mediaQuery.padding.top;
-    
-    return Container(
-      height: availableHeight * 0.9, // Ekranın %90'ını kullan
-      constraints: BoxConstraints(
-        maxHeight: availableHeight * 0.9,
-        minHeight: 300,
-      ),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBackground,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildHeader(isIOS, theme),
-          Expanded(child: _buildChatArea(isIOS)),
-          if (_isInitialized) _buildInputArea(isIOS, theme),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader(bool isIOS, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-      decoration: BoxDecoration(
-        color: CupertinoColors.systemBlue,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: CupertinoColors.systemBlue.withOpacity(0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                CupertinoIcons.chat_bubble_2,
-                color: Colors.white,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Text(
-                        'AI Asistan',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'BETA',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            decoration: TextDecoration.none,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: _isInitialized ? CupertinoColors.systemGreen : CupertinoColors.systemOrange,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _isInitialized ? 'Çevrimiçi' : 'Bağlanıyor...',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.white.withOpacity(0.9),
-                          fontWeight: FontWeight.w400,
-                          decoration: TextDecoration.none,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: _showBetaInfo,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      CupertinoIcons.info_circle,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (_isInitialized && _aiService.chatHistory.isNotEmpty) ...[
-              Container(
-                margin: const EdgeInsets.only(right: 8),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(20),
-                    onTap: _startNewChat,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        CupertinoIcons.refresh,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    CupertinoIcons.xmark,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChatArea(bool isIOS) {
-    final messages = _aiService.chatHistory;
-
-    return Expanded(
-      child: !_isInitialized
-          ? _buildLoadingState(isIOS)
-          : messages.isEmpty
-              ? _buildEmptyState(isIOS)
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(16),
-                  itemCount: messages.length + (_isTyping ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == messages.length && _isTyping) {
-                      return _buildTypingIndicator(isIOS);
-                    }
-                    return _buildMessageBubble(messages[index], isIOS);
-                  },
-                ),
-    );
-  }
-
-  Widget _buildLoadingState(bool isIOS) {
-    return Center(
+  Widget _buildLoadingState() {
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const CupertinoActivityIndicator(radius: 16),
-          ),
-          const SizedBox(height: 16),
-          const Text(
+          CupertinoActivityIndicator(radius: 16),
+          SizedBox(height: 16),
+          Text(
             'AI Asistan başlatılıyor...',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              decoration: TextDecoration.none,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Bu birkaç saniye sürebilir',
-            style: TextStyle(
-              fontSize: 14,
-              color: CupertinoColors.secondaryLabel,
-              decoration: TextDecoration.none,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(bool isIOS) {
-    return Center(
+  Widget _buildEmptyState() {
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: CupertinoColors.systemBlue.withOpacity(0.3),
-                  blurRadius: 20,
-                  spreadRadius: 5,
-                ),
-              ],
-            ),
-            child: const Icon(
-              CupertinoIcons.chat_bubble_2,
-              color: Colors.white,
-              size: 36,
+          Icon(
+            CupertinoIcons.chat_bubble_2,
+            size: 64,
+            color: CupertinoColors.systemBlue,
+          ),
+          SizedBox(height: 24),
+          Text(
+            'AI Asistan',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: CupertinoColors.label,
             ),
           ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'AI Asistan',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: CupertinoColors.label,
-                  decoration: TextDecoration.none,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: CupertinoColors.systemBlue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: CupertinoColors.systemBlue.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: const Text(
-                  'BETA',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: CupertinoColors.systemBlue,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemBlue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'Akıllı Sohbet Asistanınız',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: CupertinoColors.systemBlue,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Proje yönetimi, görev planlama ve iş akışı konularında\nsize yardımcı olmak için buradayım.',
+          SizedBox(height: 8),
+          Text(
+            'Proje yönetimi ve iş akışı konularında\nsize yardımcı olmak için buradayım.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 16,
               color: CupertinoColors.secondaryLabel,
-              height: 1.5,
-              decoration: TextDecoration.none,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: CupertinoColors.systemGrey6,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              '💡 İpucu: Mesajları kopyalamak için basılı tutun',
-              style: TextStyle(
-                fontSize: 12,
-                color: CupertinoColors.secondaryLabel,
-                decoration: TextDecoration.none,
-              ),
             ),
           ),
         ],
@@ -663,7 +420,7 @@ class _AIChatWidgetState extends State<AIChatWidget>
     );
   }
 
-  Widget _buildTypingIndicator(bool isIOS) {
+  Widget _buildTypingIndicator() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -687,38 +444,12 @@ class _AIChatWidgetState extends State<AIChatWidget>
               color: CupertinoColors.systemGrey6,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Yazıyor',
-                  style: TextStyle(
-                    color: CupertinoColors.secondaryLabel,
-                    fontSize: 14,
-                    decoration: TextDecoration.none,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 20,
-                  height: 12,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(3, (index) {
-                      return AnimatedContainer(
-                        duration: Duration(milliseconds: 400 + (index * 100)),
-                        curve: Curves.easeInOut,
-                        width: 4,
-                        height: 4,
-                        decoration: const BoxDecoration(
-                          color: CupertinoColors.systemGrey3,
-                          shape: BoxShape.circle,
-                        ),
-                      );
-                    }),
-                  ),
-                ),
-              ],
+            child: const Text(
+              'Yazıyor...',
+              style: TextStyle(
+                color: CupertinoColors.secondaryLabel,
+                fontSize: 14,
+              ),
             ),
           ),
         ],
@@ -726,7 +457,7 @@ class _AIChatWidgetState extends State<AIChatWidget>
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message, bool isIOS) {
+  Widget _buildMessageBubble(ChatMessage message) {
     final isUser = message.isUser;
     
     return Padding(
@@ -763,16 +494,6 @@ class _AIChatWidgetState extends State<AIChatWidget>
                     bottomLeft: isUser ? const Radius.circular(18) : const Radius.circular(4),
                     bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(18),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isUser 
-                        ? CupertinoColors.systemBlue.withOpacity(0.3)
-                        : Colors.black.withOpacity(0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                      spreadRadius: 0,
-                    ),
-                  ],
                 ),
                 child: Text(
                   message.text,
@@ -780,8 +501,6 @@ class _AIChatWidgetState extends State<AIChatWidget>
                     color: isUser ? Colors.white : CupertinoColors.label,
                     fontSize: 15,
                     height: 1.4,
-                    fontWeight: FontWeight.w400,
-                    decoration: TextDecoration.none,
                   ),
                 ),
               ),
@@ -807,53 +526,40 @@ class _AIChatWidgetState extends State<AIChatWidget>
     );
   }
 
-  Widget _buildInputArea(bool isIOS, ThemeData theme) {
+  Widget _buildInputArea() {
     return Container(
-      constraints: const BoxConstraints(
-        minHeight: 70,
-        maxHeight: 120,
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
         color: CupertinoColors.systemGroupedBackground,
         border: Border(
-          top: BorderSide(
-            color: CupertinoColors.separator,
-            width: 0.5,
-          ),
+          top: BorderSide(color: CupertinoColors.separator, width: 0.5),
         ),
       ),
       child: SafeArea(
         top: false,
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
               child: Container(
-                constraints: const BoxConstraints(
-                  maxHeight: 80,
-                ),
                 decoration: BoxDecoration(
                   color: CupertinoColors.tertiarySystemFill,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(25),
                   border: Border.all(
                     color: _inputFocusNode.hasFocus 
                       ? CupertinoColors.systemBlue
                       : Colors.transparent,
-                    width: _inputFocusNode.hasFocus ? 1.5 : 0,
+                    width: _inputFocusNode.hasFocus ? 2 : 0,
                   ),
                 ),
                 child: TextField(
                   controller: _messageController,
                   focusNode: _inputFocusNode,
                   enabled: !_isLoading,
-                  maxLines: 3,
+                  maxLines: 4,
                   minLines: 1,
                   style: const TextStyle(
                     fontSize: 15,
                     color: CupertinoColors.label,
-                    fontWeight: FontWeight.w400,
-                    decoration: TextDecoration.none,
                   ),
                   decoration: const InputDecoration(
                     hintText: 'Mesajınızı yazın...',
@@ -862,22 +568,18 @@ class _AIChatWidgetState extends State<AIChatWidget>
                     hintStyle: TextStyle(
                       color: CupertinoColors.placeholderText,
                       fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                      decoration: TextDecoration.none,
                     ),
                   ),
                   onSubmitted: (_) => _sendMessage(),
                   textInputAction: TextInputAction.send,
-                  onChanged: (value) {
-                    setState(() {});
-                  },
+                  onChanged: (value) => setState(() {}),
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Container(
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: _isLoading || _messageController.text.trim().isEmpty
                   ? CupertinoColors.systemGrey4
@@ -887,25 +589,22 @@ class _AIChatWidgetState extends State<AIChatWidget>
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(24),
                   onTap: (_isLoading || _messageController.text.trim().isEmpty) 
                     ? null 
                     : _sendMessage,
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(shape: BoxShape.circle),
-                    child: _isLoading
-                        ? const CupertinoActivityIndicator(
+                  child: _isLoading
+                      ? const Center(
+                          child: CupertinoActivityIndicator(
                             color: Colors.white,
                             radius: 10,
-                          )
-                        : const Icon(
-                            CupertinoIcons.paperplane_fill,
-                            color: Colors.white,
-                            size: 16,
                           ),
-                  ),
+                        )
+                      : const Icon(
+                          CupertinoIcons.paperplane_fill,
+                          color: Colors.white,
+                          size: 16,
+                        ),
                 ),
               ),
             ),

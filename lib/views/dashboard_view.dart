@@ -478,15 +478,11 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     
     _updateAIAssistantData(profileViewModel, groupViewModel, dashboardViewModel);
     
-    // Chat ekranını göster
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      enableDrag: true,
-      isDismissible: true,
-      backgroundColor: Colors.transparent,
-      useSafeArea: true,
-      builder: (context) => const AIChatWidget(),
+    // Chat ekranını tam sayfa olarak göster
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (context) => const AIChatWidget(),
+      ),
     );
   }
 
