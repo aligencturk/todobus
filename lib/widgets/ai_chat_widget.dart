@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'dart:io' show Platform;
 import '../services/ai_assistant_service.dart';
@@ -139,22 +140,146 @@ class _AIChatWidgetState extends State<AIChatWidget>
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(message)),
+            Icon(CupertinoIcons.exclamationmark_triangle, color: CupertinoColors.systemRed, size: 20),
+            SizedBox(width: 8),
+            Text('Hata'),
           ],
         ),
-        backgroundColor: Colors.red[600],
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
-        duration: const Duration(seconds: 3),
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('Tamam'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
       ),
     );
+  }
+
+  void _showBetaInfo() {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.info_circle, color: CupertinoColors.systemBlue, size: 24),
+            SizedBox(width: 8),
+            Text('Beta Sürümü'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 12),
+            Text(
+              'AI Asistan şu anda beta sürecindedir. Deneyiminizi geliştirmek için geri dönüşleriniz çok değerli!',
+              style: TextStyle(fontSize: 15),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Önerilerinizi ve hata bildirimlerinizi şu adrese gönderebilirsiniz:',
+              style: TextStyle(fontSize: 14, color: CupertinoColors.secondaryLabel),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'info@todobus.tr',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: CupertinoColors.systemBlue,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('E-posta Kopyala'),
+            onPressed: () {
+              Clipboard.setData(const ClipboardData(text: 'info@todobus.tr'));
+              Navigator.pop(context);
+              _showSuccessSnackBar('E-posta adresi kopyalandı!');
+            },
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            child: const Text('Tamam'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    final overlay = Overlay.of(context);
+    late OverlayEntry overlayEntry;
+    
+    overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 100,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemGreen,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  CupertinoIcons.check_mark_circled,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    overlay.insert(overlayEntry);
+    
+    // 2 saniye sonra kaldır
+    Future.delayed(const Duration(seconds: 2), () {
+      overlayEntry.remove();
+    });
+  }
+
+  void _copyMessage(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    _showSuccessSnackBar('Mesaj kopyalandı!');
   }
 
   @override
@@ -236,14 +361,35 @@ class _AIChatWidgetState extends State<AIChatWidget>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'AI Asistan',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      decoration: TextDecoration.none,
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        'AI Asistan',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'BETA',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            decoration: TextDecoration.none,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   Row(
                     children: [
@@ -268,6 +414,28 @@ class _AIChatWidgetState extends State<AIChatWidget>
                     ],
                   ),
                 ],
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.only(right: 8),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: _showBetaInfo,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      CupertinoIcons.info_circle,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                ),
               ),
             ),
             if (_isInitialized && _aiService.chatHistory.isNotEmpty) ...[
@@ -402,14 +570,40 @@ class _AIChatWidgetState extends State<AIChatWidget>
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
-            'AI Asistan',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: CupertinoColors.label,
-              decoration: TextDecoration.none,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'AI Asistan',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: CupertinoColors.label,
+                  decoration: TextDecoration.none,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: CupertinoColors.systemBlue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: CupertinoColors.systemBlue.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: const Text(
+                  'BETA',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: CupertinoColors.systemBlue,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Container(
@@ -437,6 +631,22 @@ class _AIChatWidgetState extends State<AIChatWidget>
               color: CupertinoColors.secondaryLabel,
               height: 1.5,
               decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: CupertinoColors.systemGrey6,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              '💡 İpucu: Mesajları kopyalamak için basılı tutun',
+              style: TextStyle(
+                fontSize: 12,
+                color: CupertinoColors.secondaryLabel,
+                decoration: TextDecoration.none,
+              ),
             ),
           ),
         ],
@@ -532,35 +742,38 @@ class _AIChatWidgetState extends State<AIChatWidget>
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: isUser
-                    ? CupertinoColors.systemBlue
-                    : CupertinoColors.systemGrey6,
-                borderRadius: BorderRadius.circular(18).copyWith(
-                  bottomLeft: isUser ? const Radius.circular(18) : const Radius.circular(4),
-                  bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(18),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: isUser 
-                      ? CupertinoColors.systemBlue.withOpacity(0.3)
-                      : Colors.black.withOpacity(0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                    spreadRadius: 0,
+            child: GestureDetector(
+              onLongPress: () => _copyMessage(message.text),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isUser
+                      ? CupertinoColors.systemBlue
+                      : CupertinoColors.systemGrey6,
+                  borderRadius: BorderRadius.circular(18).copyWith(
+                    bottomLeft: isUser ? const Radius.circular(18) : const Radius.circular(4),
+                    bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(18),
                   ),
-                ],
-              ),
-              child: Text(
-                message.text,
-                style: TextStyle(
-                  color: isUser ? Colors.white : CupertinoColors.label,
-                  fontSize: 15,
-                  height: 1.4,
-                  fontWeight: FontWeight.w400,
-                  decoration: TextDecoration.none,
+                  boxShadow: [
+                    BoxShadow(
+                      color: isUser 
+                        ? CupertinoColors.systemBlue.withOpacity(0.3)
+                        : Colors.black.withOpacity(0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                      spreadRadius: 0,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  message.text,
+                  style: TextStyle(
+                    color: isUser ? Colors.white : CupertinoColors.label,
+                    fontSize: 15,
+                    height: 1.4,
+                    fontWeight: FontWeight.w400,
+                    decoration: TextDecoration.none,
+                  ),
                 ),
               ),
             ),
