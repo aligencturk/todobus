@@ -303,12 +303,15 @@ class _AIChatWidgetState extends State<AIChatWidget>
     final isIOS = Platform.isIOS;
     final mediaQuery = MediaQuery.of(context);
     final keyboardHeight = mediaQuery.viewInsets.bottom;
+    final screenHeight = mediaQuery.size.height;
+    final availableHeight = screenHeight - keyboardHeight - mediaQuery.padding.top;
     
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
-      curve: Curves.easeOutCubic,
-      height: MediaQuery.of(context).size.height * 0.75,
-      margin: EdgeInsets.only(bottom: keyboardHeight),
+    return Container(
+      height: availableHeight * 0.9, // Ekranın %90'ını kullan
+      constraints: BoxConstraints(
+        maxHeight: availableHeight * 0.9,
+        minHeight: 300,
+      ),
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -322,9 +325,10 @@ class _AIChatWidgetState extends State<AIChatWidget>
         ],
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           _buildHeader(isIOS, theme),
-          _buildChatArea(isIOS),
+          Expanded(child: _buildChatArea(isIOS)),
           if (_isInitialized) _buildInputArea(isIOS, theme),
         ],
       ),
@@ -804,15 +808,12 @@ class _AIChatWidgetState extends State<AIChatWidget>
   }
 
   Widget _buildInputArea(bool isIOS, ThemeData theme) {
-    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    
     return Container(
-      padding: EdgeInsets.fromLTRB(
-        20, 
-        16, 
-        20, 
-        keyboardHeight > 0 ? 16 : 20
+      constraints: const BoxConstraints(
+        minHeight: 70,
+        maxHeight: 120,
       ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: const BoxDecoration(
         color: CupertinoColors.systemGroupedBackground,
         border: Border(
@@ -824,26 +825,29 @@ class _AIChatWidgetState extends State<AIChatWidget>
       ),
       child: SafeArea(
         top: false,
-        minimum: EdgeInsets.only(bottom: keyboardHeight > 0 ? 8 : 0),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
               child: Container(
+                constraints: const BoxConstraints(
+                  maxHeight: 80,
+                ),
                 decoration: BoxDecoration(
                   color: CupertinoColors.tertiarySystemFill,
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: _inputFocusNode.hasFocus 
                       ? CupertinoColors.systemBlue
                       : Colors.transparent,
-                    width: _inputFocusNode.hasFocus ? 2 : 0,
+                    width: _inputFocusNode.hasFocus ? 1.5 : 0,
                   ),
                 ),
                 child: TextField(
                   controller: _messageController,
                   focusNode: _inputFocusNode,
                   enabled: !_isLoading,
-                  maxLines: keyboardHeight > 0 ? 2 : 4, // Klavye açıkken satır sayısını azalt
+                  maxLines: 3,
                   minLines: 1,
                   style: const TextStyle(
                     fontSize: 15,
@@ -854,7 +858,7 @@ class _AIChatWidgetState extends State<AIChatWidget>
                   decoration: const InputDecoration(
                     hintText: 'Mesajınızı yazın...',
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     hintStyle: TextStyle(
                       color: CupertinoColors.placeholderText,
                       fontSize: 15,
@@ -872,6 +876,8 @@ class _AIChatWidgetState extends State<AIChatWidget>
             ),
             const SizedBox(width: 12),
             Container(
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: _isLoading || _messageController.text.trim().isEmpty
                   ? CupertinoColors.systemGrey4
@@ -881,23 +887,23 @@ class _AIChatWidgetState extends State<AIChatWidget>
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(25),
+                  borderRadius: BorderRadius.circular(22),
                   onTap: (_isLoading || _messageController.text.trim().isEmpty) 
                     ? null 
                     : _sendMessage,
                   child: Container(
-                    width: 50,
-                    height: 50,
+                    width: 44,
+                    height: 44,
                     decoration: const BoxDecoration(shape: BoxShape.circle),
                     child: _isLoading
                         ? const CupertinoActivityIndicator(
                             color: Colors.white,
-                            radius: 12,
+                            radius: 10,
                           )
                         : const Icon(
                             CupertinoIcons.paperplane_fill,
                             color: Colors.white,
-                            size: 18,
+                            size: 16,
                           ),
                   ),
                 ),

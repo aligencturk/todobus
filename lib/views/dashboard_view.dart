@@ -485,13 +485,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       enableDrag: true,
       isDismissible: true,
       backgroundColor: Colors.transparent,
-      useSafeArea: false,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: const AIChatWidget(),
-      ),
+      useSafeArea: true,
+      builder: (context) => const AIChatWidget(),
     );
   }
 
