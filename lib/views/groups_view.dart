@@ -360,7 +360,7 @@ class _GroupsViewState extends State<GroupsView> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 4),
       child: CupertinoSearchTextField(
         controller: _searchController,
         placeholder: 'Grup Ara',
@@ -371,7 +371,7 @@ class _GroupsViewState extends State<GroupsView> {
 
   Widget _buildFilterChips() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
       child: Row(
         children: [
           _buildFilterChip(0, 'Tümü'),
