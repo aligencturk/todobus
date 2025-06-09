@@ -11,10 +11,12 @@ import '../services/snackbar_service.dart';
 import '../services/user_service.dart';
 import '../services/notification_service.dart';
 import '../services/version_check_service.dart';
+import '../services/ai_assistant_service.dart';
 import '../viewmodels/group_viewmodel.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import '../viewmodels/event_viewmodel.dart';
 import '../models/group_models.dart';
+import '../widgets/ai_chat_widget.dart';
 import '../main_app.dart';
 import 'login_view.dart';
 import 'profile_view.dart';
@@ -58,13 +60,14 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   final UserService _userService = UserService();
   final NotificationService _notificationService = NotificationService.instance;
   final VersionCheckService _versionCheckService = VersionCheckService();
+  final AIAssistantService _aiAssistantService = AIAssistantService.instance;
   
   List<GroupLog> _recentLogs = [];
   bool _isLoadingLogs = false;
   bool _isRefreshing = false;
   int _unreadNotifications = 0;
   
-  List<ProjectPreviewItem> _userProjects = [];
+  List<Map<String, dynamic>> _userProjects = [];
   
   // Tamamlanan görevlerin animasyonlu çıkış için geçici listesi ve animasyon kontrolleri
   Map<int, _TaskCompletionAnimationState> _completingTasksMap = {};
@@ -161,6 +164,9 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         if (mounted) {
           // Gruplar yüklendikten sonra projeleri yükle ve UI'ı güncelle
           _loadUserProjects(groupViewModel);
+          
+          // AI Assistant'a kullanıcı verilerini gönder
+          _updateAIAssistantData(profileViewModel, groupViewModel, dashboardViewModel);
           
           // FCM topic aboneliklerini arka planda işle
           if (profileViewModel.user != null) {
@@ -383,6 +389,25 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     }
   }
   
+  // AI Assistant'a kullanıcı verilerini güncelle
+  void _updateAIAssistantData(
+    ProfileViewModel profileViewModel, 
+    GroupViewModel groupViewModel, 
+    DashboardViewModel dashboardViewModel
+  ) {
+    try {
+      _aiAssistantService.updateUserData(
+        user: profileViewModel.user,
+        groups: groupViewModel.groups,
+        tasks: dashboardViewModel.userTasks,
+        projects: _userProjects,
+      );
+      _logger.i('AI Assistant kullanıcı verileri güncellendi');
+    } catch (e) {
+      _logger.e('AI Assistant veri güncelleme hatası: $e');
+    }
+  }
+
   // Kullanıcı verilerini yükleme
   Future<void> _loadUserData(ProfileViewModel profileViewModel) async {
     try {
@@ -440,6 +465,26 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         ),
       );
     }
+  }
+
+  // AI Assistant'ı göster
+  void _showAIAssistant() {
+    if (!mounted) return;
+    
+    // Kullanıcı verilerini AI Assistant'a güncelle
+    final profileViewModel = Provider.of<ProfileViewModel>(context, listen: false);
+    final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+    final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
+    
+    _updateAIAssistantData(profileViewModel, groupViewModel, dashboardViewModel);
+    
+    // Chat ekranını göster
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const AIChatWidget(),
+    );
   }
 
   @override
@@ -618,8 +663,25 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       ),
       body: SafeArea(
         bottom: false,
-        child: _buildDashboardBody(dashboardViewModel, groupViewModel, eventViewModel, isIOS),
-      )
+        child: Stack(
+          children: [
+            _buildDashboardBody(dashboardViewModel, groupViewModel, eventViewModel, isIOS),
+            // AI Assistant Floating Action Button
+            Positioned(
+              bottom: 100,
+              right: 16,
+              child: FloatingActionButton(
+                onPressed: _showAIAssistant,
+                backgroundColor: isIOS ? CupertinoColors.activeBlue : Theme.of(context).primaryColor,
+                child: Icon(
+                  isIOS ? CupertinoIcons.chat_bubble_2 : Icons.smart_toy,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
   
@@ -1207,7 +1269,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     );
   }
   
-  Widget _buildProjectCard(ProjectPreviewItem project) {
+  Widget _buildProjectCard(Map<String, dynamic> project) {
     final bool isIOS = Platform.isIOS;
     final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
     final LoggerService _projectLogger = LoggerService();
@@ -1220,7 +1282,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     final statuses = groupViewModel.cachedProjectStatuses;
     
     // Status ID'sine göre varsayılan değerler ata (API'den bulunamazsa kullanılır)
-    switch (project.projectStatusID) {
+    switch (project['projectStatusID'] as int) {
       case 1:
         baseColor = isIOS ? CupertinoColors.systemBlue : Colors.blue;
         projectIconData = isIOS ? CupertinoIcons.plus_app : Icons.add_box;
@@ -1256,15 +1318,15 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     // API'den durumlar yüklendiyse, statuses içinde ilgili durum var mı kontrol et 
     if (statuses.isNotEmpty) {
       // İlgili durumu ara
-      final matchingStatus = statuses.where((s) => s.statusID == project.projectStatusID).toList();
+      final matchingStatus = statuses.where((s) => s.statusID == (project['projectStatusID'] as int)).toList();
       if (matchingStatus.isNotEmpty) {
         // Durumun renk ve adını API'den kullan
         final status = matchingStatus.first;
         baseColor = _hexToColor(status.statusColor);
         statusText = status.statusName;
-        _projectLogger.i('Proje ${project.projectName} için API durumu bulundu: ${status.statusName}, Color: ${status.statusColor}');
+        _projectLogger.i('Proje ${project['projectName']} için API durumu bulundu: ${status.statusName}, Color: ${status.statusColor}');
       } else {
-        _projectLogger.w('Proje ${project.projectName} (ID: ${project.projectStatusID}) için uygun durum bulunamadı. Varsayılan değer kullanılıyor.');
+        _projectLogger.w('Proje ${project['projectName']} (ID: ${project['projectStatusID']}) için uygun durum bulunamadı. Varsayılan değer kullanılıyor.');
       }
     } else {
       _projectLogger.w('API proje durumları yüklenmemiş. Varsayılan değerler kullanılıyor.');
@@ -1280,8 +1342,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
           Navigator.of(context).push(
             CupertinoPageRoute(
               builder: (context) => ProjectDetailView(
-                projectId: project.projectID,
-                groupId: project.groupID,
+                projectId: project['projectID'] as int,
+                groupId: project['groupID'] as int,
               ),
             ),
           );
@@ -1314,7 +1376,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: Text(
-                project.projectName,
+                project['projectName'] as String,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -1782,7 +1844,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     }
     
     // Optimize edilmiş verimli proje listesi oluşturma
-    final List<ProjectPreviewItem> allProjects = [];
+    final List<Map<String, dynamic>> allProjects = [];
     final groups = groupViewModel.groups;
     final int groupCount = groups.length;
     
@@ -1794,15 +1856,13 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       
       for (int j = 0; j < projectCount; j++) {
         final project = projects[j];
-        allProjects.add(
-          ProjectPreviewItem(
-            projectID: project.projectID,
-            projectName: project.projectName,
-            projectStatusID: project.projectStatusID,
-            groupID: group.groupID,
-            groupName: group.groupName,
-          ),
-        );
+        allProjects.add({
+          'projectID': project.projectID,
+          'projectName': project.projectName,
+          'projectStatusID': project.projectStatusID,
+          'groupID': group.groupID,
+          'groupName': group.groupName,
+        });
       }
     }
     
@@ -1859,6 +1919,8 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         // Gruplar yüklendi mi kontrol et
         if (groupViewModel.groups.isNotEmpty) {
           _loadUserProjects(groupViewModel);
+          // AI Assistant verilerini de güncelle
+          _updateAIAssistantData(profileViewModel, groupViewModel, dashboardViewModel);
         } else {
           _logger.w('Refresh sırasında gruplar boş, projeler yüklenemedi');
         }
@@ -2078,26 +2140,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   }
 }
 
-class ProjectPreviewItem {
-  final int projectID;
-  final String projectName;
-  final int projectStatusID;
-  final int groupID;
-  final String groupName;
-  
-  ProjectPreviewItem({
-    required this.projectID,
-    required this.projectName,
-    required this.projectStatusID,
-    required this.groupID,
-    required this.groupName,
-  });
-  
-  @override
-  String toString() {
-    return 'ProjectPreviewItem{projectID: $projectID, projectName: $projectName, projectStatusID: $projectStatusID, groupID: $groupID, groupName: $groupName}';
-  }
-}
+
 
 // Görev tamamlama animasyonu için durum sınıfı
 class _TaskCompletionAnimationState {
