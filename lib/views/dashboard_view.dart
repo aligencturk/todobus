@@ -61,6 +61,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   
   List<GroupLog> _recentLogs = [];
   bool _isLoadingLogs = false;
+  bool _isRefreshing = false;
   int _unreadNotifications = 0;
   
   List<ProjectPreviewItem> _userProjects = [];
@@ -158,6 +159,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         await groupsFuture;
         
         if (mounted) {
+          // Gruplar yüklendikten sonra projeleri yükle ve UI'ı güncelle
           _loadUserProjects(groupViewModel);
           
           // FCM topic aboneliklerini arka planda işle
@@ -180,8 +182,6 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             });
           }
           
-          // Tüm veriler yüklendikten sonra tek bir kez UI güncelle
-          setState(() {});
           _logger.i('Dashboard açıldı: Tüm veriler yüklendi');
         }
       }
@@ -641,10 +641,14 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             child: Padding(
               padding: const EdgeInsets.only(top: 10.0, bottom: 5.0),
               child: Center(
-                child: PlatformIconButton(
-                  icon: Icon(context.platformIcons.refresh),
-                  onPressed: _refreshData,
-                ),
+                child: _isRefreshing
+                  ? const CupertinoActivityIndicator()
+                  : PlatformIconButton(
+                      icon: Icon(context.platformIcons.refresh),
+                      onPressed: () async {
+                        await _refreshData();
+                      },
+                    ),
               ),
             ),
           ),
@@ -687,14 +691,14 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  crossAxisSpacing: 12.0,
-                  mainAxisSpacing: 12.0,
+                  crossAxisSpacing: 10.0,
+                  mainAxisSpacing: 10.0,
                   childAspectRatio: 2.0,
                 ),
                 delegate: SliverChildListDelegate([
                   _buildInfoCard(
                     context,
-                    title: 'Bekleyen Görevler',
+                    title: 'Bekleyen Görevler' ,
                     value: '${dashboardViewModel.incompletedTaskCount}',
                     icon: CupertinoIcons.tray_arrow_up_fill,
                     color: CupertinoColors.systemIndigo,
@@ -1175,8 +1179,10 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
 
   Widget _buildProjectsList(bool isLoadingOverall) {
-        
-    if (isLoadingOverall && _userProjects.isEmpty) {
+    final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+    
+    // Eğer gruplar henüz yüklenmediyse veya genel yükleme devam ediyorsa loading göster
+    if ((isLoadingOverall && _userProjects.isEmpty) || groupViewModel.groups.isEmpty) {
         return SizedBox(height: 120, child: Center(child: CupertinoActivityIndicator()));
     }
     if (_userProjects.isEmpty) {
@@ -1769,6 +1775,12 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   void _loadUserProjects(GroupViewModel groupViewModel) {
     if (!mounted) return;
     
+    // Grupların yüklendiğinden emin ol
+    if (groupViewModel.groups.isEmpty) {
+      _logger.w('Gruplar henüz yüklenmemiş, projeler yüklenemiyor');
+      return;
+    }
+    
     // Optimize edilmiş verimli proje listesi oluşturma
     final List<ProjectPreviewItem> allProjects = [];
     final groups = groupViewModel.groups;
@@ -1798,6 +1810,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       setState(() {
         _userProjects = allProjects;
       });
+      _logger.i('Projeler UI\'a yüklendi: ${allProjects.length} adet');
     }
       
     // Log ekleyelim - hangi durumlara sahip projeler yüklendiğini görelim
@@ -1809,37 +1822,59 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       if (statuses.isNotEmpty) {
         _logger.i('Mevcut durumlar: ${statuses.length} adet');
       }
+    } else {
+      _logger.w('Hiç proje bulunamadı. Grup sayısı: $groupCount');
     }
   }
 
   // Verileri yenileme - optimize edilmiş
   Future<void> _refreshData() async {
-    if (!mounted) return;
+    if (!mounted || _isRefreshing) return;
+    
+    setState(() {
+      _isRefreshing = true;
+    });
     
     _logger.i('Veriler yenileniyor...');
     
     // Önceden önbellekten yüklenen verileri koruruz, yenileyiciyi çekerken yenisini alırız
     final dashboardViewModel = Provider.of<DashboardViewModel>(context, listen: false);
     final groupViewModel = Provider.of<GroupViewModel>(context, listen: false);
+    final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
+    final profileViewModel = Provider.of<ProfileViewModel>(context, listen: false);
     
     try {
       // Tüm veri yüklemelerini paralel olarak başlat
       await Future.wait([
         groupViewModel.getProjectStatuses(),
         dashboardViewModel.loadDashboardData(),
-        groupViewModel.loadGroups()
+        groupViewModel.loadGroups(),
+        eventViewModel.loadEvents(),
+        _loadUserData(profileViewModel),
+        _checkNotifications(),
       ]);
       
-      // Projeleri yükle
+      // Projeleri yükle - gruplar yüklendikten sonra
       if (mounted) {
-        _loadUserProjects(groupViewModel);
-        setState(() {}); // UI'ı güncelle
+        // Gruplar yüklendi mi kontrol et
+        if (groupViewModel.groups.isNotEmpty) {
+          _loadUserProjects(groupViewModel);
+        } else {
+          _logger.w('Refresh sırasında gruplar boş, projeler yüklenemedi');
+        }
         _logger.i('Dashboard verileri yenilendi');
       }
     } catch (e) {
       if (mounted) {
         _logger.e('Veriler yenilenirken hata: $e');
         _snackBarService.showError('Veriler yenilenirken hata oluştu');
+      }
+    } finally {
+      // Her durumda refresh state'ini sıfırla ve UI'ı güncelle
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
       }
     }
   }

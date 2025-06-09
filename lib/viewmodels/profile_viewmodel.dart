@@ -106,7 +106,6 @@ class ProfileViewModel with ChangeNotifier {
     required String userFullname,
     required String userEmail,
     required String userBirthday,
-    required String userPhone,
     required int userGender,
     String profilePhoto = '',
   }) async {
@@ -122,7 +121,6 @@ class ProfileViewModel with ChangeNotifier {
         userFullname: userFullname,
         userEmail: userEmail,
         userBirthday: userBirthday,
-        userPhone: userPhone,
         userGender: userGender,
         profilePhoto: profilePhoto,
       );
@@ -210,7 +208,6 @@ class ProfileViewModel with ChangeNotifier {
         userFullname: _user!.userFullname,
         userEmail: _user!.userEmail,
         userBirthday: _user!.userBirthday,
-        userPhone: _user!.userPhone,
         userGender: int.tryParse(_user!.userGender) ?? 0,
         profilePhoto: base64Image,
       );

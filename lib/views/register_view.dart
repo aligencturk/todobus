@@ -3,91 +3,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/register_viewmodel.dart';
+import '../widgets/web_view_page.dart';
 import 'login_view.dart';
-import 'dart:math' as math;
-
-// Telefon numarası formatlayıcı sınıf
-class TurkeyPhoneFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue, 
-    TextEditingValue newValue
-  ) {
-    // Sadece rakamları alıyoruz
-    String text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
-    
-    // Telefon numarası girilmemişse boş dön
-    if (text.isEmpty) {
-      return const TextEditingValue(
-        text: "",
-        selection: TextSelection.collapsed(offset: 0),
-      );
-    }
-    
-    // Başa 0 ekle (yoksa)
-    if (!text.startsWith('0') && text.isNotEmpty) {
-      text = '0$text';
-    }
-    
-    // Telefon numarasını formatla
-    String formattedText = '';
-    
-    // İlk basamak (0)
-    if (text.length >= 1) {
-      formattedText = text.substring(0, 1);
-    }
-    
-    // Alan kodu
-    if (text.length > 1) {
-      formattedText += '(' + text.substring(1, math.min(4, text.length));
-    }
-    
-    // Alan kodu sonrası kapanış parantezi
-    if (text.length > 4) {
-      formattedText += ') ';
-    }
-    
-    // İlk üç rakam
-    if (text.length > 4) {
-      formattedText += text.substring(4, math.min(7, text.length));
-    }
-    
-    // İkinci üç rakam (arada boşlukla)
-    if (text.length > 7) {
-      formattedText += ' ' + text.substring(7, math.min(9, text.length));
-    }
-    
-    // Son iki rakam (arada boşlukla)
-    if (text.length > 9) {
-      formattedText += ' ' + text.substring(9, math.min(11, text.length));
-    }
-    
-    return TextEditingValue(
-      text: formattedText,
-      selection: TextSelection.collapsed(offset: formattedText.length),
-    );
-  }
-}
-
-// Telefon numarası input validatörü
-String? validatePhoneNumber(String? value) {
-  if (value == null || value.isEmpty) {
-    return 'Telefon numarası gerekli';
-  }
-  
-  // Sadece rakamları alarak kontrol et
-  final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
-  
-  if (digitsOnly.length != 11) {
-    return 'Geçerli bir telefon numarası girin';
-  }
-  
-  if (!digitsOnly.startsWith('0')) {
-    return 'Telefon numarası 0 ile başlamalıdır';
-  }
-  
-  return null;
-}
 
 class RegisterView extends StatefulWidget {
   const RegisterView({Key? key}) : super(key: key);
@@ -100,7 +17,6 @@ class _RegisterViewState extends State<RegisterView> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
@@ -109,7 +25,6 @@ class _RegisterViewState extends State<RegisterView> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -283,53 +198,6 @@ class _RegisterViewState extends State<RegisterView> {
                                 
                                 const SizedBox(height: 16),
                                 
-                                // Telefon alanı
-                                Container(
-                                  decoration: BoxDecoration(
-                                    border: Border(
-                                      bottom: BorderSide.none,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    'Telefon',
-                                    style: TextStyle(
-                                      color: const Color(0xFF34495E),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      decoration: TextDecoration.none,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                CupertinoTextField(
-                                  controller: _phoneController,
-                                  keyboardType: TextInputType.phone,
-                                  placeholder: '0(555) 555 55 55',
-                                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-                                  style: const TextStyle(
-                                    color: Color(0xFF2C3E50),
-                                    fontSize: 16,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF5F5F5),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  prefix: Padding(
-                                    padding: const EdgeInsets.only(left: 12),
-                                    child: Icon(
-                                      CupertinoIcons.phone,
-                                      color: const Color(0xFF7F8C8D),
-                                      size: 20,
-                                    ),
-                                  ),
-                                  inputFormatters: [
-                                    LengthLimitingTextInputFormatter(18), // Format uzunluğu kısıtlaması
-                                    TurkeyPhoneFormatter(), // Özel formatımız
-                                  ],
-                                ),
-                                
-                                const SizedBox(height: 16),
-                                
                                 // Şifre alanı
                                 Container(
                                   decoration: BoxDecoration(
@@ -401,13 +269,46 @@ class _RegisterViewState extends State<RegisterView> {
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
-                                      child: Text(
-                                        'Kullanım Koşullarını kabul ediyorum',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: const Color(0xFF7F8C8D),
-                                          decoration: TextDecoration.none,
-                                        ),
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                Navigator.of(context).push(
+                                                  CupertinoPageRoute(
+                                                    builder: (context) => const WebViewPage(
+                                                      url: 'https://www.todobus.tr/uyelik-sozlesmesi',
+                                                      title: 'Kullanım Koşulları',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              child: RichText(
+                                                text: TextSpan(
+                                                  children: [
+                                                    TextSpan(
+                                                      text: 'Kullanım Koşullarını',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: const Color(0xFF3498DB),
+                                                        decoration: TextDecoration.underline,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text: ' kabul ediyorum',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: const Color(0xFF7F8C8D),
+                                                        decoration: TextDecoration.none,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -429,13 +330,46 @@ class _RegisterViewState extends State<RegisterView> {
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
-                                      child: Text(
-                                        'KVKK Aydınlatma Metnini kabul ediyorum',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: const Color(0xFF7F8C8D),
-                                          decoration: TextDecoration.none,
-                                        ),
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                Navigator.of(context).push(
+                                                  CupertinoPageRoute(
+                                                    builder: (context) => const WebViewPage(
+                                                      url: 'https://www.todobus.tr/kvkk-aydinlatma-metni',
+                                                      title: 'KVKK Aydınlatma Metni',
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                              child: RichText(
+                                                text: TextSpan(
+                                                  children: [
+                                                    TextSpan(
+                                                      text: 'KVKK Aydınlatma Metnini',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: const Color(0xFF3498DB),
+                                                        decoration: TextDecoration.underline,
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text: ' kabul ediyorum',
+                                                      style: TextStyle(
+                                                        fontSize: 14,
+                                                        color: const Color(0xFF7F8C8D),
+                                                        decoration: TextDecoration.none,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ],
@@ -486,33 +420,10 @@ class _RegisterViewState extends State<RegisterView> {
                               onPressed: viewModel.status == RegisterStatus.loading
                                   ? null
                                   : () async {
-                                      // Telefon validasyonu ekle
-                                      final phoneError = validatePhoneNumber(_phoneController.text);
-                                      if (phoneError != null) {
-                                        // setError fonksiyonu yerine bir CupertinoDialog gösterelim
-                                        showCupertinoDialog(
-                                          context: context,
-                                          builder: (context) => CupertinoAlertDialog(
-                                            title: const Text('Telefon Numarası Hatası'),
-                                            content: Text(phoneError),
-                                            actions: [
-                                              CupertinoDialogAction(
-                                                child: const Text('Tamam'),
-                                                onPressed: () {
-                                                  Navigator.of(context).pop();
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      
                                       final success = await viewModel.register(
                                         firstName: _firstNameController.text.trim(),
                                         lastName: _lastNameController.text.trim(),
                                         email: _emailController.text.trim(),
-                                        phone: _phoneController.text.trim(),
                                         password: _passwordController.text,
                                       );
                                       

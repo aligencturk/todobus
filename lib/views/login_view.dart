@@ -18,36 +18,20 @@ class _LoginViewState extends State<LoginView> {
   final TextEditingController _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   late LoginViewModel _viewModel;
-  bool _loginSuccess = false;
+  bool _isNavigating = false;
 
   @override
   void initState() {
     super.initState();
     _viewModel = LoginViewModel();
     _loadSavedEmail();
-    
-    // ViewModel durumunu dinle
-    _viewModel.addListener(_checkLoginStateAndNavigate);
   }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _viewModel.removeListener(_checkLoginStateAndNavigate);
     super.dispose();
-  }
-  
-  // Giriş durumunu kontrol et ve tamamlandığında ana sayfaya geç
-  void _checkLoginStateAndNavigate() {
-    if (_loginSuccess && _viewModel.status == LoginStatus.success && mounted) {
-      _loginSuccess = false; // Tekrar çağrılmasını engelle
-      Navigator.of(context).pushReplacement(
-        CupertinoPageRoute(
-          builder: (context) => const MainApp(),
-        ),
-      );
-    }
   }
 
   // Kaydedilmiş e-posta adresini yükle
@@ -286,7 +270,9 @@ class _LoginViewState extends State<LoginView> {
                             padding: const EdgeInsets.only(bottom: 20),
                             child: CupertinoButton(
                               padding: EdgeInsets.zero,
-                              onPressed: viewModel.status == LoginStatus.loading || viewModel.status == LoginStatus.dataLoading
+                              onPressed: viewModel.status == LoginStatus.loading || 
+                                        viewModel.status == LoginStatus.dataLoading ||
+                                        _isNavigating
                                   ? null
                                   : () async {
                                       if (_formKey.currentState?.validate() ?? false) {
@@ -296,9 +282,17 @@ class _LoginViewState extends State<LoginView> {
                                           _passwordController.text,
                                         );
                                         
-                                        // Başarılı giriş yapıldıysa flag'i ayarla
-                                        if (success) {
-                                          _loginSuccess = true;
+                                        // Başarılı giriş yapıldıysa ve navigation henüz başlatılmadıysa
+                                        if (success && !_isNavigating && mounted) {
+                                          setState(() {
+                                            _isNavigating = true;
+                                          });
+                                          
+                                          Navigator.of(context).pushReplacement(
+                                            CupertinoPageRoute(
+                                              builder: (context) => const MainApp(),
+                                            ),
+                                          );
                                         }
                                       }
                                     },

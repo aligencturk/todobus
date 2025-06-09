@@ -70,6 +70,23 @@
 		<string>Düzenlenen fotoğrafların kaydedilmesi için galeri erişimi gerekiyor</string>
 		<key>NSCalendarsUsageDescription</key>
 		<string>Etkinliği takvime eklemek için takvim erişimine ihtiyacımız var.</string>
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSAllowsArbitraryLoads</key>
+			<true/>
+			<key>NSExceptionDomains</key>
+			<dict>
+				<key>todobus.tr</key>
+				<dict>
+					<key>NSExceptionAllowsInsecureHTTPLoads</key>
+					<true/>
+					<key>NSExceptionMinimumTLSVersion</key>
+					<string>TLSv1.0</string>
+					<key>NSIncludesSubdomains</key>
+					<true/>
+				</dict>
+			</dict>
+		</dict>
 		<key>UIStatusBarHidden</key>
 		<true/>
 		<key>UIViewControllerBasedStatusBarAppearance</key>

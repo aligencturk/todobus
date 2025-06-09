@@ -6,7 +6,6 @@ class User {
   final String userFullname;
   final String userEmail;
   final String userBirthday;
-  final String userPhone;
   final String userRank;
   final String userStatus;
   final String userGender;
@@ -25,7 +24,6 @@ class User {
     required this.userFullname,
     required this.userEmail,
     required this.userBirthday,
-    required this.userPhone,
     required this.userRank,
     required this.userStatus,
     required this.userGender,
@@ -46,7 +44,6 @@ class User {
       userFullname: json['userFullname'] ?? '',
       userEmail: json['userEmail'] ?? '',
       userBirthday: json['userBirthday'] ?? '',
-      userPhone: json['userPhone'] ?? '',
       userRank: json['userRank'] ?? '',
       userStatus: json['userStatus'] ?? '',
       userGender: json['userGender'] ?? '',
@@ -68,7 +65,6 @@ class User {
       'userFullname': userFullname,
       'userEmail': userEmail,
       'userBirthday': userBirthday,
-      'userPhone': userPhone,
       'userRank': userRank,
       'userStatus': userStatus,
       'userGender': userGender,
