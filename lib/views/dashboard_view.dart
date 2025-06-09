@@ -482,8 +482,16 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      enableDrag: true,
+      isDismissible: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const AIChatWidget(),
+      useSafeArea: false,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: const AIChatWidget(),
+      ),
     );
   }
 

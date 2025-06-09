@@ -301,9 +301,14 @@ class _AIChatWidgetState extends State<AIChatWidget>
   Widget _buildChatInterface() {
     final theme = Theme.of(context);
     final isIOS = Platform.isIOS;
+    final mediaQuery = MediaQuery.of(context);
+    final keyboardHeight = mediaQuery.viewInsets.bottom;
     
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
       height: MediaQuery.of(context).size.height * 0.75,
+      margin: EdgeInsets.only(bottom: keyboardHeight),
       decoration: BoxDecoration(
         color: CupertinoColors.systemBackground,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -799,8 +804,15 @@ class _AIChatWidgetState extends State<AIChatWidget>
   }
 
   Widget _buildInputArea(bool isIOS, ThemeData theme) {
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      padding: EdgeInsets.fromLTRB(
+        20, 
+        16, 
+        20, 
+        keyboardHeight > 0 ? 16 : 20
+      ),
       decoration: const BoxDecoration(
         color: CupertinoColors.systemGroupedBackground,
         border: Border(
@@ -812,6 +824,7 @@ class _AIChatWidgetState extends State<AIChatWidget>
       ),
       child: SafeArea(
         top: false,
+        minimum: EdgeInsets.only(bottom: keyboardHeight > 0 ? 8 : 0),
         child: Row(
           children: [
             Expanded(
@@ -830,7 +843,7 @@ class _AIChatWidgetState extends State<AIChatWidget>
                   controller: _messageController,
                   focusNode: _inputFocusNode,
                   enabled: !_isLoading,
-                  maxLines: 4,
+                  maxLines: keyboardHeight > 0 ? 2 : 4, // Klavye açıkken satır sayısını azalt
                   minLines: 1,
                   style: const TextStyle(
                     fontSize: 15,
