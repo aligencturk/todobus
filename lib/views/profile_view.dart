@@ -169,7 +169,7 @@ class _ProfileViewState extends State<ProfileView> {
   }
   
   void _openFAQ() {
-    _launchUrl('https://www.todobus.tr/sss', 'SSS');
+    _launchUrl('https://www.todobus.tr#faq', 'SSS');
   }
   
   void _openContact() {
@@ -1337,15 +1337,16 @@ class _EditProfileViewState extends State<EditProfileView> {
     _emailController = TextEditingController(text: widget.user.userEmail);
     _birthdayController = TextEditingController(text: widget.user.userBirthday);
     
-    // Cinsiyet değerini String olarak ayarla
-    // Eğer userGender sayı değilse veya boşsa "0" olarak ayarla
-    try {
-      _selectedGender = widget.user.userGender.isNotEmpty ? widget.user.userGender : "0";
-      // Geçerli bir sayı olup olmadığını kontrol et
-      int.parse(_selectedGender);
-    } catch (e) {
-      _logger.e('Cinsiyet verisi geçersiz: ${widget.user.userGender}', e);
-      _selectedGender = "0";
+    // Cinsiyet değerini String olarak ayarla ve API'den gelen string değeri sayıya çevir
+    String userGender = widget.user.userGender;
+    if (userGender == "Erkek") {
+      _selectedGender = "1";
+    } else if (userGender == "Kadın") {
+      _selectedGender = "2";
+    } else if (userGender == "1" || userGender == "2") {
+      _selectedGender = userGender;
+    } else {
+      _selectedGender = "0"; // Belirtilmemiş
     }
   }
   

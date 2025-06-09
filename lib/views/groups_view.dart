@@ -371,7 +371,7 @@ class _GroupsViewState extends State<GroupsView> {
 
   Widget _buildFilterChips() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
           _buildFilterChip(0, 'Tümü'),
@@ -379,6 +379,7 @@ class _GroupsViewState extends State<GroupsView> {
           _buildFilterChip(1, 'Yönetici'),
           const SizedBox(width: 8),
           _buildFilterChip(2, 'Üye'),
+          
         ],
       ),
     );
