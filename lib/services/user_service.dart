@@ -65,7 +65,6 @@ class UserService {
     required String userFullname,
     required String userEmail,
     required String userBirthday,
-    required String userPhone,
     required int userGender,
     required String profilePhoto,
   }) async {
@@ -74,7 +73,7 @@ class UserService {
       _logger.i('userFullname: $userFullname');
       _logger.i('userEmail: $userEmail');
       _logger.i('userBirthday: $userBirthday');
-      _logger.i('userPhone: $userPhone');
+
       _logger.i('userGender: $userGender');
       
       // Veri kontrolü
@@ -121,7 +120,7 @@ class UserService {
         'userFullname': userFullname.trim(),
         'userEmail': userEmail.trim(),
         'userBirthday': userBirthday.trim(),
-        'userPhone': userPhone.trim(),
+
         'userGender': validatedGender,
         'profilePhoto': profilePhoto,
       };

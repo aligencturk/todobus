@@ -16,9 +16,7 @@ import '../services/logger_service.dart';
 import '../services/auth_service.dart';
 import 'login_view.dart';
 import 'account_activation_view.dart';
-import 'package:firebase_remote_config/firebase_remote_config.dart';
-import 'package:package_info_plus/package_info_plus.dart';
-import '../services/version_check_service.dart';
+
 
 
 class ProfileView extends StatefulWidget {
@@ -171,7 +169,7 @@ class _ProfileViewState extends State<ProfileView> {
   }
   
   void _openFAQ() {
-    _launchUrl('https://www.todobus.tr/sss', 'SSS');
+    _launchUrl('https://www.todobus.tr#faq', 'SSS');
   }
   
   void _openContact() {
@@ -179,7 +177,7 @@ class _ProfileViewState extends State<ProfileView> {
   }
   
   void _openTermsOfUse() {
-    _launchUrl('https://www.todobus.tr/kullanim-sartlari', 'Kullanım Şartları');
+    _launchUrl('https://www.todobus.tr/site-kullanim-sartlari', 'Kullanım Şartları');
   }
 
   // Profil düzenleme ekranını aç
@@ -556,72 +554,7 @@ class _ProfileViewState extends State<ProfileView> {
     );
   }
 
-  // Sürüm debug kontrolü
-  Future<void> _debugVersionCheck() async {
-    try {
-      final versionService = VersionCheckService();
-      await versionService.debugVersionCheck();
-      
-      if (mounted) {
-        showPlatformDialog(
-          context: context,
-          builder: (context) => PlatformAlertDialog(
-            title: const Text('Debug Bilgileri'),
-            content: const Text('Debug bilgileri konsola yazdırıldı. Detaylar için logları kontrol edin.'),
-            actions: <Widget>[
-              PlatformDialogAction(
-                child: const Text('Tamam'),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        showPlatformDialog(
-          context: context,
-          builder: (context) => PlatformAlertDialog(
-            title: const Text('Hata'),
-            content: Text('Debug kontrolü yapılırken hata oluştu: $e'),
-            actions: <Widget>[
-              PlatformDialogAction(
-                child: const Text('Tamam'),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      }
-    }
-  }
 
-  // Remote Config Sıfırlama butonu
-  Future<void> _resetRemoteConfig() async {
-    try {
-      final versionService = VersionCheckService();
-      await versionService.resetToDefaults();
-      
-      if (mounted) {
-        showPlatformDialog(
-          context: context,
-          builder: (context) => PlatformAlertDialog(
-            title: const Text('Başarılı'),
-            content: const Text('Remote Config başarıyla sıfırlandı ve varsayılan değerler yüklendi'),
-            actions: <Widget>[
-              PlatformDialogAction(
-                child: const Text('Tamam'),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      _logger.e('Remote Config sıfırlama hatası: $e');
-      _showErrorMessage('Remote Config sıfırlama işlemi sırasında bir hata oluştu: ${e.toString()}');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -729,7 +662,6 @@ class _ProfileViewState extends State<ProfileView> {
               _buildListItem(context, 'Ad Soyad', user?.userFullname ?? ""),
               _buildListItem(context, 'E-posta', user?.userEmail ?? ""),
               _buildListItem(context, 'Doğum Tarihi', user?.userBirthday ?? ""),
-              _buildListItem(context, 'Telefon', user?.userPhone ?? ""),
               _buildListItem(context, 'Cinsiyet', _getGenderText(user?.userGender ?? "")),
               _buildListItem(
                 context, 
@@ -822,44 +754,6 @@ class _ProfileViewState extends State<ProfileView> {
               _buildListItem(context, 'Web Sitesi', 'todobus.tr', 
                 onTap: _launchWebsite,
                 isLink: true
-              ),
-              // Debug butonu - sadece development modunda göster
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                child: PlatformElevatedButton(
-                  onPressed: _debugVersionCheck,
-                  child: const Text('Sürüm Kontrolü Debug'),
-                  material: (_, __) => MaterialElevatedButtonData(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                  cupertino: (_, __) => CupertinoElevatedButtonData(
-                    color: CupertinoColors.systemOrange,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
-              ),
-              // Remote Config Sıfırlama butonu
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                child: PlatformElevatedButton(
-                  onPressed: _resetRemoteConfig,
-                  child: const Text('Remote Config Sıfırla'),
-                  material: (_, __) => MaterialElevatedButtonData(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                  cupertino: (_, __) => CupertinoElevatedButtonData(
-                    color: CupertinoColors.systemRed,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
               ),
             ],
           ),
@@ -1428,7 +1322,6 @@ class _EditProfileViewState extends State<EditProfileView> {
   
   late TextEditingController _fullNameController;
   late TextEditingController _emailController;
-  late TextEditingController _phoneController;
   late TextEditingController _birthdayController;
   
   String _selectedGender = "0"; // String tipine değiştirildi
@@ -1442,18 +1335,18 @@ class _EditProfileViewState extends State<EditProfileView> {
     super.initState();
     _fullNameController = TextEditingController(text: widget.user.userFullname);
     _emailController = TextEditingController(text: widget.user.userEmail);
-    _phoneController = TextEditingController(text: widget.user.userPhone);
     _birthdayController = TextEditingController(text: widget.user.userBirthday);
     
-    // Cinsiyet değerini String olarak ayarla
-    // Eğer userGender sayı değilse veya boşsa "0" olarak ayarla
-    try {
-      _selectedGender = widget.user.userGender.isNotEmpty ? widget.user.userGender : "0";
-      // Geçerli bir sayı olup olmadığını kontrol et
-      int.parse(_selectedGender);
-    } catch (e) {
-      _logger.e('Cinsiyet verisi geçersiz: ${widget.user.userGender}', e);
-      _selectedGender = "0";
+    // Cinsiyet değerini String olarak ayarla ve API'den gelen string değeri sayıya çevir
+    String userGender = widget.user.userGender;
+    if (userGender == "Erkek") {
+      _selectedGender = "1";
+    } else if (userGender == "Kadın") {
+      _selectedGender = "2";
+    } else if (userGender == "1" || userGender == "2") {
+      _selectedGender = userGender;
+    } else {
+      _selectedGender = "0"; // Belirtilmemiş
     }
   }
   
@@ -1461,7 +1354,6 @@ class _EditProfileViewState extends State<EditProfileView> {
   void dispose() {
     _fullNameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _birthdayController.dispose();
     super.dispose();
   }
@@ -1589,7 +1481,6 @@ class _EditProfileViewState extends State<EditProfileView> {
         userFullname: _fullNameController.text.trim(),
         userEmail: _emailController.text.trim(),
         userBirthday: birthday,
-        userPhone: _phoneController.text.trim(),
         userGender: userGender,
         profilePhoto: _profileImageBase64 ?? widget.user.profilePhoto,
       );
@@ -1748,20 +1639,7 @@ class _EditProfileViewState extends State<EditProfileView> {
               
               const SizedBox(height: 16),
               
-              _buildTextFormField(
-                context: context,
-                controller: _phoneController,
-                label: 'Telefon',
-                keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return null; // İsteğe bağlı
-                  }
-                  return null;
-                },
-              ),
-              
-              const SizedBox(height: 24),
+              const SizedBox(height: 8),
               
               _buildGenderSelection(context),
               

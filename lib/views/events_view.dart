@@ -30,6 +30,7 @@ class _EventsViewState extends State<EventsView> {
   DateTime _selectedDay = DateTime.now();
   late Map<DateTime, List<Event>> _eventsByDay = {};
   int _selectedEventType = 0;
+  EventViewModel? _eventViewModel;
   
   @override
   void initState() {
@@ -40,11 +41,17 @@ class _EventsViewState extends State<EventsView> {
   }
   
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // EventViewModel referansını güvenli bir şekilde kaydet
+    _eventViewModel = Provider.of<EventViewModel>(context, listen: false);
+  }
+  
+  @override
   void dispose() {
     // Sayfadan çıkarken ViewModel'i temizle
     try {
-      final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
-      eventViewModel.reset();
+      _eventViewModel?.reset();
     } catch (e) {
       _logger.e('EventsView dispose sırasında hata: $e');
     }
@@ -56,7 +63,9 @@ class _EventsViewState extends State<EventsView> {
     
     setState(() => _isLoading = true);
     try {
-      final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
+      final eventViewModel = _eventViewModel;
+      if (eventViewModel == null) return;
+      
       if (_selectedEventType == 0) {
         await eventViewModel.loadEvents(groupID: widget.groupID);
       } else if (_selectedEventType == 1) {
@@ -80,7 +89,9 @@ class _EventsViewState extends State<EventsView> {
     if (!mounted) return;
     
     _eventsByDay = {};
-    final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
+    final eventViewModel = _eventViewModel;
+    if (eventViewModel == null) return;
+    
     List<Event> events;
     if (_selectedEventType == 0) events = eventViewModel.events;
     else if (_selectedEventType == 1) events = eventViewModel.userEvents;
@@ -235,7 +246,9 @@ class _EventsViewState extends State<EventsView> {
     
     setState(() => _isLoading = true);
     try {
-      final eventViewModel = Provider.of<EventViewModel>(context, listen: false);
+      final eventViewModel = _eventViewModel;
+      if (eventViewModel == null) return;
+      
       final success = await eventViewModel.deleteEvent(event.eventID, groupID: widget.groupID);
       
       if (!mounted) return;

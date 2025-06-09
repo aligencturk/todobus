@@ -60,10 +60,9 @@ class RegisterViewModel with ChangeNotifier {
     required String firstName,
     required String lastName,
     required String email,
-    required String phone,
     required String password,
   }) async {
-    if (firstName.isEmpty || lastName.isEmpty || email.isEmpty || phone.isEmpty || password.isEmpty) {
+    if (firstName.isEmpty || lastName.isEmpty || email.isEmpty || password.isEmpty) {
       _errorMessage = 'Tüm alanlar doldurulmalıdır';
       _status = RegisterStatus.error;
       _safeNotifyListeners();
@@ -87,7 +86,6 @@ class RegisterViewModel with ChangeNotifier {
         firstName: firstName,
         lastName: lastName,
         email: email,
-        phone: phone,
         password: password,
         policy: _acceptPolicy,
         kvkk: _acceptKvkk,
