@@ -1,9 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
     id("com.google.gms.google-services")
     // END: FlutterFire Configuration
     id("kotlin-android")
+    id("dev.flutter.flutter-gradle-plugin") // Flutter eklentisi
+}
+
+// 🔐 key.properties dosyasını oku
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -30,6 +40,16 @@ android {
         versionName = flutter.versionName
     }
 
+    // ✅ Release imzalama yapılandırması
+    signingConfigs {
+        create("release") {
+            storeFile = file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+        }
+    }
+
  signingConfigs {
     create("release") {
         storeFile = file("../my-key.jks") // <- bir üst klasöre çıkıyoruz
@@ -41,6 +61,14 @@ android {
 
 
     buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release") // ✅ artık debug değil!
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -50,6 +78,10 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
         }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildFeatures {
