@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../viewmodels/register_viewmodel.dart';
 import '../widgets/web_view_page.dart';
 import 'login_view.dart';
+import 'account_activation_view.dart';
 
 class RegisterView extends StatefulWidget {
   const RegisterView({Key? key}) : super(key: key);
@@ -428,12 +429,12 @@ class _RegisterViewState extends State<RegisterView> {
                                       );
                                       
                                       if (success && mounted) {
-                                        // Kayıt başarılıysa giriş sayfasına yönlendir
+                                        // Kayıt başarılıysa hesap doğrulama sayfasına yönlendir
                                         showCupertinoDialog(
                                           context: context,
                                           builder: (context) => CupertinoAlertDialog(
                                             title: const Text('Kayıt Başarılı'),
-                                            content: const Text('Hesabınız başarıyla oluşturuldu. Giriş yapabilirsiniz.'),
+                                            content: const Text('Hesabınız başarıyla oluşturuldu. Şimdi e-posta adresinizi doğrulamanız gerekiyor.'),
                                             actions: [
                                               CupertinoDialogAction(
                                                 child: const Text('Tamam'),
@@ -441,7 +442,9 @@ class _RegisterViewState extends State<RegisterView> {
                                                   Navigator.of(context).pop();
                                                   Navigator.of(context).pushReplacement(
                                                     CupertinoPageRoute(
-                                                      builder: (context) => const LoginView(),
+                                                      builder: (context) => AccountActivationView(
+                                                        initialCodeToken: viewModel.registerData?.codeToken,
+                                                      ),
                                                     ),
                                                   );
                                                 },

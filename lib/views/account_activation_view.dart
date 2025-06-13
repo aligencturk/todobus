@@ -7,7 +7,12 @@ import '../services/storage_service.dart';
 import '../services/logger_service.dart';
 
 class AccountActivationView extends StatefulWidget {
-  const AccountActivationView({super.key});
+  final String? initialCodeToken;
+  
+  const AccountActivationView({
+    super.key,
+    this.initialCodeToken,
+  });
 
   @override
   State<AccountActivationView> createState() => _AccountActivationViewState();
@@ -48,10 +53,16 @@ class _AccountActivationViewState extends State<AccountActivationView>
       curve: Curves.linear,
     ));
     
-    // Sayfa açıldığında otomatik olarak doğrulama kodu gönder
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _sendInitialActivationCode();
-    });
+    // Eğer initialCodeToken varsa onu kullan
+    if (widget.initialCodeToken != null && widget.initialCodeToken!.isNotEmpty) {
+      _currentCodeToken = widget.initialCodeToken;
+      _logger.i('Initial codeToken kullanılıyor: ${_currentCodeToken!.substring(0, 8)}...');
+    } else {
+      // Sayfa açıldığında otomatik olarak doğrulama kodu gönder
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _sendInitialActivationCode();
+      });
+    }
   }
   
   @override

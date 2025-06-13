@@ -136,6 +136,7 @@ class RegisterResponse {
   final String? message;
   final int? statusCode;
   final String? userFriendlyMessage;
+  final RegisterData? data;
 
   RegisterResponse({
     required this.error,
@@ -143,6 +144,7 @@ class RegisterResponse {
     this.message,
     this.statusCode,
     this.userFriendlyMessage,
+    this.data,
   });
 
   factory RegisterResponse.fromJson(Map<String, dynamic> json) {
@@ -174,6 +176,28 @@ class RegisterResponse {
       message: message,
       statusCode: statusCode,
       userFriendlyMessage: userFriendlyMessage,
+      data: json['data'] != null ? RegisterData.fromJson(json['data']) : null,
+    );
+  }
+}
+
+// Kayıt data modeli
+class RegisterData {
+  final int userID;
+  final String userToken;
+  final String codeToken;
+
+  RegisterData({
+    required this.userID,
+    required this.userToken,
+    required this.codeToken,
+  });
+
+  factory RegisterData.fromJson(Map<String, dynamic> json) {
+    return RegisterData(
+      userID: json['userID'],
+      userToken: json['userToken'],
+      codeToken: json['codeToken'],
     );
   }
 }
@@ -210,9 +234,18 @@ class ForgotPasswordResponse {
   });
 
   factory ForgotPasswordResponse.fromJson(Map<String, dynamic> json) {
+    print('🔍 ForgotPasswordResponse.fromJson çağrıldı');
+    print('🔍 Raw JSON: $json');
+    print('🔍 JSON keys: ${json.keys.toList()}');
+    
     final int? statusCode = json['statusCode'] is int 
         ? json['statusCode'] 
         : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
+    print('🔍 Parsed statusCode: $statusCode');
+    print('🔍 Success value: ${json['success']}');
+    print('🔍 Data is null: ${json['data'] == null}');
+    print('🔍 Data content: ${json['data']}');
     
     // Kullanıcı dostu mesaj oluştur
     String? friendlyMessage;
@@ -220,18 +253,20 @@ class ForgotPasswordResponse {
       String baseMessage;
       if (statusCode == 404) {
         baseMessage = 'Bu e-posta adresiyle kayıtlı hesap bulunamadı.';
+      } else if (statusCode == 417) {
+        baseMessage = 'Çok sık şifre sıfırlama isteği gönderdiniz. Lütfen birkaç dakika bekleyip tekrar deneyin.';
       } else {
         baseMessage = json['message'] ?? 'Şifre sıfırlama işlemi sırasında bir hata oluştu.';
       }
 
-      if (statusCode != null) {
+      if (statusCode != null && statusCode != 417) {
         friendlyMessage = 'API Hatası: $statusCode - $baseMessage';
       } else {
         friendlyMessage = baseMessage;
       }
     }
     
-    return ForgotPasswordResponse(
+    final response = ForgotPasswordResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,
       message: json['message'],
@@ -239,6 +274,10 @@ class ForgotPasswordResponse {
       statusCode: statusCode,
       userFriendlyMessage: friendlyMessage,
     );
+    
+    print('🔍 Final ForgotPasswordResponse created: success=${response.success}, data=${response.data}');
+    
+    return response;
   }
 }
 
@@ -250,9 +289,44 @@ class ForgotPasswordData {
   });
 
   factory ForgotPasswordData.fromJson(Map<String, dynamic> json) {
+    print('🔍 ForgotPasswordData.fromJson çağrıldı');
+    print('🔍 Raw JSON: $json');
+    print('🔍 JSON keys: ${json.keys.toList()}');
+    
+    // Muhtemel token field isimleri
+    String? tokenValue;
+    
+    // Farklı token field isimlerini dene
+    if (json.containsKey('token')) {
+      tokenValue = json['token'] as String?;
+      print('🔍 Token found with key "token": $tokenValue');
+    } else if (json.containsKey('userToken')) {
+      tokenValue = json['userToken'] as String?;
+      print('🔍 Token found with key "userToken": $tokenValue');
+    } else if (json.containsKey('verificationToken')) {
+      tokenValue = json['verificationToken'] as String?;
+      print('🔍 Token found with key "verificationToken": $tokenValue');
+    } else if (json.containsKey('codeToken')) {
+      tokenValue = json['codeToken'] as String?;
+      print('🔍 Token found with key "codeToken": $tokenValue');
+    } else if (json.containsKey('code_token')) {
+      tokenValue = json['code_token'] as String?;
+      print('🔍 Token found with key "code_token": $tokenValue');
+    } else {
+      tokenValue = json['token'] as String?;
+      print('🔍 No token key found, using default "token": $tokenValue');
+    }
+    
+    print('🔍 Final token value: $tokenValue');
+    
     return ForgotPasswordData(
-      token: json['token'] as String?,
+      token: tokenValue,
     );
+  }
+  
+  @override
+  String toString() {
+    return 'ForgotPasswordData{token: $token}';
   }
 }
 
@@ -278,6 +352,7 @@ class CodeCheckResponse {
   final String? message;
   final CodeCheckData? data;
   final String? userFriendlyMessage;
+  final int? statusCode;
 
   CodeCheckResponse({
     required this.error,
@@ -285,18 +360,26 @@ class CodeCheckResponse {
     this.message,
     this.data,
     this.userFriendlyMessage,
+    this.statusCode,
   });
 
   factory CodeCheckResponse.fromJson(Map<String, dynamic> json) {
+    // statusCode'u parse et
+    final int? statusCode = json['statusCode'] is int 
+        ? json['statusCode'] 
+        : (json['statusCode'] is String ? int.tryParse(json['statusCode']) : null);
+    
     // Kullanıcı dostu mesaj oluştur
     String? friendlyMessage;
     if (!json['success']) {
-      final message = json['message'] as String?;
+      final message = json['message'] ?? json['error_message'];
       if (message != null) {
         if (message.contains('hatalı')) {
           friendlyMessage = 'Girdiğiniz kod hatalı. Lütfen tekrar kontrol edin.';
         } else if (message.contains('süresi')) {
           friendlyMessage = 'Doğrulama kodunun süresi dolmuş. Lütfen yeni kod talep edin.';
+        } else if (statusCode == 417) {
+          friendlyMessage = 'Doğrulama kodunuz yanlış veya süresi dolmuş olabilir. Lütfen yeni kod talep edin.';
         } else {
           friendlyMessage = 'Doğrulama kodu kontrolü sırasında bir hata oluştu.';
         }
@@ -306,9 +389,10 @@ class CodeCheckResponse {
     return CodeCheckResponse(
       error: json['error'] ?? false,
       success: json['success'] ?? false,
-      message: json['message'],
+      message: json['message'] ?? json['error_message'],
       data: json['data'] != null ? CodeCheckData.fromJson(json['data']) : null,
       userFriendlyMessage: friendlyMessage,
+      statusCode: statusCode,
     );
   }
 }

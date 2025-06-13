@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/logger_service.dart';
 import '../services/device_info_service.dart';
+import '../services/storage_service.dart';
+import '../models/auth_models.dart';
 
 enum RegisterStatus { initial, loading, success, error }
 
@@ -9,6 +11,7 @@ class RegisterViewModel with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final LoggerService _logger = LoggerService();
   final DeviceInfoService _deviceInfoService = DeviceInfoService();
+  final StorageService _storageService = StorageService();
   
   RegisterStatus _status = RegisterStatus.initial;
   String _errorMessage = '';
@@ -16,6 +19,7 @@ class RegisterViewModel with ChangeNotifier {
   bool _acceptPolicy = false;
   bool _acceptKvkk = false;
   bool _isDisposed = false;
+  RegisterData? _registerData;
 
   // Getters
   RegisterStatus get status => _status;
@@ -23,6 +27,7 @@ class RegisterViewModel with ChangeNotifier {
   bool get obscurePassword => _obscurePassword;
   bool get acceptPolicy => _acceptPolicy;
   bool get acceptKvkk => _acceptKvkk;
+  RegisterData? get registerData => _registerData;
 
   // Güvenli notifyListeners
   void _safeNotifyListeners() {
@@ -93,6 +98,15 @@ class RegisterViewModel with ChangeNotifier {
 
       if (response.success) {
         _logger.i('Kayıt başarılı');
+        
+        // Token bilgilerini kaydet
+        if (response.data != null) {
+          _registerData = response.data;
+          await _storageService.saveToken(response.data!.userToken);
+          await _storageService.saveUserId(response.data!.userID);
+          _logger.i('Kayıt token bilgileri kaydedildi: userID=${response.data!.userID}');
+        }
+        
         _status = RegisterStatus.success;
         _safeNotifyListeners();
         return true;

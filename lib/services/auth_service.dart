@@ -119,24 +119,67 @@ class AuthService {
   // Şifremi unuttum metodu
   Future<ForgotPasswordResponse> forgotPassword(String email) async {
     try {
+      print('🔍 AUTH_SERVICE: forgotPassword başlatıldı - email: $email');
       _logger.i('Şifre sıfırlama isteği gönderiliyor: $email');
       
       final forgotRequest = ForgotPasswordRequest(
         userEmail: email,
       );
       
+      _logger.d('API endpoint: service/auth/forgotPassword');
+      _logger.d('Request payload: ${forgotRequest.toJson()}');
+      print('🔍 AUTH_SERVICE: Request payload hazırlandı: ${forgotRequest.toJson()}');
+      
+      print('🔍 AUTH_SERVICE: API çağrısı yapılıyor: service/auth/forgotPassword');
       final response = await _apiService.post(
         'service/auth/forgotPassword',
         body: forgotRequest.toJson(),
       );
       
+      print('🔍 AUTH_SERVICE: Ham API yanıtı alındı');
+      print('🔍 AUTH_SERVICE: Response type: ${response.runtimeType}');
+      print('🔍 AUTH_SERVICE: Response: $response');
+      
+      _logger.d('Raw API response: $response');
+      
+      print('🔍 AUTH_SERVICE: Response parsing başlıyor...');
       final forgotResponse = ForgotPasswordResponse.fromJson(response);
+      print('🔍 AUTH_SERVICE: Response parsing tamamlandı');
+      
+      _logger.d('Parsed response - success: ${forgotResponse.success}, statusCode: ${forgotResponse.statusCode}');
+      _logger.d('Response message: ${forgotResponse.message}');
+      _logger.d('Response data: ${forgotResponse.data}');
+      _logger.d('Token in data: ${forgotResponse.data?.token}');
+      
+      print('🔍 AUTH_SERVICE: Parsed response özeti:');
+      print('  - success: ${forgotResponse.success}');
+      print('  - statusCode: ${forgotResponse.statusCode}');
+      print('  - message: ${forgotResponse.message}');
+      print('  - data is null: ${forgotResponse.data == null}');
+      if (forgotResponse.data != null) {
+        print('  - token is null: ${forgotResponse.data!.token == null}');
+        print('  - token: ${forgotResponse.data!.token}');
+      }
       
       if (forgotResponse.success) {
+        print('🔍 AUTH_SERVICE: ✅ API başarılı');
         _logger.i('Şifre sıfırlama isteği başarılı: $email');
       } else {
+        print('🔍 AUTH_SERVICE: ❌ API başarısız');
         if (forgotResponse.statusCode == 404) {
           _logger.w('Şifre sıfırlama: Kullanıcı bulunamadı: $email');
+        } else if (forgotResponse.statusCode == 417) {
+          _logger.w('Şifre sıfırlama: Rate limiting - çok sık istek gönderildi');
+          print('🔍 AUTH_SERVICE: 417 - Rate limiting hatası');
+          // 417 durumunda kullanıcı dostu mesaj oluştur
+          return ForgotPasswordResponse(
+            error: true,
+            success: false,
+            message: forgotResponse.message,
+            statusCode: 417,
+            userFriendlyMessage: 'Çok sık şifre sıfırlama isteği gönderdiniz. Lütfen birkaç dakika bekleyip tekrar deneyin.',
+            data: null,
+          );
         } else {
           _logger.w('Şifre sıfırlama isteği başarısız: ${forgotResponse.statusCode} - ${forgotResponse.message}');
         }
@@ -144,6 +187,8 @@ class AuthService {
       
       return forgotResponse;
     } catch (e, s) {
+      print('🔍 AUTH_SERVICE: ❌ Exception yakalandı: $e');
+      print('🔍 AUTH_SERVICE: Stack trace: $s');
       _logger.e('Şifre sıfırlama isteği sırasında kritik hata: $e', null, s);
       return ForgotPasswordResponse(
         error: true,
@@ -182,6 +227,16 @@ class AuthService {
           _logger.w('Doğrulama kodu hatalı: $code');
         } else if (codeResponse.message?.contains('süresi') == true) {
           _logger.w('Doğrulama kodunun süresi dolmuş');
+        } else if (codeResponse.statusCode == 417) {
+          _logger.w('Doğrulama kodu: Rate limiting veya geçersiz token - 417');
+          // 417 durumunda kullanıcı dostu mesaj döndür
+          return CodeCheckResponse(
+            error: true,
+            success: false,
+            message: codeResponse.message,
+            userFriendlyMessage: 'Doğrulama kodunuz yanlış veya süresi dolmuş olabilir. Lütfen yeni kod talep edin.',
+            data: null,
+          );
         } else {
           _logger.w('Doğrulama kodu kontrolü başarısız: ${codeResponse.message}');
         }

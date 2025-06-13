@@ -237,7 +237,8 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
         } else if (viewModel.passToken.isNotEmpty) {
           return _buildResetPasswordStep(viewModel);
         } else {
-          return _buildEmailStep();
+          // E-posta gönderildi ama token alınamadı durumu için recovery
+          return _buildEmailStepWithRecovery();
         }
       default:
         return Container();
@@ -285,6 +286,115 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
     );
   }
 
+  // E-posta adımı (recovery ile)
+  Widget _buildEmailStepWithRecovery() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Bilgi mesajı
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F9FA),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xFFE9ECEF)),
+          ),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.info_outline,
+                color: Color(0xFF6C757D),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'E-posta gönderildi ancak bağlantı sorunu yaşandı. Doğrulama kodunuz e-postanızda olabilir.',
+                  style: const TextStyle(
+                    color: Color(0xFF6C757D),
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        
+        // E-posta adımı
+        const Text(
+          'E-posta',
+          style: TextStyle(
+            color: Color(0xFF34495E),
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
+          decoration: InputDecoration(
+            hintText: 'E-posta adresinizi girin',
+            prefixIcon: const Icon(
+              Icons.mail_outline,
+              color: Color(0xFF7F8C8D),
+              size: 20,
+            ),
+            filled: true,
+            fillColor: const Color(0xFFF5F5F5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          ),
+          style: const TextStyle(
+            color: Color(0xFF2C3E50),
+            fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Manuel doğrulama kodu geçiş butonu
+        Center(
+          child: Column(
+            children: [
+              TextButton(
+                onPressed: () {
+                  // Manuel olarak doğrulama adımına geç
+                  context.read<ForgotPasswordViewModel>().manualSwitchToCodeVerification();
+                },
+                child: Text(
+                  'Doğrulama kodumu aldım, devam et →',
+                  style: TextStyle(
+                    color: Color(0xFF3498DB),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () {
+                  // Tekrar e-posta gönder
+                  context.read<ForgotPasswordViewModel>().reset();
+                },
+                child: Text(
+                  'Yeni kod talep et',
+                  style: TextStyle(
+                    color: Color(0xFF6C757D),
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   // Doğrulama kodu adımı
   Widget _buildCodeVerificationStep() {
     return Column(
@@ -320,6 +430,24 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           style: const TextStyle(
             color: Color(0xFF2C3E50),
             fontSize: 16,
+          ),
+        ),
+        const SizedBox(height: 16),
+        
+        // Yeni kod talep et butonu
+        Center(
+          child: TextButton(
+            onPressed: () {
+              // Yeni kod talep et - başa dön
+              context.read<ForgotPasswordViewModel>().reset();
+            },
+            child: Text(
+              'Yeni doğrulama kodu talep et',
+              style: TextStyle(
+                color: Color(0xFF6C757D),
+                fontSize: 14,
+              ),
+            ),
           ),
         ),
       ],
@@ -470,41 +598,97 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
 
   // Durum değişkenine göre ileri butonuna basıldığında işlem yap
   void _handlePrimaryAction(BuildContext context, ForgotPasswordViewModel viewModel) async {
+    print('🔍 DEBUG: _handlePrimaryAction çağrıldı, mevcut durum: ${viewModel.status}');
+    
     switch (viewModel.status) {
       case ForgotPasswordStatus.initial:
         if (_emailController.text.isNotEmpty) {
-          await viewModel.forgotPassword(_emailController.text.trim());
+          print('🔍 DEBUG: E-posta ile şifre sıfırlama başlatılıyor: ${_emailController.text.trim()}');
+          final result = await viewModel.forgotPassword(_emailController.text.trim());
+          print('🔍 DEBUG: forgotPassword sonucu: $result');
+          print('🔍 DEBUG: Yeni durum: ${viewModel.status}');
+          if (viewModel.status == ForgotPasswordStatus.error) {
+            print('🔍 DEBUG: Hata mesajı: ${viewModel.errorMessage}');
+          }
+        } else {
+          print('🔍 DEBUG: E-posta alanı boş!');
         }
         break;
         
       case ForgotPasswordStatus.codeVerification:
         if (_codeController.text.isNotEmpty) {
-          await viewModel.verifyCode(_codeController.text.trim());
+          print('🔍 DEBUG: Doğrulama kodu kontrol ediliyor: ${_codeController.text.trim()}');
+          final result = await viewModel.verifyCode(_codeController.text.trim());
+          print('🔍 DEBUG: verifyCode sonucu: $result');
+        } else {
+          print('🔍 DEBUG: Doğrulama kodu alanı boş!');
         }
         break;
         
       case ForgotPasswordStatus.resetPassword:
         if (_passwordController.text.isNotEmpty && _passwordConfirmController.text.isNotEmpty) {
-          await viewModel.resetPassword(
+          print('🔍 DEBUG: Şifre sıfırlama işlemi başlatılıyor');
+          final result = await viewModel.resetPassword(
             _passwordController.text,
             _passwordConfirmController.text,
           );
+          print('🔍 DEBUG: resetPassword sonucu: $result');
+        } else {
+          print('🔍 DEBUG: Şifre alanları boş!');
         }
         break;
         
       case ForgotPasswordStatus.success:
+        print('🔍 DEBUG: Başarılı, giriş ekranına yönlendiriliyor');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const LoginView()),
         );
         break;
         
+      case ForgotPasswordStatus.error:
+        // Error durumunda hangi adımda olduğunu kontrol et ve uygun aksiyonu al
+        if (viewModel.verificationToken.isNotEmpty && viewModel.passToken.isEmpty) {
+          // Doğrulama kodu adımındayken hata oluştuysa
+          if (_codeController.text.isNotEmpty) {
+            print('🔍 DEBUG: Error durumunda doğrulama kodu tekrar deneniyor');
+            final result = await viewModel.verifyCode(_codeController.text.trim());
+            print('🔍 DEBUG: Error durumunda verifyCode sonucu: $result');
+          } else {
+            print('🔍 DEBUG: Error durumında doğrulama kodu alanı boş!');
+          }
+        } else if (viewModel.passToken.isNotEmpty) {
+          // Şifre sıfırlama adımındayken hata oluştuysa
+          if (_passwordController.text.isNotEmpty && _passwordConfirmController.text.isNotEmpty) {
+            print('🔍 DEBUG: Error durumunda şifre sıfırlama tekrar deneniyor');
+            final result = await viewModel.resetPassword(
+              _passwordController.text,
+              _passwordConfirmController.text,
+            );
+            print('🔍 DEBUG: Error durumunda resetPassword sonucu: $result');
+          } else {
+            print('🔍 DEBUG: Error durumında şifre alanları boş!');
+          }
+        } else {
+          // İlk adımdayken hata oluştuysa
+          if (_emailController.text.isNotEmpty) {
+            print('🔍 DEBUG: Error durumunda e-posta tekrar deneniyor');
+            final result = await viewModel.forgotPassword(_emailController.text.trim());
+            print('🔍 DEBUG: Error durumunda forgotPassword sonucu: $result');
+          } else {
+            print('🔍 DEBUG: Error durumında e-posta alanı boş!');
+          }
+        }
+        break;
+        
       default:
+        print('🔍 DEBUG: Beklenmeyen durum: ${viewModel.status}');
         break;
     }
     
     // Hata durumunda kullanıcıya Snackbar ile bildirim göster
     if (viewModel.status == ForgotPasswordStatus.error) {
       String formattedMessage = _formatErrorMessage(viewModel.errorMessage);
+      print('🔍 DEBUG: Hata gösteriliyor: $formattedMessage');
       _snackbarService.showError(formattedMessage);
     }
   }
