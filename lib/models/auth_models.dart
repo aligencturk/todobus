@@ -152,19 +152,19 @@ class RegisterResponse {
     
     bool success = json['success'] ?? false;
     String? message = json['message'];
+    String? errorMessage = json['error_message']; // API'den gelen error_message alanı
     String? userFriendlyMessage;
 
     if (!success) {
-      String baseMessage = message ?? 'Kayıt işlemi sırasında bilinmeyen bir hata oluştu.';
-      if (json.containsKey('417') || statusCode == 417) {
-        baseMessage = 'Bu e-posta adresi zaten kayıtlı. Lütfen giriş yapın veya başka bir e-posta adresi kullanın.';
-        userFriendlyMessage = 'API Hatası: 417 - $baseMessage';
+      // Önce error_message'ı kontrol et, yoksa message'ı kullan
+      String baseMessage = errorMessage ?? message ?? 'Kayıt işlemi sırasında bilinmeyen bir hata oluştu.';
+      
+      // Status code check'ini kaldırıp direkt API'den gelen mesajı kullan
+      if (json.containsKey('417')) {
+        // 417 durumunda da API'den gelen mesajı kullan
+        userFriendlyMessage = baseMessage;
       } else {
-        if (statusCode != null) {
-          userFriendlyMessage = 'API Hatası: $statusCode - $baseMessage';
-        } else {
-          userFriendlyMessage = baseMessage;
-        }
+        userFriendlyMessage = baseMessage;
       }
     }
     

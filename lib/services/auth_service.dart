@@ -85,47 +85,35 @@ class AuthService {
     required bool policy,
     required bool kvkk,
   }) async {
-    try {
-      _logger.i('Kullanıcı kaydı yapılıyor: $email');
-      
-      final registerRequest = RegisterRequest(
-        userFirstname: firstName,
-        userLastname: lastName,
-        userEmail: email,
-        userPhone: '',
-        userPassword: password,
-        version: _apiService.getAppVersion(),
-        platform: _apiService.getPlatform(),
-        policy: policy,
-        kvkk: kvkk,
-      );
-      
-      final response = await _apiService.post(
-        'service/auth/register',
-        body: registerRequest.toJson(),
-      );
-      
-      final registerResponse = RegisterResponse.fromJson(response);
-      
-      if (registerResponse.success) {
-        _logger.i('Kullanıcı kaydı başarılı: $email');
-      } else {
-        // Log the specific error message if available
-        _logger.w('Kullanıcı kaydı başarısız: ${registerResponse.userFriendlyMessage ?? registerResponse.message ?? registerResponse.statusCode?.toString() ?? "Bilinmeyen hata"}');
-      }
-      
-      return registerResponse;
-    } catch (e, s) {
-      _logger.e('Kullanıcı kaydı sırasında kritik hata: $e', null, s);
-      // Return a RegisterResponse indicating failure instead of throwing an exception
-      return RegisterResponse(
-        error: true,
-        success: false,
-        message: e.toString(), // Technical error message
-        statusCode: null, // Or try to extract from DioError if 'e' is DioError
-        userFriendlyMessage: 'Kayıt işlemi sırasında bir sorun oluştu. Lütfen internet bağlantınızı kontrol edin ve daha sonra tekrar deneyin.',
-      );
+    _logger.i('Kullanıcı kaydı yapılıyor: $email');
+    
+    final registerRequest = RegisterRequest(
+      userFirstname: firstName,
+      userLastname: lastName,
+      userEmail: email,
+      userPhone: '',
+      userPassword: password,
+      version: _apiService.getAppVersion(),
+      platform: _apiService.getPlatform(),
+      policy: policy,
+      kvkk: kvkk,
+    );
+    
+    final response = await _apiService.post(
+      'service/auth/register',
+      body: registerRequest.toJson(),
+    );
+    
+    final registerResponse = RegisterResponse.fromJson(response);
+    
+    if (registerResponse.success) {
+      _logger.i('Kullanıcı kaydı başarılı: $email');
+    } else {
+      // Log the specific error message if available
+      _logger.w('Kullanıcı kaydı başarısız: ${registerResponse.userFriendlyMessage ?? registerResponse.message ?? registerResponse.statusCode?.toString() ?? "Bilinmeyen hata"}');
     }
+    
+    return registerResponse;
   }
   
   // Şifremi unuttum metodu

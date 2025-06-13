@@ -122,10 +122,16 @@ class BaseApiService {
           return {'success': true, 'code': 410};
         }
       } else {
+        // Response body'yi decode et
         final responseBody = jsonDecode(response.body);
-        final userMessage = _getUserFriendlyErrorMessage(response.statusCode, responseBody);
-        _logger.e('API hatası: ${response.statusCode} - $userMessage');
-        throw Exception(userMessage);
+        
+        // AuthService gibi servislerin response'u işleyebilmesi için
+        // exception fırlatmak yerine responseBody'yi döndür
+        // statusCode'u da ekle ki service katmanında kontrol edilebilsin
+        responseBody['statusCode'] = response.statusCode;
+        
+        _logger.d('API yanıtı: ${response.statusCode} - $responseBody');
+        return responseBody;
       }
     } catch (e) {
       // Eğer zaten bir Exception ise, re-throw et

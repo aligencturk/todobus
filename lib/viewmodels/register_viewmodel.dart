@@ -105,7 +105,8 @@ class RegisterViewModel with ChangeNotifier {
         return false;
       }
     } catch (e) {
-      _errorMessage = 'Bir hata oluştu: ${e.toString()}';
+      // Network hataları vs. için
+      _errorMessage = 'Bağlantı hatası: ${e.toString()}';
       _logger.e('Kayıt hatası:', e);
       _status = RegisterStatus.error;
       _safeNotifyListeners();
