@@ -207,8 +207,8 @@ class UserService {
       } catch (apiError) {
         _logger.e('❌ FCM token API isteği başarısız: $apiError');
         
-        // 3 saniye bekleyip tekrar dene
-        await Future.delayed(const Duration(seconds: 3));
+        // 500ms bekleyip hızla tekrar dene
+        await Future.delayed(const Duration(milliseconds: 500));
         try {
           _logger.i('🔄 FCM token kaydı tekrar deneniyor...');
           final response = await _apiService.put('service/user/update/fcmtoken', body: body);

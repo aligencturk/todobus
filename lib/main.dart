@@ -88,11 +88,9 @@ void _initializeNonCriticalServices(LoggerService logger) {
     } catch (e) {
       logger.e('Non-kritik servisler başlatılırken hata: $e');
     } finally {
-      // Her durumda native splash'i kaldır (2 saniye sonra)
-      Future.delayed(const Duration(seconds: 2), () {
-        FlutterNativeSplash.remove();
-        logger.i('🎨 Native splash kaldırıldı');
-      });
+      // Servisler yüklendikten hemen sonra native splash'i kaldır
+      FlutterNativeSplash.remove();
+      logger.i('🎨 Native splash kaldırıldı');
     }
   });
 }
@@ -311,7 +309,7 @@ class _MyAppState extends State<MyApp> {
               '/onboarding': (context) => const OnboardingView(),
             },
             home: SplashScreen(
-              duration: const Duration(seconds: 1), // Splash süresini kısaltıyoruz
+              duration: const Duration(milliseconds: 300), // Splash süresini kısaltıyoruz
               child: _isLoading
                 ? PlatformScaffold(
                     body: Center(

@@ -22,7 +22,7 @@ class VersionCheckService {
       
       // Remote Config ayarları
       await _remoteConfig.setConfigSettings(RemoteConfigSettings(
-        fetchTimeout: const Duration(minutes: 1),
+        fetchTimeout: const Duration(seconds: 10),
         minimumFetchInterval: const Duration(hours: 1),
       ));
 

@@ -23,9 +23,7 @@ class DataService {
   Future<void> loadUserProfile(String userID) async {
     try {
       _logger.i('Kullanıcı profili yükleniyor: $userID');
-      // API çağrısı burada yapılacak
-      await Future.delayed(const Duration(milliseconds: 300));
-      
+      // Gerçek API çağrısı yapılacak - şimdilik hızlı tamamlama
       _isProfileLoaded = true;
       _logger.i('Kullanıcı profili başarıyla yüklendi');
     } catch (e) {
@@ -38,9 +36,7 @@ class DataService {
   Future<void> loadUserTasks(String userID) async {
     try {
       _logger.i('Kullanıcı görevleri yükleniyor: $userID');
-      // API çağrısı burada yapılacak
-      await Future.delayed(const Duration(milliseconds: 500));
-      
+      // Gerçek API çağrısı yapılacak - şimdilik hızlı tamamlama
       _areTasksLoaded = true;
       _logger.i('Kullanıcı görevleri başarıyla yüklendi');
     } catch (e) {
@@ -53,9 +49,7 @@ class DataService {
   Future<void> loadNotifications(String userID) async {
     try {
       _logger.i('Kullanıcı bildirimleri yükleniyor: $userID');
-      // API çağrısı burada yapılacak
-      await Future.delayed(const Duration(milliseconds: 200));
-      
+      // Gerçek API çağrısı yapılacak - şimdilik hızlı tamamlama
       _areNotificationsLoaded = true;
       _logger.i('Kullanıcı bildirimleri başarıyla yüklendi');
     } catch (e) {
@@ -68,9 +62,7 @@ class DataService {
   Future<void> loadSettings(String userID) async {
     try {
       _logger.i('Kullanıcı ayarları yükleniyor: $userID');
-      // API çağrısı burada yapılacak
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      // Gerçek API çağrısı yapılacak - şimdilik hızlı tamamlama
       _areSettingsLoaded = true;
       _logger.i('Kullanıcı ayarları başarıyla yüklendi');
     } catch (e) {
@@ -83,9 +75,7 @@ class DataService {
   Future<void> loadCategories() async {
     try {
       _logger.i('Kategoriler yükleniyor');
-      // API çağrısı burada yapılacak
-      await Future.delayed(const Duration(milliseconds: 250));
-      
+      // Gerçek API çağrısı yapılacak - şimdilik hızlı tamamlama
       _areCategoriesLoaded = true;
       _logger.i('Kategoriler başarıyla yüklendi');
     } catch (e) {
