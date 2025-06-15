@@ -1,7 +1,7 @@
 import '../models/group_models.dart';
 import '../services/logger_service.dart';
 import '../services/storage_service.dart';
-import '../services/notification_service.dart';
+// Gereksiz import kaldırıldı
 import 'base_api_service.dart';
 
 class GroupService {
@@ -296,7 +296,7 @@ class GroupService {
     }
   }
 
-  // Kullanıcıyı projeye ekle ve bildirim gönder
+  // Kullanıcıyı projeye ekle (bildirim backend tarafından gönderilecek)
   Future<bool> addUserToProjectWithNotification({
     required int groupId,
     required int projectId,
@@ -304,30 +304,11 @@ class GroupService {
     required String userEmail,
     required String currentUserName,
   }) async {
-    final result = await addUserToProject(
+    // Sadece backend API'yi çağır, bildirim backend tarafından gönderilir
+    return await addUserToProject(
       groupId: groupId,
       projectId: projectId,
       userEmail: userEmail
     );
-    
-    if (result) {
-      // Bildirim gönder
-      final notificationService = NotificationService.instance;
-      
-      // Konu olarak grup ID'sini kullan (grup ID'ye abone olanlar bildirim alacak)
-      final topic = groupId.toString();
-      
-      // Bildirimi gönder
-      await notificationService.sendProjectAssignedNotification(
-        topic: topic,
-        userName: currentUserName,
-        projectName: projectName,
-        projectId: projectId
-      );
-      
-      return true;
-    }
-    
-    return false;
   }
 } 

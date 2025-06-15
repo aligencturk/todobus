@@ -434,6 +434,33 @@ class _WorkDetailViewState extends State<WorkDetailView> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: PlatformElevatedButton(
+                  onPressed: _confirmDeleteWork,
+                  material: (_, __) => MaterialElevatedButtonData(
+                    style: ElevatedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.red,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                  cupertino: (_, __) => CupertinoElevatedButtonData(
+                    color: CupertinoColors.destructiveRed,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: Text(
+                    'Görevi Sil',
+                    style: TextStyle(
+                      color: isIOS ? CupertinoColors.white : Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -549,6 +576,98 @@ class _WorkDetailViewState extends State<WorkDetailView> {
     }
   }
   
+  // Görev silme doğrulama
+  void _confirmDeleteWork() {
+    if (_workDetail == null) return;
+    
+    final isIOS = isCupertino(context);
+    
+    if (isIOS) {
+      showCupertinoDialog(
+        context: context,
+        builder: (dialogContext) => CupertinoAlertDialog(
+          title: const Text('Görevi Sil'),
+          content: Text('${_workDetail!.workName} görevini silmek istediğinize emin misiniz?'),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _deleteWork();
+              },
+              child: const Text('Sil'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Görevi Sil'),
+          content: Text('${_workDetail!.workName} görevini silmek istediğinize emin misiniz?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('İptal'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _deleteWork();
+              },
+              child: const Text('Sil'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  // Görevi silme
+  void _deleteWork() async {
+    if (_workDetail == null) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final success = await Provider.of<GroupViewModel>(context, listen: false)
+          .deleteProject(widget.projectId, widget.workId);
+      
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        if (success) {
+          _snackBarService.showSuccess('Görev başarıyla silindi');
+          
+          // Görev silindikten sonra önceki sayfaya dön
+          Navigator.of(context).pop(true);
+        } else {
+          _showErrorSnackbar('Görev silinemedi');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        
+        _showErrorSnackbar(_formatErrorMessage(e.toString()));
+      }
+    }
+  }
+
   // Hata mesajı göster
   void _showErrorSnackbar(String errorMessage) {
     if (!mounted) return;

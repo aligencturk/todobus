@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
@@ -173,19 +174,18 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
             final groups = groupViewModel.groups;
             final groupIds = groups.map((group) => group.groupID).toList();
             
-            // Kullanıcıyı gruplarına abone et (arka planda, bloklama yapmadan)
-            _notificationService.subscribeUserToRequiredTopics(
-              profileViewModel.user!.userID, 
-              groupIds
-            ).then((_) {
-              if (mounted) {
-                _logger.i('Kullanıcı FCM topics\'lerine abone edildi: ${groupIds.join(", ")}');
+            // Kullanıcıyı kendi topic'ine abone et
+            _notificationService.subscribeToUserTopic(profileViewModel.user!.userID).then((success) {
+              if (mounted && success) {
+                _logger.i('Kullanıcı FCM topic\'ine abone edildi');
               }
             }).catchError((e) {
               if (mounted) {
-                _logger.e('FCM topics aboneliğinde hata: $e');
+                _logger.e('FCM topic aboneliğinde hata: $e');
               }
             });
+            
+
           }
           
           _logger.i('Dashboard açıldı: Tüm veriler yüklendi');

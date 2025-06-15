@@ -1,64 +1,109 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Arka plan mesajları için Firebase'i başlat
   try {
+    // Firebase'i başlat
     if (Firebase.apps.isEmpty) {
       await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform,
       );
-      debugPrint("Firebase arka plan mesaj işleyicide başlatıldı");
     }
+    
+    debugPrint("🔔 Background bildirim alındı: ${message.notification?.title}");
+    debugPrint("📱 Bildirim gövdesi: ${message.notification?.body}");
+    
+    // Bildirim verilerini detaylı işle
+    if (message.data.isNotEmpty) {
+      debugPrint("📋 Bildirim verisi: ${message.data}");
+      
+      // Veri içinden type bilgisini al
+      final dataString = message.data['keysandvalues'] as String?;
+      if (dataString != null) {
+        debugPrint("🔍 Veri anahtarları: $dataString");
+      }
+      
+      // Notification type'a göre özel işlemler
+      final notificationType = message.data['type'] ?? 'unknown';
+      debugPrint("📌 Bildirim tipi: $notificationType");
+      
+      switch (notificationType) {
+        case 'project_assigned':
+          debugPrint("👥 Proje atama bildirimi");
+          break;
+        case 'task_assigned':
+          debugPrint("📝 Görev atama bildirimi");
+          break;
+        case 'comment_added':
+          debugPrint("💬 Yorum bildirimi");
+          break;
+        default:
+          debugPrint("ℹ️ Genel bildirim");
+      }
+    }
+    
+    // Background'da local notification göster
+    await _showBackgroundNotification(message);
+    
   } catch (e) {
-    debugPrint("Firebase başlatılırken hata: $e");
+    debugPrint("❌ Background bildirim işleme hatası: $e");
   }
-  
-  // Arka planda alınan bildirimi detaylı logla
-  debugPrint("================ ARKA PLAN BİLDİRİMİ ALINDI ================");
-  debugPrint("Bildirim ID: ${message.messageId}");
-  debugPrint("Gönderim Zamanı: ${message.sentTime}");
-  
-  // Bildirim verisi detaylı yazdırma
-  debugPrint("------- Bildirim Verisi -------");
-  message.data.forEach((key, value) {
-    debugPrint("$key: $value");
-  });
-  
-  // Bildirim içeriği detaylı yazdırma
-  if (message.notification != null) {
-    debugPrint("------- Bildirim İçeriği -------");
-    debugPrint("Başlık: ${message.notification!.title}");
-    debugPrint("İçerik: ${message.notification!.body}");
-    debugPrint("Android Kanal ID: ${message.notification!.android?.channelId}");
-    debugPrint("Android Öncelik: ${message.notification!.android?.priority}");
+}
+
+// Background'da local notification göstermek için
+Future<void> _showBackgroundNotification(RemoteMessage message) async {
+  try {
+    final FlutterLocalNotificationsPlugin localNotifications = FlutterLocalNotificationsPlugin();
+    
+    // Android initialization
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    
+    // iOS initialization
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+    
+    const InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
+    
+    await localNotifications.initialize(initializationSettings);
+    
+    // Bildirim göster
+    await localNotifications.show(
+      message.notification.hashCode,
+      message.notification?.title ?? 'TodoBus',
+      message.notification?.body ?? 'Yeni bildirim var',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'todobus_channel',
+          'TodoBus Bildirimleri',
+          channelDescription: 'TodoBus uygulaması bildirimleri',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      payload: message.data.toString(),
+    );
+    
+    debugPrint("✅ Background local notification gösterildi");
+    
+  } catch (e) {
+    debugPrint("❌ Background local notification hatası: $e");
   }
-  
-  // iOS özel alanları kontrol et
-  if (message.notification?.apple != null) {
-    debugPrint("------- iOS Bildirim Detayları -------");
-    debugPrint("Badge: ${message.notification!.apple!.badge}");
-    debugPrint("Sound: ${message.notification!.apple!.sound}");
-  }
-  
-  // Content-available kontrolü
-  if (message.data.containsKey('content-available')) {
-    debugPrint("Content-Available: ${message.data['content-available']}");
-  }
-  
-  // Bildirim kaynağını kontrol et
-  debugPrint("------- Bildirim Kaynağı -------");
-  debugPrint("Mesaj Tipi: ${message.messageType}");
-  debugPrint("Kaynak: ${message.from}");
-  
-  // Burada bildirimleri işleyebilirsiniz
-  // Örnek: Yerel bildirim gösterme, veritabanı güncelleme, vb.
-  
-  debugPrint("==============================================================");
-  
-  // Arka plan işlemi tamamlandı
-  return Future.value();
 } 

@@ -9,8 +9,7 @@ import 'views/events_view.dart';
 import 'viewmodels/group_viewmodel.dart';
 import 'viewmodels/dashboard_viewmodel.dart';
 import 'viewmodels/event_viewmodel.dart';
-import 'services/firebase_messaging_service.dart';
-import 'services/notification_viewmodel.dart';
+// Gereksiz import kaldırıldı
 import 'viewmodels/profile_viewmodel.dart';
 import 'viewmodels/report_viewmodel.dart';
 
@@ -47,14 +46,7 @@ class MainAppState extends State<MainApp> {
         ChangeNotifierProvider(create: (_) => ProfileViewModel(), lazy: true),
         ChangeNotifierProvider(create: (_) => EventViewModel(), lazy: true),
         ChangeNotifierProvider(create: (_) => ReportViewModel(), lazy: true),
-        ChangeNotifierProxyProvider<FirebaseMessagingService, NotificationViewModel>(
-          create: (context) => NotificationViewModel(
-            Provider.of<FirebaseMessagingService>(context, listen: false),
-          ),
-          update: (context, messaging, previous) => 
-            previous ?? NotificationViewModel(messaging),
-          lazy: true,
-        ),
+        // NotificationService artık singleton olarak kullanılıyor
       ],
       child: PlatformScaffold(
         body: IndexedStack(

@@ -15,8 +15,7 @@ import 'viewmodels/event_viewmodel.dart';
 import 'services/logger_service.dart';
 import 'services/storage_service.dart';
 import 'services/device_info_service.dart';
-import 'services/firebase_messaging_service.dart';
-import 'services/notification_viewmodel.dart';
+import 'services/notification_service.dart';
 import 'services/base_api_service.dart';
 import 'services/spelling_correction_service.dart';
 import 'views/login_view.dart';
@@ -156,10 +155,22 @@ Future<void> _initializeDeviceInfo() async {
 
 Future<void> _initializeMessaging(LoggerService logger) async {
   try {
-    await FirebaseMessagingService.instance.initialize();
-    logger.i('Firebase Messaging servisi başarıyla başlatıldı');
+    await NotificationService.instance.init();
+    
+    // Notification tap callback'i ayarla
+    NotificationService.instance.onNotificationTap = (data) {
+      logger.i('📱 Notification tapped from main: $data');
+      // Burada gerekli navigation işlemleri yapılabilir
+    };
+    
+    // Token update callback'i ayarla
+    NotificationService.instance.onTokenUpdate = (token) {
+      logger.i('🔄 FCM Token updated: ${token.substring(0, 20)}...');
+    };
+    
+    logger.i('✅ Notification servisi başarıyla başlatıldı');
   } catch (e) {
-    logger.e('Bildirim servisi başlatılırken hata: $e');
+    logger.e('❌ Bildirim servisi başlatılırken hata: $e');
   }
 }
 
@@ -213,10 +224,18 @@ class _MyAppState extends State<MyApp> {
         criticalAlert: true,
       );
       
-      _logger.i('Bildirim izin durumu: ${settings.authorizationStatus}');
+      _logger.i('📱 Bildirim izin durumu: ${settings.authorizationStatus}');
+      
+      // Eğer izinler alındıysa debug bilgilerini göster
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        // Debug bilgilerini bir süre sonra göster
+        Future.delayed(const Duration(seconds: 3), () async {
+          await NotificationService.instance.debug();
+        });
+      }
       
     } catch (e) {
-      _logger.e('Bildirim ayarları yapılandırılırken hata: $e');
+      _logger.e('❌ Bildirim ayarları yapılandırılırken hata: $e');
     }
   }
 
@@ -248,11 +267,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => ProfileViewModel(), lazy: true),
         ChangeNotifierProvider(create: (_) => DashboardViewModel(), lazy: true),
         ChangeNotifierProvider(create: (_) => GroupViewModel(), lazy: true),
-        ChangeNotifierProvider(create: (_) => EventViewModel(), lazy: true),
-        ChangeNotifierProvider(
-          create: (_) => NotificationViewModel(FirebaseMessagingService.instance),
-          lazy: true,
-        ),
+                  ChangeNotifierProvider(create: (_) => EventViewModel(), lazy: true),
       ],
       child: PlatformProvider(
         settings: PlatformSettingsData(

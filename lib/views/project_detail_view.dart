@@ -1001,7 +1001,6 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
             _loadProjectWorks();
           });
         },
-        onLongPress: () => _showWorkDetailActions(work),
         borderRadius: BorderRadius.circular(8),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -1062,6 +1061,16 @@ class _ProjectDetailViewState extends State<ProjectDetailView> {
                         ],
                       ],
                     ),
+                  ),
+                  // Görev menü butonu
+                  PlatformIconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      isIOS ? CupertinoIcons.ellipsis_vertical : Icons.more_vert,
+                      size: 20,
+                      color: isIOS ? CupertinoColors.systemGrey : Colors.grey[600],
+                    ),
+                    onPressed: () => _showWorkDetailActions(work),
                   ),
                 ],
               ),

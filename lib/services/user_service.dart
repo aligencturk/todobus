@@ -192,35 +192,37 @@ class UserService {
       try {
         final response = await _apiService.put('service/user/update/fcmtoken', body: body);
         
-        final success = response['success'] == true || response['code'] == 410;
+        // API yanıtı kontrol et - loglardan görüldüğü gibi error: false, code: 200 geliyor
+        final success = response['error'] == false || response['success'] == true || response['code'] == 200;
+        
         if (success) {
-          _logger.i('FCM token başarıyla kaydedildi');
+          _logger.i('✅ FCM token başarıyla kaydedildi');
           _logger.i('Sunucu Yanıtı: $response');
         } else {
-          _logger.w('FCM token kaydedilemedi: ${response['errorMessage'] ?? 'Bilinmeyen hata'}');
+          _logger.w('⚠️ FCM token kaydedilemedi: ${response['errorMessage'] ?? response['message'] ?? 'Bilinmeyen hata'}');
           _logger.w('Sunucu Yanıtı: $response');
         }
         
         return success;
       } catch (apiError) {
-        _logger.e('FCM token API isteği başarısız: $apiError');
+        _logger.e('❌ FCM token API isteği başarısız: $apiError');
         
         // 3 saniye bekleyip tekrar dene
         await Future.delayed(const Duration(seconds: 3));
         try {
-          _logger.i('FCM token kaydı tekrar deneniyor...');
+          _logger.i('🔄 FCM token kaydı tekrar deneniyor...');
           final response = await _apiService.put('service/user/update/fcmtoken', body: body);
-          final success = response['success'] == true || response['code'] == 410;
+          final success = response['error'] == false || response['success'] == true || response['code'] == 200;
           
           if (success) {
-            _logger.i('FCM token başarıyla kaydedildi (tekrar deneme)');
+            _logger.i('✅ FCM token başarıyla kaydedildi (tekrar deneme)');
           } else {
-            _logger.w('FCM token tekrar deneme başarısız: ${response['errorMessage'] ?? 'Bilinmeyen hata'}');
+            _logger.w('⚠️ FCM token tekrar deneme başarısız: ${response['errorMessage'] ?? response['message'] ?? 'Bilinmeyen hata'}');
           }
           
           return success;
         } catch (retryError) {
-          _logger.e('FCM token tekrar deneme başarısız: $retryError');
+          _logger.e('❌ FCM token tekrar deneme başarısız: $retryError');
           return false;
         }
       }
