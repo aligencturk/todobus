@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -82,13 +83,16 @@ void _initializeNonCriticalServices(LoggerService logger) {
         _initializeVersionCheck(logger),
       ]);
       
-      // Tüm non-kritik servisler başlatıldıktan sonra native splash'i kaldır  
-      FlutterNativeSplash.remove();
+      logger.i('✅ Tüm non-kritik servisler başarıyla yüklendi');
       
     } catch (e) {
       logger.e('Non-kritik servisler başlatılırken hata: $e');
-      // Hata olsa bile native splash'i kaldır
-      FlutterNativeSplash.remove();
+    } finally {
+      // Her durumda native splash'i kaldır (2 saniye sonra)
+      Future.delayed(const Duration(seconds: 2), () {
+        FlutterNativeSplash.remove();
+        logger.i('🎨 Native splash kaldırıldı');
+      });
     }
   });
 }
@@ -226,12 +230,18 @@ class _MyAppState extends State<MyApp> {
       
       _logger.i('📱 Bildirim izin durumu: ${settings.authorizationStatus}');
       
-      // Eğer izinler alındıysa debug bilgilerini göster
+      // Debug modunda ve izinler alındıysa debug bilgilerini göster
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        // Debug bilgilerini bir süre sonra göster
-        Future.delayed(const Duration(seconds: 3), () async {
-          await NotificationService.instance.debug();
-        });
+        // Debug bilgilerini sadece debug modunda ve background'da göster
+        if (kDebugMode) {
+          Future.delayed(const Duration(seconds: 10), () async {
+            try {
+              await NotificationService.instance.debug();
+            } catch (e) {
+              _logger.e('❌ Debug bilgileri gösterilirken hata: $e');
+            }
+          });
+        }
       }
       
     } catch (e) {

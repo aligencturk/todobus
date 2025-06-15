@@ -57,8 +57,8 @@ class NotificationService {
       // Message handlers ayarla
       _setupMessageHandlers();
       
-      // User topic subscription
-      await _subscribeToUserTopic();
+      // User topic subscription'ı background'da yap
+      _subscribeToUserTopic();
       
       _logger.i('✅ NotificationService başarıyla başlatıldı');
     } catch (e) {
@@ -105,9 +105,9 @@ class NotificationService {
       if (Platform.isIOS) {
         String? apnsToken = await _firebaseMessaging.getAPNSToken();
         if (apnsToken == null) {
-          _logger.w('⚠️ APNs token henüz hazır değil, bekleniyor...');
-          // APNs token'ı için maksimum 30 saniye bekle
-          for (int i = 0; i < 30; i++) {
+          _logger.w('⚠️ APNs token henüz hazır değil, kısa süre bekleniyor...');
+          // APNs token'ı için maksimum 3 saniye bekle (eskiden 30 saniyeydi)
+          for (int i = 0; i < 3; i++) {
             await Future.delayed(const Duration(seconds: 1));
             apnsToken = await _firebaseMessaging.getAPNSToken();
             if (apnsToken != null) {
@@ -117,7 +117,8 @@ class NotificationService {
           }
           
           if (apnsToken == null) {
-            _logger.e('❌ APNs token 30 saniye içinde alınamadı');
+            _logger.w('⚠️ APNs token 3 saniye içinde alınamadı, devam ediliyor');
+            // Token alınamasa bile devam et, background'da tekrar denenecek
           }
         }
       }
@@ -126,8 +127,8 @@ class NotificationService {
       if (_fcmToken != null) {
         _logger.i('✅ FCM Token alındı: ${_fcmToken!.substring(0, 20)}...');
         
-        // Token'ı sunucuya gönder
-        await _sendTokenToServer(_fcmToken!);
+        // Token'ı sunucuya gönder (background'da)
+        _sendTokenToServerAsync(_fcmToken!);
         
         // Callback çağır
         onTokenUpdate?.call(_fcmToken!);
@@ -139,12 +140,23 @@ class NotificationService {
       _firebaseMessaging.onTokenRefresh.listen((newToken) async {
         _logger.i('🔄 FCM Token yenilendi');
         _fcmToken = newToken;
-        await _sendTokenToServer(newToken);
+        _sendTokenToServerAsync(newToken);
         onTokenUpdate?.call(newToken);
       });
     } catch (e) {
       _logger.e('❌ Token alma hatası: $e');
     }
+  }
+  
+  // Token göndermeyi async yapmak için yeni method
+  void _sendTokenToServerAsync(String token) {
+    Future.microtask(() async {
+      try {
+        await _sendTokenToServer(token);
+      } catch (e) {
+        _logger.e('❌ Async token gönderme hatası: $e');
+      }
+    });
   }
   
   Future<void> _sendTokenToServer(String token) async {
@@ -327,15 +339,18 @@ class NotificationService {
   
   // User topic aboneliği
   Future<void> _subscribeToUserTopic() async {
-    try {
-      final userResponse = await _userService.getUser();
-      if (userResponse.success && userResponse.data != null) {
-        final userId = userResponse.data!.user.userID;
-        await subscribeToUserTopic(userId);
+    // Background'da topic aboneliği yap
+    Future.microtask(() async {
+      try {
+        final userResponse = await _userService.getUser();
+        if (userResponse.success && userResponse.data != null) {
+          final userId = userResponse.data!.user.userID;
+          await subscribeToUserTopic(userId);
+        }
+      } catch (e) {
+        _logger.e('❌ User topic aboneliği hatası: $e');
       }
-    } catch (e) {
-      _logger.e('❌ User topic aboneliği hatası: $e');
-    }
+    });
   }
   
   // Topic aboneliği
