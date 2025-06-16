@@ -497,30 +497,13 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       appBar: PlatformAppBar(
         title: const Text('Ana Sayfa'),
         material: (_, __) => MaterialAppBarData(
-          leading: GestureDetector(
-            onTap: _showWidgetOrderingScreen,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.sort,
-                    size: 20,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Düzen',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).primaryColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+          leading: IconButton(
+            onPressed: _showWidgetOrderingScreen,
+            icon: Icon(
+              Icons.sort,
+              color: Theme.of(context).colorScheme.onSecondary,
             ),
+            tooltip: 'Widget Düzeni',
           ),
           actions: <Widget>[
             IconButton(
