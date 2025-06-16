@@ -17,7 +17,7 @@ class BaseApiService {
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   // API ayarları
-  static const String baseUrl = 'https://api.todobus.tr/v1.0.0/';  // Gerçek URL eklenecek
+  static const String baseUrl = 'https://api.todobus.tr/v1.0.1/';  // Gerçek URL eklenecek
   static const String username = 'Tr2VAhW2ICWHJN2nlvp9T5ycBoyMJD';
   static const String password = 'vRP4rTBAqm1tm2I17I1EV3PH57Edl0';
 

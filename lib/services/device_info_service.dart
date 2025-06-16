@@ -44,7 +44,7 @@ class DeviceInfoService {
   // Uygulama versiyonunu döndürür
   String getAppVersion() {
     _ensureInitialized();
-    return _packageInfo?.version ?? '1.0.0';
+    return _packageInfo?.version ?? '1.0.1';
   }
 
   // Uygulama build numarasını döndürür

@@ -28,10 +28,10 @@ class VersionCheckService {
 
       // Varsayılan değerler
       await _remoteConfig.setDefaults({
-        'min_ios_version': '1.0.0',
-        'min_android_version': '1.0.0',
-        'current_ios_version': '1.0.0',
-        'current_android_version': '1.0.0',
+        'min_ios_version': '1.0.1',
+        'min_android_version': '1.0.1',
+        'current_ios_version': '1.0.1',
+        'current_android_version': '1.0.1',
         'force_update_ios': false,
         'force_update_android': false,
         'update_message_ios': 'Yeni bir sürüm mevcut! Güncellemek için App Store\'a gidin.',
@@ -63,10 +63,10 @@ class VersionCheckService {
       
       // Varsayılan değerleri tekrar ayarla
       await _remoteConfig.setDefaults({
-        'min_ios_version': '1.0.0',
-        'min_android_version': '1.0.0',
-        'current_ios_version': '1.0.0',
-        'current_android_version': '1.0.0',
+        'min_ios_version': '1.0.1',
+        'min_android_version': '1.0.1',
+        'current_ios_version': '1.0.1',
+        'current_android_version': '1.0.1',
         'force_update_ios': false,
         'force_update_android': false,
         'update_message_ios': 'Yeni bir sürüm mevcut! Güncellemek için App Store\'a gidin.',
