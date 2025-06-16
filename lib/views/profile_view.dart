@@ -1360,63 +1360,95 @@ class _EditProfileViewState extends State<EditProfileView> {
   
   // Profil fotoğrafı seçme
   Future<void> _pickProfileImage() async {
+    // Eğer zaten yükleme işlemi devam ediyorsa, yeni bir işlem başlatma
+    if (_isLoadingImage) return;
+    
     try {
-      final XFile? pickedImage = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 70,
-      );
-      
-      if (pickedImage == null) return;
-      
       setState(() {
         _isLoadingImage = true;
       });
       
-      // Resmi kırp
-      final croppedFile = await _cropImage(File(pickedImage.path));
-      if (croppedFile == null) {
+      final XFile? pickedImage = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+        maxWidth: 1024,
+        maxHeight: 1024,
+      );
+      
+      if (pickedImage == null) {
         setState(() {
           _isLoadingImage = false;
         });
         return;
       }
       
-      // Dosyayı base64'e dönüştür
-      final bytes = await croppedFile.readAsBytes();
-      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-      
-      setState(() {
-        _profileImageBase64 = base64Image;
-        _isLoadingImage = false;
-      });
+      // Android'de image_cropper sorunları nedeniyle basit bir yeniden boyutlandırma kullan
+      if (Platform.isAndroid) {
+        await _processImageForAndroid(File(pickedImage.path));
+      } else {
+        // iOS'ta normal kırpma işlemi
+        final croppedFile = await _cropImage(File(pickedImage.path));
+        if (croppedFile != null) {
+          await _convertImageToBase64(croppedFile);
+        }
+      }
       
     } catch (e) {
       _logger.e('Profil fotoğrafı seçilirken hata: $e');
-      setState(() {
-        _isLoadingImage = false;
-      });
-      _showErrorMessage('Görsel seçilirken bir hata oluştu: ${e.toString()}');
+      if (mounted) {
+        _showErrorMessage('Görsel seçilirken bir hata oluştu. Lütfen tekrar deneyin.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingImage = false;
+        });
+      }
     }
   }
   
-  // Resmi kırpma
+  // Android için basit resim işleme
+  Future<void> _processImageForAndroid(File imageFile) async {
+    try {
+      // Sadece base64'e çevir, kırpma işlemi yapmadan
+      await _convertImageToBase64(imageFile);
+    } catch (e) {
+      _logger.e('Android resim işleme hatası: $e');
+      throw e;
+    }
+  }
+  
+  // Resmi base64'e çevir
+  Future<void> _convertImageToBase64(File imageFile) async {
+    try {
+      final bytes = await imageFile.readAsBytes();
+      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      
+      if (mounted) {
+        setState(() {
+          _profileImageBase64 = base64Image;
+        });
+      }
+    } catch (e) {
+      _logger.e('Base64 dönüştürme hatası: $e');
+      throw e;
+    }
+  }
+  
+  // Resmi kırpma (sadece iOS için)
   Future<File?> _cropImage(File imageFile) async {
     try {
+      // iOS için image cropper kullan
       final croppedFile = await ImageCropper().cropImage(
         sourcePath: imageFile.path,
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        compressQuality: 70,
+        compressQuality: 80,
         compressFormat: ImageCompressFormat.jpg,
         uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Profil Fotoğrafını Düzenle',
-            toolbarColor: Colors.blue,
-            toolbarWidgetColor: Colors.white,
-            lockAspectRatio: true,
-          ),
           IOSUiSettings(
             title: 'Profil Fotoğrafını Düzenle',
             aspectRatioLockEnabled: true,
+            resetAspectRatioEnabled: false,
           ),
         ],
       );
@@ -1424,7 +1456,7 @@ class _EditProfileViewState extends State<EditProfileView> {
       return croppedFile != null ? File(croppedFile.path) : null;
     } catch (e) {
       _logger.e('Resim kırpılırken hata: $e');
-      return null;
+      return imageFile; // Hata durumunda orijinal dosyayı döndür
     }
   }
   

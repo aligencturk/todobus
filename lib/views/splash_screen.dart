@@ -37,13 +37,19 @@ class _SplashScreenState extends State<SplashScreen> {
     }
     
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Container(
         width: double.infinity,
         height: double.infinity,
         decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/splash.png'),
-            fit: BoxFit.cover,
+          color: Colors.white,
+        ),
+        child: Center(
+          child: Image.asset(
+            'assets/splash.png',
+            fit: BoxFit.contain,
+            width: MediaQuery.of(context).size.width * 0.6,
+            height: MediaQuery.of(context).size.height * 0.3,
           ),
         ),
       ),

@@ -70,10 +70,8 @@ class _EditProjectViewState extends State<EditProjectView> {
         _isLoadingStatuses = true;
       });
       
-      final statuses = await Provider.of<GroupViewModel>(context, listen: false).getProjectStatuses();
       
       setState(() {
-        _projectStatuses = statuses;
         _isLoadingStatuses = false;
       });
     } catch (e) {

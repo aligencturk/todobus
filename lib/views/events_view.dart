@@ -67,11 +67,11 @@ class _EventsViewState extends State<EventsView> {
       if (eventViewModel == null) return;
       
       if (_selectedEventType == 0) {
-        await eventViewModel.loadEvents(groupID: widget.groupID);
+          await eventViewModel.loadEvents(groupID: widget.groupID, includeCompanyEvents: true);
       } else if (_selectedEventType == 1) {
         await eventViewModel.loadEvents(groupID: widget.groupID, includeCompanyEvents: false);
       } else if (_selectedEventType == 2) {
-        await eventViewModel.loadEvents(groupID: 1);
+        await eventViewModel.loadEvents(groupID: 1, includeCompanyEvents: false);
       }
       
       if (!mounted) return;

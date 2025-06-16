@@ -279,7 +279,7 @@ class _MyAppState extends State<MyApp> {
       ],
       child: PlatformProvider(
         settings: PlatformSettingsData(
-          iosUsesMaterialWidgets: true,
+          iosUsesMaterialWidgets: false,
         ),
         builder: (context) => MediaQuery(
           data: MediaQuery.of(context).copyWith(
@@ -299,8 +299,23 @@ class _MyAppState extends State<MyApp> {
             ],
             theme: ThemeData(
               colorSchemeSeed: Colors.blue,
-              useMaterial3: true,
+              useMaterial3: false,
+              brightness: Brightness.light,
+              appBarTheme: const AppBarTheme(
+                centerTitle: true,
+                elevation: 1,
+              ),
+              bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+                type: BottomNavigationBarType.fixed,
+                elevation: 8,
+              ),
             ),
+            darkTheme: ThemeData(
+              colorSchemeSeed: Colors.blue,
+              useMaterial3: false,
+              brightness: Brightness.dark,
+            ),
+            themeMode: ThemeMode.system,
             scaffoldMessengerKey: SnackBarService.scaffoldMessengerKey,
             navigatorKey: BaseApiService.navigatorKey,
             routes: {

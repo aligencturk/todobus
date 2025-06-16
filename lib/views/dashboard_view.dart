@@ -65,7 +65,6 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
   
   List<GroupLog> _recentLogs = [];
   bool _isLoadingLogs = false;
-  bool _isRefreshing = false;
   int _unreadNotifications = 0;
   
   List<Map<String, dynamic>> _userProjects = [];
@@ -691,27 +690,11 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
     EventViewModel eventViewModel,
     bool isIOS
   ) {
-    return CustomScrollView(
+    final scrollView = CustomScrollView(
       slivers: [
         if (isIOS)
           CupertinoSliverRefreshControl(
             onRefresh: _refreshData,
-          )
-        else
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 10.0, bottom: 5.0),
-              child: Center(
-                child: _isRefreshing
-                  ? const CupertinoActivityIndicator()
-                  : PlatformIconButton(
-                      icon: Icon(context.platformIcons.refresh),
-                      onPressed: () async {
-                        await _refreshData();
-                      },
-                    ),
-              ),
-            ),
           ),
         
         // Widget'ları sıraya göre oluştur
@@ -722,6 +705,16 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
         ),
       ]
     );
+
+    // Android için RefreshIndicator kullan
+    if (isIOS) {
+      return scrollView;
+    } else {
+      return RefreshIndicator(
+        onRefresh: _refreshData,
+        child: scrollView,
+      );
+    }
   }
   
   // Widget'ları belirlenen sıraya göre oluşturma
@@ -1888,11 +1881,7 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
 
   // Verileri yenileme - optimize edilmiş
   Future<void> _refreshData() async {
-    if (!mounted || _isRefreshing) return;
-    
-    setState(() {
-      _isRefreshing = true;
-    });
+    if (!mounted) return;
     
     _logger.i('Veriler yenileniyor...');
     
@@ -1929,13 +1918,6 @@ class _DashboardViewState extends State<DashboardView> with TickerProviderStateM
       if (mounted) {
         _logger.e('Veriler yenilenirken hata: $e');
         _snackBarService.showError('Veriler yenilenirken hata oluştu');
-      }
-    } finally {
-      // Her durumda refresh state'ini sıfırla ve UI'ı güncelle
-      if (mounted) {
-        setState(() {
-          _isRefreshing = false;
-        });
       }
     }
   }

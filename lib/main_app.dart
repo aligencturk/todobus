@@ -81,6 +81,9 @@ class MainAppState extends State<MainApp> {
           material: (_, __) => MaterialNavBarData(
             type: BottomNavigationBarType.fixed,
             selectedItemColor: Theme.of(context).colorScheme.primary,
+            unselectedItemColor: Colors.grey,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            elevation: 8,
           ),
           cupertino: (_, __) => CupertinoTabBarData(
             activeColor: CupertinoColors.activeBlue,
