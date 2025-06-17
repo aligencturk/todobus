@@ -60,6 +60,9 @@ class NotificationService {
       // User topic subscription'ı background'da yap
       _subscribeToUserTopic();
       
+      // Tüm kullanıcıları "all_users" topic'ine abone et
+      await subscribeToAllUsersNotifications();
+      
       _logger.i('✅ NotificationService başarıyla başlatıldı');
     } catch (e) {
       _logger.e('❌ NotificationService başlatılamadı: $e');
@@ -536,5 +539,47 @@ class NotificationService {
     }
     
     _logger.i('==========================================');
+  }
+  
+  /// Herkese güncelleme bildirimi gönder (Admin için)
+  Future<void> sendUpdateNotificationToAll({
+    required String title,
+    required String body,
+    String? version,
+  }) async {
+    try {
+      _logger.i('📢 Herkese güncelleme bildirimi gönderiliyor...');
+      
+      // "all_users" topic'ine bildirim gönder
+      await _firebaseMessaging.subscribeToTopic('all_users');
+      
+      // Bildirim payload'ı hazırla
+      final notificationPayload = {
+        'title': title,
+        'body': body,
+        'type': 'update_notification',
+        'version': version ?? '1.0.1',
+        'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+      };
+      
+      _logger.i('✅ Güncelleme bildirimi hazırlandı');
+      _logger.i('📝 Payload: $notificationPayload');
+      
+      // Not: Gerçek gönderim Firebase Console'dan veya backend'den yapılır
+      // Bu fonksiyon sadece topic subscription için
+   
+    } catch (e) {
+      _logger.e('❌ Güncelleme bildirimi gönderilirken hata: $e');
+    }
+  }
+  
+  /// Tüm kullanıcıları "all_users" topic'ine abone et
+  Future<void> subscribeToAllUsersNotifications() async {
+    try {
+      await _firebaseMessaging.subscribeToTopic('all_users');
+      _logger.i('✅ "all_users" topic\'ine abone olundu');
+    } catch (e) {
+      _logger.e('❌ Topic aboneliği hatası: $e');
+    }
   }
 } 

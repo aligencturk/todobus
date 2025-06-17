@@ -70,8 +70,10 @@ class _EditProjectViewState extends State<EditProjectView> {
         _isLoadingStatuses = true;
       });
       
+      final statuses = await Provider.of<GroupViewModel>(context, listen: false).getProjectStatuses();
       
       setState(() {
+        _projectStatuses = statuses;
         _isLoadingStatuses = false;
       });
     } catch (e) {
@@ -412,6 +414,7 @@ class _EditProjectViewState extends State<EditProjectView> {
   
   // Seçili durum rengini döndür
   String _getSelectedStatusColor() {
+    if (_projectStatuses.isEmpty) return '#007AFF';
     final status = _projectStatuses.firstWhere(
       (s) => s.statusID == _selectedStatus,
       orElse: () => _projectStatuses.first,
@@ -421,11 +424,19 @@ class _EditProjectViewState extends State<EditProjectView> {
   
   // Seçili durum adını döndür
   String _getSelectedStatusName() {
+    if (_projectStatuses.isEmpty) return 'Seçiniz';
     final status = _projectStatuses.firstWhere(
       (s) => s.statusID == _selectedStatus,
       orElse: () => _projectStatuses.first,
     );
     return status.statusName;
+  }
+  
+  // Picker için başlangıç index'ini döndür
+  int _getInitialPickerIndex() {
+    if (_projectStatuses.isEmpty) return 0;
+    final index = _projectStatuses.indexWhere((s) => s.statusID == _selectedStatus);
+    return index >= 0 ? index : 0;
   }
   
   // iOS için durum seçici
@@ -453,7 +464,7 @@ class _EditProjectViewState extends State<EditProjectView> {
             Expanded(
               child: CupertinoPicker(
                 scrollController: FixedExtentScrollController(
-                  initialItem: _projectStatuses.indexWhere((s) => s.statusID == _selectedStatus),
+                  initialItem: _getInitialPickerIndex(),
                 ),
                 itemExtent: 40,
                 onSelectedItemChanged: (index) {

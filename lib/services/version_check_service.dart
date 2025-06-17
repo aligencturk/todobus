@@ -26,21 +26,6 @@ class VersionCheckService {
         minimumFetchInterval: const Duration(hours: 1),
       ));
 
-      // Varsayılan değerler
-      await _remoteConfig.setDefaults({
-        'min_ios_version': '1.0.1',
-        'min_android_version': '1.0.1',
-        'current_ios_version': '1.0.1',
-        'current_android_version': '1.0.1',
-        'force_update_ios': false,
-        'force_update_android': false,
-        'update_message_ios': 'Yeni bir sürüm mevcut! Güncellemek için App Store\'a gidin.',
-        'update_message_android': 'Yeni bir sürüm mevcut! Güncellemek için Play Store\'a gidin.',
-        'force_update_message': 'Bu sürüm artık desteklenmiyor. Uygulamayı güncellemeden devam edemezsiniz.',
-        'ios_store_url': 'https://apps.apple.com/app/todobus/id6738289053',
-        'android_store_url': 'https://play.google.com/store/apps/details?id=com.rivorya.todobus',
-      });
-
       // Remote Config verilerini getir
       await _remoteConfig.fetchAndActivate();
       
@@ -50,41 +35,7 @@ class VersionCheckService {
     }
   }
 
-  /// Remote Config cache'ini temizle ve varsayılan değerleri yeniden yükle
-  Future<void> resetToDefaults() async {
-    try {
-      _logger.i('🔄 Remote Config sıfırlanıyor...');
-      
-      // Cache'i temizle
-      await _remoteConfig.setConfigSettings(RemoteConfigSettings(
-        fetchTimeout: const Duration(minutes: 1),
-        minimumFetchInterval: Duration.zero, // Hemen fetch etmek için
-      ));
-      
-      // Varsayılan değerleri tekrar ayarla
-      await _remoteConfig.setDefaults({
-        'min_ios_version': '1.0.1',
-        'min_android_version': '1.0.1',
-        'current_ios_version': '1.0.1',
-        'current_android_version': '1.0.1',
-        'force_update_ios': false,
-        'force_update_android': false,
-        'update_message_ios': 'Yeni bir sürüm mevcut! Güncellemek için App Store\'a gidin.',
-        'update_message_android': 'Yeni bir sürüm mevcut! Güncellemek için Play Store\'a gidin.',
-        'force_update_message': 'Bu sürüm artık desteklenmiyor. Uygulamayı güncellemeden devam edemezsiniz.',
-        'ios_store_url': 'https://apps.apple.com/app/todobus/id6738289053',
-        'android_store_url': 'https://play.google.com/store/apps/details?id=com.rivorya.todobus',
-      });
-      
-      // Yeni verilerle fetch et
-      await _remoteConfig.fetchAndActivate();
-      
-      _logger.i('✅ Remote Config başarıyla sıfırlandı');
-      
-    } catch (e) {
-      _logger.e('❌ Remote Config sıfırlanırken hata: $e');
-    }
-  }
+
 
   /// Sürüm kontrolü yap ve gerekirse güncelleme bildirimi göster
   Future<void> checkForUpdates(BuildContext context) async {
@@ -145,22 +96,17 @@ class VersionCheckService {
         }
       }
       
-      if (isBelowMinimum || forceUpdate) {
-        // Zorla güncelleme
+      if (isBelowMinimum) {
+        // Zorla güncelleme - sadece minimum sürümün altındakiler için
         _logger.w('⚠️ ZORLA GÜNCELLEME GEREKİYOR!');
         _logger.w('  Sebep - Minimum altında: $isBelowMinimum');
-        _logger.w('  Sebep - Zorla güncelleme: $forceUpdate');
+        _logger.w('  Mevcut sürüm: $currentVersion, Minimum: $minVersion');
         if (context.mounted) {
           await _showForceUpdateDialog(context, platform);
         }
-      } else if (needsUpdate) {
-        // Opsiyonel güncelleme
-        _logger.i('📱 Opsiyonel güncelleme mevcut');
-        if (context.mounted) {
-          await _showOptionalUpdateDialog(context, platform);
-        }
       } else {
-        _logger.i('✅ Uygulama güncel');
+        // Minimum sürüm veya üzeri - hiçbir güncelleme gösterme
+        _logger.i('✅ Uygulama güncel (v$currentVersion) - hiçbir güncelleme bildirimi gösterilmeyecek');
       }
       
     } catch (e) {
@@ -240,64 +186,6 @@ class VersionCheckService {
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-            ),
-          ],
-        ),
-      );
-    }
-  }
-
-  /// Opsiyonel güncelleme dialogu
-  Future<void> _showOptionalUpdateDialog(BuildContext context, String platform) async {
-    // Kullanıcı daha önce bu sürüm için "Sonra hatırlat" demiş mi kontrol et
-    final skipVersion = _storageService.getData('skip_update_version');
-    final remoteVersion = _remoteConfig.getString('current_${platform}_version');
-    
-    if (skipVersion == remoteVersion) {
-      _logger.i('📱 Kullanıcı bu sürüm için güncelleme bildirimi atlamış');
-      return;
-    }
-    
-    final message = _remoteConfig.getString('update_message_$platform');
-    
-    if (context.mounted) {
-      await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.update, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Güncelleme Mevcut'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(message),
-              const SizedBox(height: 16),
-              Text(
-                'Yeni sürüm: $remoteVersion',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Bu sürüm için bir süre hatırlatma
-                _storageService.saveData('skip_update_version', remoteVersion);
-              },
-              child: const Text('Sonra Hatırlat'),
-            ),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _openStore(platform);
-              },
-              icon: const Icon(Icons.open_in_new),
-              label: const Text('Güncelle'),
             ),
           ],
         ),

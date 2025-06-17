@@ -1,4 +1,4 @@
- import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
@@ -188,9 +188,7 @@ Future<void> _initializeSpellingCorrection(LoggerService logger) async {
 Future<void> _initializeVersionCheck(LoggerService logger) async {
   final versionCheckService = VersionCheckService();
   await versionCheckService.initialize();
-  // Remote Config'i sıfırla ve varsayılan değerleri yükle
-  await versionCheckService.resetToDefaults();
-  logger.i('Version check servisi başlatıldı ve sıfırlandı');
+  logger.i('Version check servisi başlatıldı');
 }
 
 class MyApp extends StatefulWidget {
