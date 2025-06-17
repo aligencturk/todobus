@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../firebase_options.dart';
 import 'user_service.dart';
 import 'logger_service.dart';
@@ -291,6 +292,14 @@ class NotificationService {
       
       if (response.payload != null) {
         final data = jsonDecode(response.payload!);
+        
+        // Background'dan gelen URL'yi kontrol et
+        final backgroundUrl = data['notification_url'] as String?;
+        if (backgroundUrl != null && backgroundUrl.isNotEmpty) {
+          _launchUrl(backgroundUrl);
+          return;
+        }
+        
         _processNotificationData(data);
         onNotificationTap?.call(data);
       }
@@ -317,8 +326,15 @@ class NotificationService {
         final parsedData = jsonDecode(keysAndValues);
         final notificationType = parsedData['type'] as String?;
         final id = parsedData['id'];
+        final url = parsedData['url'] as String?;
         
-        _logger.i('📌 Bildirim tipi: $notificationType, ID: $id');
+        _logger.i('📌 Bildirim tipi: $notificationType, ID: $id, URL: $url');
+        
+        // URL varsa aç
+        if (url != null && url.isNotEmpty) {
+          _launchUrl(url);
+          return;
+        }
         
         // Bildirim tipine göre navigasyon
         switch (notificationType) {
@@ -337,6 +353,21 @@ class NotificationService {
       }
     } catch (e) {
       _logger.e('❌ Bildirim data işleme hatası: $e');
+    }
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      _logger.i('🔗 Push notification URL açılıyor: $url');
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        _logger.i('✅ URL başarıyla açıldı');
+      } else {
+        _logger.e('❌ URL açılamadı: $url');
+      }
+    } catch (e) {
+      _logger.e('❌ Push notification URL açma hatası: $e');
     }
   }
   

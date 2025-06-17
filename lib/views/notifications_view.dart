@@ -4,6 +4,7 @@ import '../models/notification_model.dart';
 import '../services/notification_service.dart';
 import '../services/logger_service.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class NotificationsView extends StatefulWidget {
   const NotificationsView({Key? key}) : super(key: key);
@@ -56,6 +57,30 @@ class _NotificationsViewState extends State<NotificationsView> {
       return DateFormat('dd MMM yyyy, HH:mm', 'tr_TR').format(date);
     } catch (e) {
       return dateStr;
+    }
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      _logger.i('URL açılıyor: $url');
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _logger.e('URL açılamadı: $url');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Bu bağlantı açılamadı: $url')),
+          );
+        }
+      }
+    } catch (e) {
+      _logger.e('URL açma hatası: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Bağlantı açılırken hata oluştu')),
+        );
+      }
     }
   }
 
@@ -181,7 +206,7 @@ class _NotificationsViewState extends State<NotificationsView> {
                   onTap: () {
                     _logger.i('Bildirime tıklandı: ${notification.id}');
                     if (notification.url != null && notification.url!.isNotEmpty) {
-                      _logger.i('Bildirim yönlendirmesi: ${notification.url}');
+                      _launchUrl(notification.url!);
                     }
                   },
                   child: Padding(

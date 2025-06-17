@@ -41,6 +41,12 @@ class _EditProjectViewState extends State<EditProjectView> {
   List<ProjectStatus> _projectStatuses = [];
   bool _isLoadingStatuses = true;
   
+  // Kullanıcı seçimi için
+  List<GroupUser> _groupUsers = [];
+  List<ProjectUser> _currentProjectUsers = [];
+  Set<int> _selectedUserIds = <int>{};
+  bool _isLoadingUsers = true;
+  
   // Tarih seçimi
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now().add(const Duration(days: 7));
@@ -50,9 +56,11 @@ class _EditProjectViewState extends State<EditProjectView> {
     super.initState();
     _initializeData();
     
-    // UI oluşturma işlemi tamamlandıktan sonra API çağrısı yap
+    // UI oluşturma işlemi tamamlandıktan sonra API çağrıları yap
     Future.microtask(() {
       _loadProjectStatuses();
+      _loadGroupUsers();
+      _loadProjectDetail();
     });
   }
   
@@ -81,6 +89,44 @@ class _EditProjectViewState extends State<EditProjectView> {
       setState(() {
         _isLoadingStatuses = false;
       });
+    }
+  }
+
+  // Grup kullanıcılarını yükle
+  Future<void> _loadGroupUsers() async {
+    try {
+      setState(() {
+        _isLoadingUsers = true;
+      });
+      
+      final users = await Provider.of<GroupViewModel>(context, listen: false).getGroupUsers(widget.groupId);
+      
+      setState(() {
+        _groupUsers = users;
+        _isLoadingUsers = false;
+      });
+    } catch (e) {
+      _logger.e('Grup kullanıcıları yüklenirken hata: $e');
+      setState(() {
+        _isLoadingUsers = false;
+      });
+    }
+  }
+
+  // Proje detaylarını yükle
+  Future<void> _loadProjectDetail() async {
+    try {
+      final projectDetail = await Provider.of<GroupViewModel>(context, listen: false)
+          .getProjectDetail(widget.projectId, widget.groupId);
+      
+      if (projectDetail != null) {
+        setState(() {
+          _currentProjectUsers = projectDetail.users;
+          _selectedUserIds = projectDetail.users.map((user) => user.userID).toSet();
+        });
+      }
+    } catch (e) {
+      _logger.e('Proje detayları yüklenirken hata: $e');
     }
   }
   
@@ -125,6 +171,13 @@ class _EditProjectViewState extends State<EditProjectView> {
       });
       return;
     }
+
+    if (_selectedUserIds.isEmpty) {
+      setState(() {
+        _errorMessage = 'En az bir kullanıcı seçmelisiniz';
+      });
+      return;
+    }
     
     setState(() {
       _isLoading = true;
@@ -132,17 +185,15 @@ class _EditProjectViewState extends State<EditProjectView> {
     });
     
     try {
-      // Mevcut proje detaylarını al (mevcut üyeleri korumak için)
-      final projectDetail = await Provider.of<GroupViewModel>(context, listen: false)
-          .getProjectDetail(widget.projectId, widget.groupId);
-      
-      // Mevcut kullanıcıları List<Map<String, dynamic>> formatına dönüştür
-      List<Map<String, dynamic>>? currentUsers;
-      if (projectDetail != null && projectDetail.users.isNotEmpty) {
-        currentUsers = projectDetail.users.map((user) => {
-          'userID': user.userID,
-          'userRole': user.userRoleID,
-        }).toList();
+      // Seçilen kullanıcıları List<Map<String, dynamic>> formatına dönüştür
+      List<Map<String, dynamic>> selectedUsers = [];
+      for (int userId in _selectedUserIds) {
+        // Mevcut kullanıcı ise rolünü koru, yeni kullanıcı ise varsayılan rol ver
+        final existingUser = _currentProjectUsers.where((user) => user.userID == userId).firstOrNull;
+        selectedUsers.add({
+          'userID': userId,
+          'userRole': existingUser?.userRoleID ?? 2, // Varsayılan olarak Üye (2)
+        });
       }
       
       final success = await Provider.of<GroupViewModel>(context, listen: false).updateProject(
@@ -153,7 +204,7 @@ class _EditProjectViewState extends State<EditProjectView> {
         projectDesc,
         _formatDate(_startDate),
         _formatDate(_endDate),
-        currentUsers, // Mevcut kullanıcıları koru
+        selectedUsers,
       );
       
       if (success && mounted) {
@@ -234,6 +285,8 @@ class _EditProjectViewState extends State<EditProjectView> {
                     _buildStatusSelector(context),
                     const SizedBox(height: 16),
                     _buildDateSelectors(context),
+                    const SizedBox(height: 16),
+                    _buildUserSelector(context),
                     const SizedBox(height: 24),
                     PlatformElevatedButton(
                       onPressed: _updateProject,
@@ -420,6 +473,145 @@ class _EditProjectViewState extends State<EditProjectView> {
                       }
                     },
                   ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildUserSelector(BuildContext context) {
+    final isIOS = isCupertino(context);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Proje Üyeleri *',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isIOS ? CupertinoColors.secondaryLabel : Colors.grey[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        if (_isLoadingUsers)
+          Center(
+            child: PlatformCircularProgressIndicator(),
+          )
+        else if (_groupUsers.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: isIOS ? CupertinoColors.systemGrey4 : Colors.grey.shade300,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text('Grup üyeleri yüklenemedi'),
+          )
+        else
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: isIOS ? CupertinoColors.systemGrey4 : Colors.grey.shade300,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              children: [
+                // Seçilen kullanıcı sayısını göster
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isIOS 
+                        ? CupertinoColors.systemGrey6 
+                        : Colors.grey.shade100,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      topRight: Radius.circular(8),
+                    ),
+                  ),
+                  child: Text(
+                    '${_selectedUserIds.length} kullanıcı seçildi',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isIOS 
+                          ? CupertinoColors.secondaryLabel 
+                          : Colors.grey[600],
+                    ),
+                  ),
+                ),
+                // Kullanıcı listesi
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _groupUsers.length,
+                  itemBuilder: (context, index) {
+                    final user = _groupUsers[index];
+                    final isSelected = _selectedUserIds.contains(user.userID);
+                    
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: user.isAdmin 
+                            ? (isIOS ? CupertinoColors.activeBlue : Colors.blue).withOpacity(0.2) 
+                            : (isIOS ? CupertinoColors.systemGrey : Colors.grey).withOpacity(0.2),
+                        backgroundImage: user.profilePhoto.isNotEmpty
+                            ? NetworkImage(user.profilePhoto)
+                            : null,
+                        child: user.profilePhoto.isEmpty
+                            ? Text(
+                                user.userName.isNotEmpty 
+                                  ? user.userName.substring(0, 1).toUpperCase()
+                                  : '?',
+                                style: TextStyle(
+                                  color: user.isAdmin 
+                                      ? (isIOS ? CupertinoColors.activeBlue : Colors.blue)
+                                      : (isIOS ? CupertinoColors.systemGrey : Colors.grey),
+                                ),
+                              )
+                            : null,
+                      ),
+                      title: Text(user.userName),
+                      subtitle: Text(user.isAdmin ? 'Yönetici' : 'Üye'),
+                      trailing: isIOS
+                          ? CupertinoSwitch(
+                              value: isSelected,
+                              onChanged: (value) {
+                                setState(() {
+                                  if (value) {
+                                    _selectedUserIds.add(user.userID);
+                                  } else {
+                                    _selectedUserIds.remove(user.userID);
+                                  }
+                                });
+                              },
+                            )
+                          : Checkbox(
+                              value: isSelected,
+                              onChanged: (value) {
+                                setState(() {
+                                  if (value == true) {
+                                    _selectedUserIds.add(user.userID);
+                                  } else {
+                                    _selectedUserIds.remove(user.userID);
+                                  }
+                                });
+                              },
+                            ),
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedUserIds.remove(user.userID);
+                          } else {
+                            _selectedUserIds.add(user.userID);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
       ],
     );

@@ -2,6 +2,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -20,6 +22,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // Bildirim verilerini detaylı işle
     if (message.data.isNotEmpty) {
       debugPrint("📋 Bildirim verisi: ${message.data}");
+      
+      // URL kontrolü ve işlemi
+      await _processNotificationUrl(message.data);
       
       // Veri içinden type bilgisini al
       final dataString = message.data['keysandvalues'] as String?;
@@ -41,6 +46,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         case 'comment_added':
           debugPrint("💬 Yorum bildirimi");
           break;
+        case 'group_invate':
+          debugPrint("👥 Grup davet bildirimi");
+          break;
         default:
           debugPrint("ℹ️ Genel bildirim");
       }
@@ -51,6 +59,25 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     
   } catch (e) {
     debugPrint("❌ Background bildirim işleme hatası: $e");
+  }
+}
+
+Future<void> _processNotificationUrl(Map<String, dynamic> data) async {
+  try {
+    // keysandvalues içindeki veriyi parse et
+    final keysAndValues = data['keysandvalues'] as String?;
+    if (keysAndValues != null) {
+      final parsedData = jsonDecode(keysAndValues);
+      final url = parsedData['url'] as String?;
+      
+      if (url != null && url.isNotEmpty) {
+        debugPrint("🔗 Background notification URL bulundu: $url");
+        // URL'yi payload olarak local notification'a ekle
+        data['notification_url'] = url;
+      }
+    }
+  } catch (e) {
+    debugPrint("❌ Background URL işleme hatası: $e");
   }
 }
 
