@@ -310,12 +310,6 @@ class _MyAppState extends State<MyApp> {
                 elevation: 8,
               ),
             ),
-            darkTheme: ThemeData(
-              colorSchemeSeed: Colors.blue,
-              useMaterial3: false,
-              brightness: Brightness.dark,
-            ),
-            themeMode: ThemeMode.system,
             scaffoldMessengerKey: SnackBarService.scaffoldMessengerKey,
             navigatorKey: BaseApiService.navigatorKey,
             routes: {
