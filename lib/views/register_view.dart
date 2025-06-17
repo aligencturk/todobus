@@ -1,10 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../viewmodels/register_viewmodel.dart';
-import '../widgets/web_view_page.dart';
-import 'login_view.dart';
+
 import 'account_activation_view.dart';
 
 class RegisterView extends StatefulWidget {
@@ -274,15 +272,11 @@ class _RegisterViewState extends State<RegisterView> {
                                         children: [
                                           Flexible(
                                             child: GestureDetector(
-                                              onTap: () {
-                                                Navigator.of(context).push(
-                                                  CupertinoPageRoute(
-                                                    builder: (context) => const WebViewPage(
-                                                      url: 'https://www.todobus.tr/uyelik-sozlesmesi',
-                                                      title: 'Kullanım Koşulları',
-                                                    ),
-                                                  ),
-                                                );
+                                              onTap: () async {
+                                                final uri = Uri.parse('https://www.todobus.tr/uyelik-sozlesmesi');
+                                                if (await canLaunchUrl(uri)) {
+                                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                                }
                                               },
                                               child: RichText(
                                                 text: TextSpan(
@@ -335,15 +329,11 @@ class _RegisterViewState extends State<RegisterView> {
                                         children: [
                                           Flexible(
                                             child: GestureDetector(
-                                              onTap: () {
-                                                Navigator.of(context).push(
-                                                  CupertinoPageRoute(
-                                                    builder: (context) => const WebViewPage(
-                                                      url: 'https://www.todobus.tr/kvkk-aydinlatma-metni',
-                                                      title: 'KVKK Aydınlatma Metni',
-                                                    ),
-                                                  ),
-                                                );
+                                              onTap: () async {
+                                                final uri = Uri.parse('https://www.todobus.tr/kvkk-aydinlatma-metni');
+                                                if (await canLaunchUrl(uri)) {
+                                                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                                }
                                               },
                                               child: RichText(
                                                 text: TextSpan(

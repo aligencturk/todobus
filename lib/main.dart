@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_platform_widgets/flutter_platform_widgets.dart';
 import 'package:provider/provider.dart';
@@ -279,7 +279,7 @@ class _MyAppState extends State<MyApp> {
       ],
       child: PlatformProvider(
         settings: PlatformSettingsData(
-          iosUsesMaterialWidgets: false,
+          iosUsesMaterialWidgets: true,
         ),
         builder: (context) => MediaQuery(
           data: MediaQuery.of(context).copyWith(

@@ -48,46 +48,48 @@ class MainAppState extends State<MainApp> {
         ChangeNotifierProvider(create: (_) => ReportViewModel(), lazy: true),
         // NotificationService artık singleton olarak kullanılıyor
       ],
-      child: PlatformScaffold(
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _pages,
-        ),
-        bottomNavBar: PlatformNavBar(
-          currentIndex: _currentIndex,
-          itemChanged: (int index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          items: [
-            BottomNavigationBarItem(
-              icon: Icon(context.platformIcons.home),
-              label: 'Anasayfa',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(context.platformIcons.collections),
-              label: 'Gruplar',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(context.platformIcon(material: Icons.calendar_month, cupertino: CupertinoIcons.calendar)),
-              label: 'Etkinlikler',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(context.platformIcons.person),
-              label: 'Profil',
-            ),
-          ],
-          material: (_, __) => MaterialNavBarData(
-            type: BottomNavigationBarType.fixed,
-            selectedItemColor: Theme.of(context).colorScheme.primary,
-            unselectedItemColor: Colors.grey,
-            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            elevation: 8,
+      child: Material(
+        child: PlatformScaffold(
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _pages,
           ),
-          cupertino: (_, __) => CupertinoTabBarData(
-            activeColor: CupertinoColors.activeBlue,
-            iconSize: 24,
+          bottomNavBar: PlatformNavBar(
+            currentIndex: _currentIndex,
+            itemChanged: (int index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            items: [
+              BottomNavigationBarItem(
+                icon: Icon(context.platformIcons.home),
+                label: 'Anasayfa',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(context.platformIcons.collections),
+                label: 'Gruplar',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(context.platformIcon(material: Icons.calendar_month, cupertino: CupertinoIcons.calendar)),
+                label: 'Etkinlikler',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(context.platformIcons.person),
+                label: 'Profil',
+              ),
+            ],
+            material: (_, __) => MaterialNavBarData(
+              type: BottomNavigationBarType.fixed,
+              selectedItemColor: Theme.of(context).colorScheme.primary,
+              unselectedItemColor: Colors.grey,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              elevation: 8,
+            ),
+            cupertino: (_, __) => CupertinoTabBarData(
+              activeColor: CupertinoColors.activeBlue,
+              iconSize: 24,
+            ),
           ),
         ),
       ),
