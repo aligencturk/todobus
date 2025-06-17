@@ -1,5 +1,4 @@
 import java.util.Properties
-import java.io.File
 
 plugins {
     id("com.android.application")
@@ -7,7 +6,14 @@ plugins {
     id("com.google.gms.google-services")
     // END: FlutterFire Configuration
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("dev.flutter.flutter-gradle-plugin") // Flutter eklentisi
+}
+
+// 🔐 key.properties dosyasını oku
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -41,19 +47,36 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.rivorya.todobus"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 21
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    // ✅ Release imzalama yapılandırması
+    signingConfigs {
+        create("release") {
+            storeFile = file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+        }
+    }
+
+ signingConfigs {
+    create("release") {
+        storeFile = file("../my-key.jks") // <- bir üst klasöre çıkıyoruz
+        storePassword = "151281"
+        keyAlias = "my-key-alias"
+        keyPassword = "151281"
+    }
+}
+
+
     buildTypes {
-        release {
-            // Release build optimizasyonları
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release") // ✅ artık debug değil!
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -66,7 +89,10 @@ android {
         }
     }
 
-    // Build performansı için
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildFeatures {
         buildConfig = true
     }
