@@ -185,7 +185,7 @@ class GroupService {
   }
   
   // Kullanıcı davet et (email veya QR)
-  Future<Map<String, dynamic>> inviteUserToGroup(int groupID, String userEmail, int userRole, String inviteType) async {
+  Future<Map<String, dynamic>> inviteUserToGroup(int groupID, String userEmail, int userRole, String inviteType, {String? notificationUrl}) async {
     try {
       _logger.i('Kullanıcı gruba davet ediliyor: GroupID: $groupID, Email: $userEmail, Role: $userRole, Type: $inviteType');
       
@@ -194,15 +194,21 @@ class GroupService {
         throw Exception('Kullanıcı token bilgisi bulunamadı');
       }
       
+      final body = {
+        'userToken': token,
+        'userEmail': userEmail,
+        'userRole': userRole,
+        'groupID': groupID,
+        'invateStep': inviteType, // "email" veya "qr"
+      };
+      
+      if (notificationUrl != null) {
+        body['notificationUrl'] = notificationUrl;
+      }
+      
       final response = await _apiService.post(
         'service/user/group/InviteUser',
-        body: {
-          'userToken': token,
-          'userEmail': userEmail,
-          'userRole': userRole,
-          'groupID': groupID,
-          'invateStep': inviteType, // "email" veya "qr"
-        },
+        body: body,
         requiresToken: true,
       );
       

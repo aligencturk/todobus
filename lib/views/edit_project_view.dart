@@ -132,6 +132,19 @@ class _EditProjectViewState extends State<EditProjectView> {
     });
     
     try {
+      // Mevcut proje detaylarını al (mevcut üyeleri korumak için)
+      final projectDetail = await Provider.of<GroupViewModel>(context, listen: false)
+          .getProjectDetail(widget.projectId, widget.groupId);
+      
+      // Mevcut kullanıcıları List<Map<String, dynamic>> formatına dönüştür
+      List<Map<String, dynamic>>? currentUsers;
+      if (projectDetail != null && projectDetail.users.isNotEmpty) {
+        currentUsers = projectDetail.users.map((user) => {
+          'userID': user.userID,
+          'userRole': user.userRoleID,
+        }).toList();
+      }
+      
       final success = await Provider.of<GroupViewModel>(context, listen: false).updateProject(
         widget.groupId,
         widget.projectId,
@@ -140,7 +153,7 @@ class _EditProjectViewState extends State<EditProjectView> {
         projectDesc,
         _formatDate(_startDate),
         _formatDate(_endDate),
-        [],
+        currentUsers, // Mevcut kullanıcıları koru
       );
       
       if (success && mounted) {

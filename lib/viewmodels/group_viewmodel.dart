@@ -224,7 +224,8 @@ class GroupViewModel with ChangeNotifier {
     int groupID, 
     String userEmail, 
     int userRole, 
-    String inviteType
+    String inviteType,
+    {String? notificationUrl}
   ) async {
     try {
       _status = GroupLoadStatus.loading;
@@ -235,7 +236,8 @@ class GroupViewModel with ChangeNotifier {
         groupID, 
         userEmail, 
         userRole, 
-        inviteType
+        inviteType,
+        notificationUrl: notificationUrl
       );
       
       _status = GroupLoadStatus.loaded;

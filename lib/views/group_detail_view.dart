@@ -1000,7 +1000,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       _safeSetState(() => _isLoading = true);
       
       final result = await Provider.of<GroupViewModel>(context, listen: false)
-          .inviteUserToGroup(widget.groupId, email, role, 'qr');
+          .inviteUserToGroup(widget.groupId, email, role, 'qr', notificationUrl: 'https://www.todobus.tr/invite-accept');
       
       if (!mounted || _isDisposed) return;
       
@@ -1046,7 +1046,7 @@ class _GroupDetailViewState extends State<GroupDetailView> {
       _safeSetState(() => _isLoading = true);
       
       final result = await Provider.of<GroupViewModel>(context, listen: false)
-          .inviteUserToGroup(widget.groupId, email, role, 'email');
+          .inviteUserToGroup(widget.groupId, email, role, 'email', notificationUrl: 'https://www.todobus.tr/invite-accept');
       
       if (!mounted || _isDisposed) return;
       
