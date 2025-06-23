@@ -42,26 +42,25 @@ android {
     // ✅ Release imzalama yapılandırması
     signingConfigs {
         create("release") {
-            storeFile = file("../my-key.jks")
-            storePassword = "151281"
-            keyAlias = "my-key-alias"
-            keyPassword = "151281"
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file("my-key.jks") // android/app/ klasöründe
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
         }
     }
 
 
     buildTypes {
         getByName("release") {
-            signingConfig = signingConfigs.getByName("release") // ✅ artık debug değil!
+            signingConfig = signingConfigs.getByName("release") // Production key kullanılıyor
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-           
         }
     }
 
