@@ -14,7 +14,6 @@ val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
-    id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
@@ -27,20 +26,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_1_8
         isCoreLibraryDesugaringEnabled = true
     }
-
-    signingConfigs {
-    create("release") {
-        val keystoreProperties = Properties().apply {
-            load(File(rootDir, "key.properties").inputStream())
-        }
-
-        keyAlias = keystoreProperties["keyAlias"] as String
-        keyPassword = keystoreProperties["keyPassword"] as String
-        storeFile = file(keystoreProperties["storeFile"] as String)
-        storePassword = keystoreProperties["storePassword"] as String
-    }
-}
-
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_1_8.toString()
@@ -57,21 +42,12 @@ android {
     // ✅ Release imzalama yapılandırması
     signingConfigs {
         create("release") {
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = file("../my-key.jks")
+            storePassword = "151281"
+            keyAlias = "my-key-alias"
+            keyPassword = "151281"
         }
     }
-
- signingConfigs {
-    create("release") {
-        storeFile = file("../my-key.jks") // <- bir üst klasöre çıkıyoruz
-        storePassword = "151281"
-        keyAlias = "my-key-alias"
-        keyPassword = "151281"
-    }
-}
 
 
     buildTypes {
@@ -87,10 +63,6 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
            
         }
-    }
-
-    buildFeatures {
-        buildConfig = true
     }
 
     buildFeatures {
