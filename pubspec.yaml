@@ -49,11 +49,6 @@ dependencies:
   # Localization
   flutter_localizations:
     sdk: flutter
-<<<<<<< HEAD
-  intl: 0.20.2
-=======
-  intl: ^0.20.2
->>>>>>> 465dcc0b96106ecdae3371c88585858390f6072e
   intl: ^0.20.2
   
   # UI Components - Sadece gerçekten kullanılanlar
